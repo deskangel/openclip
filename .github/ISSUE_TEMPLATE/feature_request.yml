@@ -1,29 +1,45 @@
 name: Feature Request
 description: Suggest an idea, enhancement, or new native capability for OpenClip.
 title: "[Feature]: "
-labels: ["enhancement"]
+labels: ["enhancement", "status:needs-triage"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        **Before you file:** search [open issues and discussions](https://github.com/ganeshmshetty/openclip/issues?q=is%3Aissue+) — an
+        existing discussion may already have shaped this.
+
+        Want to add or fix an *extension*? That belongs in
+        [openclip-extensions](https://github.com/ganeshmshetty/openclip-extensions) — the catalog is a
+        separate repository, and most feature requests are better solved as a package than as a
+        change to the app.
+
   - type: textarea
     id: problem
     attributes:
-      label: Problem Statement
-      description: Is your feature request related to a problem or limitation in OpenClip?
-      placeholder: I am always frustrated when...
+      label: The problem
+      description: What are you trying to do that OpenClip makes hard or impossible? Lead with the problem, not the solution.
+      placeholder: Every time I ...
     validations:
       required: true
 
   - type: textarea
     id: proposed-solution
     attributes:
-      label: Proposed Solution and UX
-      placeholder: Describe the desired behavior or UI changes...
+      label: What you have in mind
+      description: The behavior or UI you are imagining. Rough is fine.
+      placeholder: I would expect it to ...
     validations:
       required: true
 
+  # Identical wording to the same dropdown in bug_report.yml on purpose: .github/workflows/intake.yml
+  # maps this answer to an `area:*` label, and one shared mapping table only works if both forms
+  # offer the same eight options.
   - type: dropdown
     id: area
     attributes:
-      label: Subsystem
+      label: Affected area
+      description: Picks the `area:*` label so this can be filtered and routed.
       options:
         - Floating Popup Bar / Positioning
         - Action-Search Palette (Opt+Cmd+C)
@@ -36,10 +52,31 @@ body:
     validations:
       required: true
 
+  - type: dropdown
+    id: involvement
+    attributes:
+      label: How do you want to be involved?
+      options:
+        - Just reporting — no code changes planned
+        - Happy to reproduce and confirm this
+        - I'd like to work on this
+        - I'll send a pull request
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you have tried
+      description: Other macOS utilities that do this, or workarounds you have settled for.
+      placeholder: Currently I use ... because ...
+    validations:
+      required: false
+
   - type: textarea
     id: additional-context
     attributes:
-      label: Additional Context
-      description: Links, mockups, or references from other macOS utilities.
+      label: Mockups, links, or anything else
+      placeholder: Screenshots, gists, related issues.
     validations:
       required: false

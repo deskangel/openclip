@@ -1,18 +1,23 @@
 name: Bug Report
 description: Report a bug, crash, or unexpected behavior in OpenClip.
 title: "[Bug]: "
-labels: ["bug"]
+labels: ["bug", "status:needs-triage"]
 body:
   - type: markdown
     attributes:
       value: |
-        > **Note:** If your issue is with a specific community extension (e.g. *Notion*, *Google Maps*), please open an issue in the [openclip-extensions](https://github.com/ganeshmshetty/openclip-extensions/issues) repo instead.
+        **Before you file:** search [open issues](https://github.com/ganeshmshetty/openclip/issues?q=is%3Aissue+is%3Aopen) — this form is long on purpose, but a
+        duplicate costs the reporter and the maintainer more time than a quick search.
+
+        If your issue is with a specific community extension (e.g. *Notion*, *Google Maps*), file it in
+        [openclip-extensions](https://github.com/ganeshmshetty/openclip-extensions/issues) instead — the
+        extension catalog is a separate repository.
 
   - type: textarea
     id: description
     attributes:
-      label: Description of the Bug
-      description: A clear and concise description of what happened.
+      label: What happened
+      description: A clear and concise description of the problem.
       placeholder: What went wrong?
     validations:
       required: true
@@ -20,37 +25,73 @@ body:
   - type: textarea
     id: reproduction-steps
     attributes:
-      label: Steps to Reproduce
+      label: Steps to reproduce
       placeholder: |
-        1. Open [Target App, e.g. Safari / Notes / VS Code]
-        2. Highlight the text "..."
-        3. Trigger popup (or action search Opt+Cmd+C)
-        4. Click on action "..."
-        5. See error / unexpected behavior
+        1. Open [target app, e.g. Safari / Notes / VS Code]
+        2. Select the text "..."
+        3. Trigger the popup (or action search via Opt+Cmd+C)
+        4. Choose the action "..."
+        5. Observe: the popup never appears
     validations:
       required: true
 
   - type: textarea
     id: expected-behavior
     attributes:
-      label: Expected Behavior
-      placeholder: What did you expect to happen instead?
+      label: What you expected instead
+      placeholder: What should have happened?
+    validations:
+      required: true
+
+  # The eight options below are a contract with .github/workflows/intake.yml, which maps this
+  # answer to an `area:*` label. Keep the wording identical to the same dropdown in
+  # feature_request.yml, and update the workflow's mapping if you change it. Renaming this
+  # label heading without updating the workflow stops auto-labeling — silently.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      description: Picks the `area:*` label so this can be filtered and routed.
+      options:
+        - Floating Popup Bar / Positioning
+        - Action-Search Palette (Opt+Cmd+C)
+        - Built-in Actions (Search, Calculate, Calendar, Transform)
+        - AI Assistant and Providers (Apple Intelligence, Ollama, Cloud)
+        - Extension Runtime Engine (JS Host, AppleScript, Shell Runner)
+        - Preferences and Appearance
+        - Accessibility and Performance
+        - CLI / Developer Tooling
+    validations:
+      required: true
+
+  # Mapped to `involvement:*` labels by intake.yml. This is the signal that someone wants to
+  # help rather than just report, which is what drives the claim flow and the first-timer
+  # welcome. See the "How do you want to be involved?" section of CONTRIBUTING.md.
+  - type: dropdown
+    id: involvement
+    attributes:
+      label: How do you want to be involved?
+      options:
+        - Just reporting — no code changes planned
+        - Happy to reproduce and confirm this
+        - I'd like to work on this
+        - I'll send a pull request
     validations:
       required: true
 
   - type: input
     id: macos-version
     attributes:
-      label: macOS Version
-      description: e.g. run `sw_vers` in Terminal or check Apple Menu -> About This Mac.
-      placeholder: e.g. 15.3, 14.7, macOS Sequoia / Sonoma
+      label: macOS version
+      description: Run `sw_vers` in Terminal, or check the Apple menu → About This Mac.
+      placeholder: e.g. 15.3, 14.7
     validations:
       required: true
 
   - type: dropdown
     id: architecture
     attributes:
-      label: Chip Architecture
+      label: Chip architecture
       options:
         - Apple Silicon (M1 / M2 / M3 / M4 / M5)
         - Intel (x86_64)
@@ -60,37 +101,58 @@ body:
   - type: input
     id: app-version
     attributes:
-      label: OpenClip Version / Build
-      description: Run `openclip --version` or check Menu Bar -> About OpenClip / commit hash.
-      placeholder: e.g. 0.2.0, commit hash
+      label: OpenClip version
+      description: Run `/Applications/OpenClip.app/Contents/MacOS/OpenClip --version`, or check the menu bar → About.
+      placeholder: e.g. 1.6.2
     validations:
       required: true
 
   - type: input
     id: target-app
     attributes:
-      label: Target Application(s)
-      description: Which application were you highlighting text in?
-      placeholder: e.g. Apple Notes, Safari, Chrome, VS Code, Terminal
+      label: App you were working in
+      description: Which app had your text selected when this happened?
+      placeholder: e.g. Safari, Notes, VS Code, Terminal
     validations:
       required: false
 
   - type: textarea
     id: logs
     attributes:
-      label: Diagnostic Logs
+      label: Logs
       description: |
-        Run this command in Terminal and paste relevant output:
-        `/Applications/OpenClip.app/Contents/MacOS/OpenClip --dump-logs --level=error`
+        Most "nothing happened" reports are diagnosed from logs. Reproduce the bug, then:
+
+        ```
+        /Applications/OpenClip.app/Contents/MacOS/OpenClip --dump-logs --level=error
+        ```
+
+        Logs also persist to `~/Library/Logs/OpenClip/openclip.log`. Filter by subsystem with
+        `--category=extensions`, `--category=ai`, and so on.
       render: shell
-      placeholder: Paste log lines here...
+      placeholder: Paste the relevant lines here, or say "none available" if the app never launched.
     validations:
       required: false
 
   - type: textarea
     id: media
     attributes:
-      label: Screenshots / Screen Recording
-      description: Drag & drop images or screen recordings demonstrating the issue.
+      label: Screenshot or screen recording
+      description: >-
+        Drag and drop an image or recording. The macOS recorder captures the whole screen, so
+        crop it to the popup.
+    validations:
+      required: false
+
+  # Not a dropdown on purpose — these are cheap to answer and they are the two questions that
+  # most often turn a report into a fix.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Triage shortcuts
+      options:
+        - label: This reproduces on the latest release
+        - label: This still happens with all extensions disabled
+        - label: This is not about a specific community extension
     validations:
       required: false

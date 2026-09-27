@@ -21,8 +21,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       # Signing degrades rather than fails. If the certificate or the notary credentials are
       # missing — a fork, or secrets that were rotated away — the release still builds and
