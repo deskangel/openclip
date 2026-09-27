@@ -775,6 +775,130 @@ final class OpenClipJSHostTests: XCTestCase {
                       "redirect must not be followed to a loopback host")
     }
 
+    /// Fetching loopback on an allowed unprivileged port (e.g. 8000, 11434) must succeed and reach the network.
+    func testFetchAllowsLoopbackWithSafePort() async throws {
+        MockURLProtocol.requestHandler = { request in
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "text/plain"]
+            )!
+            return (response, Data("local-ok".utf8))
+        }
+        defer { MockURLProtocol.requestHandler = nil }
+
+        let script = """
+        async function action() {
+            try {
+                const r = await openclip.fetch('http://127.0.0.1:8000/api');
+                return await r.text();
+            } catch (e) {
+                return 'rejected: ' + e.message;
+            }
+        }
+        """
+        let result = try await makeMockedHost().run(makeRequest(script: script, isAsync: true))
+        guard case .text(let text) = result else {
+            return XCTFail("Expected .text, got \(result)")
+        }
+        XCTAssertEqual(text, "local-ok")
+        XCTAssertEqual(MockURLProtocol.capturedRequests.values.first?.url?.host, "127.0.0.1")
+    }
+
+    /// Loopback on a privileged port (< 1024) must be rejected.
+    func testFetchRejectsLoopbackOnPrivilegedPort() async throws {
+        MockURLProtocol.requestHandler = { _ in
+            throw URLError(.unsupportedURL)
+        }
+        defer { MockURLProtocol.requestHandler = nil }
+
+        let script = """
+        async function action() {
+            try {
+                await openclip.fetch('http://127.0.0.1:80/secret');
+                return 'no-error';
+            } catch (e) {
+                return 'rejected';
+            }
+        }
+        """
+        let result = try await makeMockedHost().run(makeRequest(script: script, isAsync: true))
+        guard case .text(let text) = result else {
+            return XCTFail("Expected .text, got \(result)")
+        }
+        XCTAssertEqual(text, "rejected")
+        XCTAssertTrue(MockURLProtocol.capturedRequests.values.isEmpty)
+    }
+
+    /// Sensitive database/daemon ports (e.g. 6379, 5432, 2375, 9200) must be rejected.
+    func testFetchRejectsLoopbackOnBlockedDatabasePort() async throws {
+        MockURLProtocol.requestHandler = { _ in
+            throw URLError(.unsupportedURL)
+        }
+        defer { MockURLProtocol.requestHandler = nil }
+
+        let script = """
+        async function action() {
+            try {
+                await openclip.fetch('http://localhost:6379/data');
+                return 'no-error';
+            } catch (e) {
+                return 'rejected';
+            }
+        }
+        """
+        let result = try await makeMockedHost().run(makeRequest(script: script, isAsync: true))
+        guard case .text(let text) = result else {
+            return XCTFail("Expected .text, got \(result)")
+        }
+        XCTAssertEqual(text, "rejected")
+        XCTAssertTrue(MockURLProtocol.capturedRequests.values.isEmpty)
+
+        // Also test Elasticsearch (9200)
+        let esScript = """
+        async function action() {
+            try {
+                await openclip.fetch('http://127.0.0.1:9200/_search');
+                return 'no-error';
+            } catch (e) {
+                return 'rejected';
+            }
+        }
+        """
+        let esResult = try await makeMockedHost().run(makeRequest(script: esScript, isAsync: true))
+        guard case .text(let esText) = esResult else {
+            return XCTFail("Expected .text, got \(esResult)")
+        }
+        XCTAssertEqual(esText, "rejected")
+        XCTAssertTrue(MockURLProtocol.capturedRequests.values.isEmpty)
+    }
+
+    /// Loopback support must NEVER allow private LAN IP addresses (RFC1918) or link-local addresses.
+    func testFetchStillRejectsPrivateLAN() async throws {
+        MockURLProtocol.requestHandler = { _ in
+            throw URLError(.unsupportedURL)
+        }
+        defer { MockURLProtocol.requestHandler = nil }
+
+        let script = """
+        async function action() {
+            try {
+                await openclip.fetch('http://192.168.1.1:8000/admin');
+                return 'no-error';
+            } catch (e) {
+                return 'rejected';
+            }
+        }
+        """
+        let result = try await makeMockedHost().run(makeRequest(script: script, isAsync: true))
+        guard case .text(let text) = result else {
+            return XCTFail("Expected .text, got \(result)")
+        }
+        XCTAssertEqual(text, "rejected")
+        XCTAssertTrue(MockURLProtocol.capturedRequests.values.isEmpty)
+    }
+
     /// `FetchTaskBox.remove` matches by stable task identifier: removing a task by id takes it out
     /// of watchdog tracking, so a later `cancelAll` leaves it untouched while still cancelling the
     /// tracked tasks.
