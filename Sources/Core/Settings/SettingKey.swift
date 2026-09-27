@@ -99,6 +99,9 @@ public extension SettingKey where Value == Bool {
     static var automaticallyDownloadsUpdates: SettingKey<Bool> { SettingKey<Bool>("automaticallyDownloadsUpdates", defaultValue: true) }
     static var notifyOnUpdate: SettingKey<Bool> { SettingKey<Bool>("notifyOnUpdate", defaultValue: true) }
     static var contextualActionsEnabled: SettingKey<Bool> { SettingKey<Bool>("contextualActionsEnabled", defaultValue: true) }
+    /// When true, JavaScript extensions may fetch loopback destinations (localhost / 127.0.0.1 / ::1)
+    /// on safe, unprivileged ports (>= 1024, excluding known databases and daemons).
+    static var allowExtensionLocalhost: SettingKey<Bool> { SettingKey<Bool>("extension.allowLocalhost", defaultValue: false) }
 }
 
 public extension SettingKey where Value == Int {

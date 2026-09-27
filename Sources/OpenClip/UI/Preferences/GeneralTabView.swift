@@ -17,6 +17,7 @@ struct GeneralTab: View {
     @State private var showMenuBarIcon: Bool
     @State private var isMouseHoldEnabled: Bool
     @State private var fileSaveLocation: String
+    @State private var allowExtensionLocalhost: Bool
     @ObservedObject private var launchManager = LaunchAtLoginManager.shared
     @ObservedObject private var permissionManager = PermissionManager.shared
 
@@ -26,6 +27,7 @@ struct GeneralTab: View {
         _showMenuBarIcon = State(initialValue: DefaultSettingsStore.shared.get(.showMenuBarIcon))
         _isMouseHoldEnabled = State(initialValue: DefaultSettingsStore.shared.get(.isMouseHoldEnabled))
         _fileSaveLocation = State(initialValue: DefaultSettingsStore.shared.get(.fileSaveLocation))
+        _allowExtensionLocalhost = State(initialValue: DefaultSettingsStore.shared.get(.allowExtensionLocalhost))
     }
 
     var body: some View {
@@ -185,6 +187,19 @@ struct GeneralTab: View {
                             .settingsGlassCapsule()
                             .contentShape(Capsule())
                         }
+                    }
+                }
+
+                SettingsCard("Developer") {
+                    SettingsToggleRow(
+                        title: "Allow Localhost in Extensions",
+                        subtitle: "Allow JavaScript extensions to access local services (127.0.0.1 / localhost) on unprivileged ports (>= 1024).",
+                        systemImage: "network",
+                        plainIcon: true,
+                        isOn: $allowExtensionLocalhost
+                    )
+                    .onChange(of: allowExtensionLocalhost) { _, newValue in
+                        DefaultSettingsStore.shared.set(.allowExtensionLocalhost, value: newValue)
                     }
                 }
             }

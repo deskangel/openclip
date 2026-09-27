@@ -190,13 +190,16 @@ public final class OpenClipJSHost: @unchecked Sendable {
     /// URLSession used by the fetch polyfill. Injected for tests (URLProtocol mocks); the shared
     /// session by default.
     public let session: URLSession
+    public let settingsStore: any SettingsStore
 
-    public init(session: URLSession = .shared) {
+    public init(session: URLSession = .shared, settingsStore: any SettingsStore = DefaultSettingsStore.shared) {
         self.session = session
+        self.settingsStore = settingsStore
     }
 
     public func run(_ request: Request) async throws -> ActionResult {
         let session = self.session
+        let settingsStore = self.settingsStore
 
         // Every run enters the gate because async scripts also have a top-level synchronous phase.
         // JavaScriptCore's execution limit forcibly ends a CPU-bound phase, allowing the detached
@@ -225,6 +228,7 @@ public final class OpenClipJSHost: @unchecked Sendable {
                 return try OpenClipJSHost.execute(
                     request,
                     session: session,
+                    settingsStore: settingsStore,
                     cancellationFlag: cancellationFlag,
                     fetchTasks: fetchTasks
                 )
@@ -242,12 +246,14 @@ public final class OpenClipJSHost: @unchecked Sendable {
     private static func execute(
         _ request: Request,
         session: URLSession,
+        settingsStore: any SettingsStore,
         cancellationFlag: CancellationFlag,
         fetchTasks: FetchTaskBox
     ) throws -> ActionResult {
         let evaluation = try evaluate(
             request,
             session: session,
+            settingsStore: settingsStore,
             cancellationFlag: cancellationFlag,
             fetchTasks: fetchTasks
         )
@@ -258,6 +264,7 @@ public final class OpenClipJSHost: @unchecked Sendable {
     private static func evaluate(
         _ request: Request,
         session: URLSession,
+        settingsStore: any SettingsStore,
         cancellationFlag: CancellationFlag,
         fetchTasks: FetchTaskBox
     ) throws -> EvaluationResult {
@@ -498,6 +505,7 @@ public final class OpenClipJSHost: @unchecked Sendable {
                 context: jsContext,
                 promiseState: promiseState,
                 session: session,
+                settingsStore: settingsStore,
                 fetchTasks: fetchTasks
             )
         }
@@ -618,6 +626,7 @@ public final class OpenClipJSHost: @unchecked Sendable {
         context: JSContext,
         promiseState: PromiseState,
         session: URLSession,
+        settingsStore: any SettingsStore,
         fetchTasks: FetchTaskBox
     ) {
         let resolveBlock: @convention(block) (JSValue) -> Void = { value in
@@ -629,7 +638,12 @@ public final class OpenClipJSHost: @unchecked Sendable {
         openclip.setObject(resolveBlock, forKeyedSubscript: "__resolve" as NSString)
         openclip.setObject(rejectBlock, forKeyedSubscript: "__reject" as NSString)
 
-        JSNativeFetch.installNativeFetch(in: context, session: session, fetchTasks: fetchTasks)
+        JSNativeFetch.installNativeFetch(
+            in: context,
+            session: session,
+            fetchTasks: fetchTasks,
+            settingsStore: settingsStore
+        )
     }
 
     /// True when a JS result is a promise-like (has a `then` function) that cannot be awaited in

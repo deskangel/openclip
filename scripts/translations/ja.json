@@ -700,5 +700,8 @@
   "Moderate": "標準",
   "Default": "デフォルト",
   "Wide": "ワイド",
-  "Maximum": "最大"
+  "Maximum": "最大",
+  "Developer": "開発者",
+  "Allow Localhost in Extensions": "機能拡張での Localhost アクセスを許可",
+  "Allow JavaScript extensions to access local services (127.0.0.1 / localhost) on unprivileged ports (>= 1024).": "JavaScript 機能拡張が非特権ポート（>= 1024）でローカルサービス（127.0.0.1 / localhost）にアクセスすることを許可します。"
 }

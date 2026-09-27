@@ -116,10 +116,10 @@ final class OpenClipJSHostTests: XCTestCase {
     }
 
     /// A host whose fetch polyfill resolves through MockURLProtocol instead of the network.
-    private func makeMockedHost() -> OpenClipJSHost {
+    private func makeMockedHost(settingsStore: any SettingsStore = DefaultSettingsStore.shared) -> OpenClipJSHost {
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [MockURLProtocol.self]
-        return OpenClipJSHost(session: URLSession(configuration: config))
+        return OpenClipJSHost(session: URLSession(configuration: config), settingsStore: settingsStore)
     }
 
     func testPasteEffectReturnsPaste() async throws {
@@ -773,6 +773,127 @@ final class OpenClipJSHostTests: XCTestCase {
         XCTAssertEqual(text, "302", "redirect to loopback must be aborted, leaving the original 3xx response")
         XCTAssertTrue(MockURLProtocol.capturedRequests.values.allSatisfy { $0.url?.host == "public.example.com" },
                       "redirect must not be followed to a loopback host")
+    }
+
+    /// When `allowExtensionLocalhost` is enabled, fetching loopback on an allowed unprivileged port
+    /// (e.g. 8000, 11434) must succeed and reach the network.
+    func testFetchAllowsLoopbackWhenEnabledWithSafePort() async throws {
+        MockURLProtocol.requestHandler = { request in
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "text/plain"]
+            )!
+            return (response, Data("local-ok".utf8))
+        }
+        defer { MockURLProtocol.requestHandler = nil }
+
+        let store = MemorySettingsStore()
+        store.set(.allowExtensionLocalhost, value: true)
+
+        let script = """
+        async function action() {
+            try {
+                const r = await openclip.fetch('http://127.0.0.1:8000/api');
+                return await r.text();
+            } catch (e) {
+                return 'rejected: ' + e.message;
+            }
+        }
+        """
+        let result = try await makeMockedHost(settingsStore: store).run(makeRequest(script: script, isAsync: true))
+        guard case .text(let text) = result else {
+            return XCTFail("Expected .text, got \(result)")
+        }
+        XCTAssertEqual(text, "local-ok")
+        XCTAssertEqual(MockURLProtocol.capturedRequests.values.first?.url?.host, "127.0.0.1")
+    }
+
+    /// Even when `allowExtensionLocalhost` is enabled, loopback on a privileged port (< 1024)
+    /// must be rejected.
+    func testFetchRejectsLoopbackOnPrivilegedPortEvenWhenEnabled() async throws {
+        MockURLProtocol.requestHandler = { _ in
+            throw URLError(.unsupportedURL)
+        }
+        defer { MockURLProtocol.requestHandler = nil }
+
+        let store = MemorySettingsStore()
+        store.set(.allowExtensionLocalhost, value: true)
+
+        let script = """
+        async function action() {
+            try {
+                await openclip.fetch('http://127.0.0.1:80/secret');
+                return 'no-error';
+            } catch (e) {
+                return 'rejected';
+            }
+        }
+        """
+        let result = try await makeMockedHost(settingsStore: store).run(makeRequest(script: script, isAsync: true))
+        guard case .text(let text) = result else {
+            return XCTFail("Expected .text, got \(result)")
+        }
+        XCTAssertEqual(text, "rejected")
+        XCTAssertTrue(MockURLProtocol.capturedRequests.values.isEmpty)
+    }
+
+    /// Even when `allowExtensionLocalhost` is enabled, sensitive database/daemon ports (e.g. 6379, 5432, 2375)
+    /// must be rejected.
+    func testFetchRejectsLoopbackOnBlockedDatabasePortEvenWhenEnabled() async throws {
+        MockURLProtocol.requestHandler = { _ in
+            throw URLError(.unsupportedURL)
+        }
+        defer { MockURLProtocol.requestHandler = nil }
+
+        let store = MemorySettingsStore()
+        store.set(.allowExtensionLocalhost, value: true)
+
+        let script = """
+        async function action() {
+            try {
+                await openclip.fetch('http://localhost:6379/data');
+                return 'no-error';
+            } catch (e) {
+                return 'rejected';
+            }
+        }
+        """
+        let result = try await makeMockedHost(settingsStore: store).run(makeRequest(script: script, isAsync: true))
+        guard case .text(let text) = result else {
+            return XCTFail("Expected .text, got \(result)")
+        }
+        XCTAssertEqual(text, "rejected")
+        XCTAssertTrue(MockURLProtocol.capturedRequests.values.isEmpty)
+    }
+
+    /// Enabling localhost must NEVER allow private LAN IP addresses (RFC1918) or link-local addresses.
+    func testFetchStillRejectsPrivateLANWhenLocalhostEnabled() async throws {
+        MockURLProtocol.requestHandler = { _ in
+            throw URLError(.unsupportedURL)
+        }
+        defer { MockURLProtocol.requestHandler = nil }
+
+        let store = MemorySettingsStore()
+        store.set(.allowExtensionLocalhost, value: true)
+
+        let script = """
+        async function action() {
+            try {
+                await openclip.fetch('http://192.168.1.1:8000/admin');
+                return 'no-error';
+            } catch (e) {
+                return 'rejected';
+            }
+        }
+        """
+        let result = try await makeMockedHost(settingsStore: store).run(makeRequest(script: script, isAsync: true))
+        guard case .text(let text) = result else {
+            return XCTFail("Expected .text, got \(result)")
+        }
+        XCTAssertEqual(text, "rejected")
+        XCTAssertTrue(MockURLProtocol.capturedRequests.values.isEmpty)
     }
 
     /// `FetchTaskBox.remove` matches by stable task identifier: removing a task by id takes it out

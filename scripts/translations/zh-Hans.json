@@ -700,5 +700,8 @@
   "Moderate": "适中",
   "Default": "默认",
   "Wide": "宽",
-  "Maximum": "最大"
+  "Maximum": "最大",
+  "Developer": "开发者",
+  "Allow Localhost in Extensions": "允许扩展访问 Localhost",
+  "Allow JavaScript extensions to access local services (127.0.0.1 / localhost) on unprivileged ports (>= 1024).": "允许 JavaScript 扩展在非特权端口（>= 1024）上访问本地服务（127.0.0.1 / localhost）。"
 }

@@ -17,7 +17,12 @@ enum JSNativeFetch {
     /// before calling). All JS VM access stays on the thread that created the
     /// context: the URLSession completion only schedules work back onto that
     /// thread's CFRunLoop; the host's pump loop drains it.
-    static func installNativeFetch(in context: JSContext, session: URLSession, fetchTasks: FetchTaskBox) {
+    static func installNativeFetch(
+        in context: JSContext,
+        session: URLSession,
+        fetchTasks: FetchTaskBox,
+        settingsStore: any SettingsStore = DefaultSettingsStore.shared
+    ) {
         guard let openclip = context.objectForKeyedSubscript("openclip" as NSString),
               !openclip.isUndefined, !openclip.isNull, openclip.isObject else { return }
 
@@ -28,7 +33,7 @@ enum JSNativeFetch {
         // Rebuild the injected session with a redirect-intercepting delegate so every hop is
         // validated before URLSession follows it, while keeping the caller's configuration
         // (notably the MockURLProtocol classes used in tests).
-        let policySession = PolicySession(from: session)
+        let policySession = PolicySession(from: session, settingsStore: settingsStore)
 
         let nativeFetchBlock: @convention(block) (String, JSValue, JSValue, JSValue) -> Void = { urlString, options, resolve, reject in
             guard let url = URL(string: urlString) else {
@@ -39,7 +44,7 @@ enum JSNativeFetch {
             // Enforce the destination policy on the initial URL: http/https only, and never a
             // loopback / RFC1918 / link-local / Unix-local host. Redirects are validated by
             // JSNativeFetchRedirectDelegate before they are followed.
-            guard JSNativeFetch.isDestinationAllowed(url) else {
+            guard JSNativeFetch.isDestinationAllowed(url, settingsStore: settingsStore) else {
                 guard let err = JSNativeFetch.jsError("Destination not allowed: \(urlString)", in: context) else { return }
                 reject.call(withArguments: [err])
                 return
@@ -160,10 +165,62 @@ enum JSNativeFetch {
     /// be a loopback, RFC1918/private, link-local, or Unix-local target (SSRF guard). Applied to the
     /// initial URL and, via `JSNativeFetchRedirectDelegate`, to every redirect hop before it is
     /// followed.
-    static func isDestinationAllowed(_ url: URL) -> Bool {
+    static func isDestinationAllowed(_ url: URL, settingsStore: any SettingsStore = DefaultSettingsStore.shared) -> Bool {
         guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else { return false }
         guard let host = url.host, !host.isEmpty else { return false }
+
+        if isLoopbackHost(host) {
+            guard settingsStore.get(.allowExtensionLocalhost) else {
+                return false
+            }
+            let port = url.port ?? (scheme == "https" ? 443 : 80)
+            return isAllowedLocalPort(port)
+        }
+
         return !isLocalOrPrivateHost(host)
+    }
+
+    /// Classifies a host string as loopback (localhost, 127.0.0.0/8, ::1).
+    static func isLoopbackHost(_ host: String) -> Bool {
+        let bare = host.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let bareNoZone = String(bare.split(separator: "%").first ?? Substring(bare))
+        if bareNoZone == "localhost" || bareNoZone == "local" || bareNoZone == "ip6-localhost" || bareNoZone.hasSuffix(".localhost") {
+            return true
+        }
+
+        var ipv4 = in_addr()
+        if inet_pton(AF_INET, bareNoZone, &ipv4) == 1 {
+            let value = UInt32(bigEndian: ipv4.s_addr)
+            let a = UInt8((value >> 24) & 0xFF)
+            return a == 127
+        }
+
+        var ipv6 = in6_addr()
+        if inet_pton(AF_INET6, bareNoZone, &ipv6) == 1 {
+            let bytes = withUnsafeBytes(of: &ipv6) { Array($0) }
+            if bytes.prefix(15).allSatisfy({ $0 == 0 }) && bytes[15] == 1 { return true }
+            if bytes.prefix(10).allSatisfy({ $0 == 0 }) && bytes[10] == 0xFF && bytes[11] == 0xFF {
+                return bytes[12] == 127
+            }
+        }
+
+        return false
+    }
+
+    /// Validates whether a destination port on loopback is safe:
+    /// - Must be an unprivileged high port (>= 1024)
+    /// - Must not be a sensitive daemon / database port
+    static func isAllowedLocalPort(_ port: Int) -> Bool {
+        guard port >= 1024 && port <= 65535 else { return false }
+        let blockedPorts: Set<Int> = [
+            2375, 2376, // Docker daemon
+            3306,       // MySQL
+            5432,       // PostgreSQL
+            6379,       // Redis
+            11211,      // Memcached
+            27017       // MongoDB
+        ]
+        return !blockedPorts.contains(port)
     }
 
     /// Classifies a host string as loopback / RFC1918 / link-local / Unix-local. Handles `localhost`
@@ -216,8 +273,8 @@ enum JSNativeFetch {
     private final class PolicySession: @unchecked Sendable {
         let session: URLSession
         let delegate: JSNativeFetchRedirectDelegate
-        init(from base: URLSession) {
-            let delegate = JSNativeFetchRedirectDelegate()
+        init(from base: URLSession, settingsStore: any SettingsStore) {
+            let delegate = JSNativeFetchRedirectDelegate(settingsStore: settingsStore)
             self.delegate = delegate
             self.session = URLSession(configuration: base.configuration, delegate: delegate, delegateQueue: nil)
         }
@@ -227,8 +284,14 @@ enum JSNativeFetch {
     /// destination policy. Returning `nil` from `willPerformHTTPRedirection` aborts the redirect,
     /// so the task surfaces the original 3xx response instead of following the hop.
     private final class JSNativeFetchRedirectDelegate: NSObject, URLSessionTaskDelegate {
+        let settingsStore: any SettingsStore
+
+        init(settingsStore: any SettingsStore) {
+            self.settingsStore = settingsStore
+        }
+
         func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
-            if let url = request.url, JSNativeFetch.isDestinationAllowed(url) {
+            if let url = request.url, JSNativeFetch.isDestinationAllowed(url, settingsStore: settingsStore) {
                 completionHandler(request)
             } else {
                 completionHandler(nil)
