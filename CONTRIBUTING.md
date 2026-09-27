@@ -18,9 +18,6 @@ required reading before touching code.
 git clone https://github.com/ganeshmshetty/openclip.git
 cd openclip
 
-# Populate the extension-catalog submodule
-git submodule update --init
-
 # Generate the Xcode project (re-run after adding/removing .swift files)
 xcodegen generate
 ```
@@ -35,10 +32,14 @@ generated and should not be edited by hand.
 | `Sources/Core` | Pure-domain framework: models, actions, rules, selection logic, settings, manifest parsers. **No `AppKit`/`SwiftUI`.** |
 | `Sources/OpenClip` | App target: AppKit panels, SwiftUI views, platform side-effect handlers, AI providers, composition root. |
 | `Tests/OpenClipTests` | XCTest suites for both targets. |
-| `Extensions/` | Git submodule hosting the official & community extension catalog (`openclip-extensions`). |
-| `docs/` | Architecture, developer guide, runtimes, user guide, logging. |
 | `scripts/` | `dev_run`, `test`, `package_app`, `clean`, `install_extension` helpers. |
-| `web/` | Website / extension-store site (Next.js), deployed separately. |
+| `docs/` | Architecture, developer guide, runtimes, user guide, logging. |
+
+Two directories in your working copy are **not part of this repository**: `Extensions/` is a
+separate clone of the extension catalog, and `web/` is the marketing site. Both are gitignored
+here, so `git ls-files` will not list them and nothing in either can be committed here. Extension
+changes go to the [openclip-extensions](https://github.com/ganeshmshetty/openclip-extensions)
+catalog.
 
 ## Development workflow
 
@@ -111,8 +112,33 @@ Keep messages focused and lowercase-scope where applicable (e.g. `feat(extension
 5. In the PR description, describe the change and what you tested.
 
 Extension authors: the extension format is documented in
-[`Extensions/AGENTS.md`](Extensions/AGENTS.md); the built-in
-store catalog lives in the `Extensions/` submodule.
+[`Extensions/AGENTS.md`](Extensions/AGENTS.md) if you have the catalog cloned locally; the
+authoritative version is the `AGENTS.md` at the root of
+[openclip-extensions](https://github.com/ganeshmshetty/openclip-extensions).
+
+## Filing issues and picking one up
+
+Issues are the front door, so it's worth knowing what happens after you file one.
+
+**What happens when you file an issue.** The form asks which subsystem is affected and how you
+want to be involved. An automated pass applies an `area:*` label from that answer, flags the issue
+for triage, greets you if this is your first issue, and — if the title is close enough to an
+existing one — leaves a pointer to the possible duplicate. It does not close anything: duplicate
+suggestions are hints, not verdicts.
+
+**How to work on one.**
+
+- Comment `/claim` on the issue. You'll be assigned and the issue gets a `claimed` label. One
+  claim per issue — if someone beats you to it, you'll be told and invited to pair.
+- Claims do **not** expire. If you stall, say so in a comment so someone else can take it, or ask a
+  maintainer to release it.
+- Saying "I'll send a pull request" or "I'd like to work on this" in the form gets the issue
+  labelled accordingly, so the maintainer can see who wants to help before you start.
+
+**Before you open the pull request.** `main` requires two checks to pass: `Build & Tests` and
+`PR Intake`. The second one wants two things from you — a description that says what changed and
+why, and a `Fixes #<number>` line. Your own description's verification checkboxes are treated as
+claims, not results; the build is the actual gate.
 
 ## Code of Conduct
 
