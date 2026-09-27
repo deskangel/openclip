@@ -218,7 +218,8 @@ enum JSNativeFetch {
             5432,       // PostgreSQL
             6379,       // Redis
             11211,      // Memcached
-            27017       // MongoDB
+            27017,      // MongoDB
+            9200        // Elasticsearch
         ]
         return !blockedPorts.contains(port)
     }
