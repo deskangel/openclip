@@ -47,6 +47,7 @@ public struct AICustomActionSynthesis: Sendable, Equatable {
     public var urlTemplate: String?
     public var delivery: AIActionDeliveryMode
     public var isAsync: Bool
+    public var syntaxWarning: String?
 
     public init(
         title: String,
@@ -56,7 +57,8 @@ public struct AICustomActionSynthesis: Sendable, Equatable {
         scriptCode: String,
         urlTemplate: String? = nil,
         delivery: AIActionDeliveryMode,
-        isAsync: Bool = false
+        isAsync: Bool = false,
+        syntaxWarning: String? = nil
     ) {
         self.title = title
         self.description = description
@@ -66,19 +68,46 @@ public struct AICustomActionSynthesis: Sendable, Equatable {
         self.urlTemplate = urlTemplate
         self.delivery = delivery
         self.isAsync = isAsync
+        self.syntaxWarning = syntaxWarning
+    }
+
+    public var payloadContent: String {
+        get {
+            if kind == "url" {
+                return urlTemplate ?? scriptCode
+            }
+            return scriptCode
+        }
+        set {
+            if kind == "url" {
+                urlTemplate = newValue
+            } else {
+                scriptCode = newValue
+            }
+        }
+    }
+
+    public var payloadHeaderLabel: String {
+        switch kind {
+        case "url": return "URL TEMPLATE"
+        case "shell": return "SHELL SCRIPT"
+        case "textsnippet", "snippet": return "TEXT SNIPPET"
+        default: return "JAVASCRIPT (JSC)"
+        }
     }
 }
 
 // MARK: - Manifest Decoding Payload
 
-private struct AIManifestResponse: Codable {
+private struct AIManifestResponse: Decodable {
     let identifier: String?
     let name: String?
     let description: String?
     let action: ActionDetail?
     let actions: [ActionDetail]?
+    let topLevelAction: ActionDetail?
 
-    struct ActionDetail: Codable {
+    struct ActionDetail: Decodable {
         let title: String?
         let icon: String?
         let type: String?
@@ -87,10 +116,100 @@ private struct AIManifestResponse: Codable {
         let output: String?
         let result: String?
         let isAsync: Bool?
+
+        enum CodingKeys: String, CodingKey {
+            case title
+            case name
+            case icon
+            case symbol
+            case iconName
+            case type
+            case kind
+            case scriptCode
+            case script
+            case code
+            case url
+            case urlTemplate
+            case template
+            case output
+            case result
+            case delivery
+            case isAsync
+        }
+
+        init(
+            title: String? = nil,
+            icon: String? = nil,
+            type: String? = nil,
+            scriptCode: String? = nil,
+            url: String? = nil,
+            output: String? = nil,
+            result: String? = nil,
+            isAsync: Bool? = nil
+        ) {
+            self.title = title
+            self.icon = icon
+            self.type = type
+            self.scriptCode = scriptCode
+            self.url = url
+            self.output = output
+            self.result = result
+            self.isAsync = isAsync
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self.title = try container.decodeIfPresent(String.self, forKey: .title)
+                ?? container.decodeIfPresent(String.self, forKey: .name)
+            self.icon = try container.decodeIfPresent(String.self, forKey: .icon)
+                ?? container.decodeIfPresent(String.self, forKey: .symbol)
+                ?? container.decodeIfPresent(String.self, forKey: .iconName)
+            self.type = try container.decodeIfPresent(String.self, forKey: .type)
+                ?? container.decodeIfPresent(String.self, forKey: .kind)
+            self.scriptCode = try container.decodeIfPresent(String.self, forKey: .scriptCode)
+                ?? container.decodeIfPresent(String.self, forKey: .script)
+                ?? container.decodeIfPresent(String.self, forKey: .code)
+            self.url = try container.decodeIfPresent(String.self, forKey: .url)
+                ?? container.decodeIfPresent(String.self, forKey: .urlTemplate)
+                ?? container.decodeIfPresent(String.self, forKey: .template)
+            self.output = try container.decodeIfPresent(String.self, forKey: .output)
+            self.result = try container.decodeIfPresent(String.self, forKey: .result)
+                ?? container.decodeIfPresent(String.self, forKey: .delivery)
+
+            if let boolVal = try? container.decodeIfPresent(Bool.self, forKey: .isAsync) {
+                self.isAsync = boolVal
+            } else if let strVal = try? container.decodeIfPresent(String.self, forKey: .isAsync) {
+                self.isAsync = strVal.lowercased() == "true"
+            } else {
+                self.isAsync = nil
+            }
+        }
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case identifier
+        case name
+        case description
+        case action
+        case actions
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.identifier = try container.decodeIfPresent(String.self, forKey: .identifier)
+        self.name = try container.decodeIfPresent(String.self, forKey: .name)
+        self.description = try container.decodeIfPresent(String.self, forKey: .description)
+        self.action = try container.decodeIfPresent(ActionDetail.self, forKey: .action)
+        self.actions = try container.decodeIfPresent([ActionDetail].self, forKey: .actions)
+        if self.action == nil && (self.actions?.isEmpty ?? true) {
+            self.topLevelAction = try? ActionDetail(from: decoder)
+        } else {
+            self.topLevelAction = nil
+        }
     }
 
     var resolvedAction: ActionDetail? {
-        action ?? actions?.first
+        action ?? actions?.first ?? topLevelAction
     }
 }
 
@@ -161,33 +280,46 @@ public enum AICustomActionService {
             throw AIError.invalidResponse
         }
 
-        guard let action = manifest.resolvedAction else {
+        guard let action = manifest.resolvedAction,
+              action.type != nil || action.scriptCode != nil || action.url != nil || manifest.name != nil else {
             throw AIError.invalidResponse
         }
 
         let rawType = (action.type ?? "javascript").lowercased()
         let kind: String
         switch rawType {
-        case "url", "websearch", "web", "search":
+        case "url", "websearch", "web", "search", "openurl":
             kind = "url"
-        case "shell", "shellinline", "script":
+        case "shell", "shellinline", "shellscript", "script", "bash", "zsh", "sh":
             kind = "shell"
-        case "textsnippet", "snippet", "text":
+        case "textsnippet", "text_snippet", "snippet", "text", "template":
             kind = "textsnippet"
         default:
             kind = "javascript"
         }
 
-        let scriptCode = action.scriptCode ?? ""
-        let isAsync = action.isAsync ?? false
+        var scriptCode = action.scriptCode ?? ""
+        var urlTemplate = action.url
+        if kind == "url" {
+            if urlTemplate == nil || urlTemplate?.isEmpty == true {
+                urlTemplate = scriptCode.isEmpty ? nil : scriptCode
+            }
+        } else if kind == "textsnippet" {
+            if scriptCode.isEmpty, let template = urlTemplate, !template.isEmpty {
+                scriptCode = template
+            }
+        }
 
-        // Pre-flight JavaScriptCore syntax validation for JavaScript actions
+        var isAsync = action.isAsync ?? false
+        if kind == "javascript" && (scriptCode.contains("openclip.fetch") || scriptCode.contains("async ") || scriptCode.contains("await ")) {
+            isAsync = true
+        }
+
+        var syntaxWarning: String? = nil
         if kind == "javascript" && !scriptCode.isEmpty {
-            let context = JSContext()
-            let checkScript = "function __openclip_syntax_check__() {\n\(scriptCode)\n}"
-            _ = context?.evaluateScript(checkScript)
-            if let exception = context?.exception, !exception.isUndefined {
-                Log.ai.error("AI generated JavaScript with syntax issue: \(exception.toString() ?? "")")
+            if let warning = validateJavaScriptSyntax(scriptCode) {
+                syntaxWarning = warning
+                Log.ai.error("AI generated JavaScript with syntax issue: \(warning)")
             }
         }
 
@@ -203,7 +335,7 @@ public enum AICustomActionService {
 
         let title = action.title ?? manifest.name ?? "Custom Action"
         let description = manifest.description ?? ""
-        let icon = sanitizeIcon(action.icon ?? "wand.and.stars")
+        let icon = sanitizeIcon(action.icon ?? "wand.and.stars", kind: kind)
 
         return AICustomActionSynthesis(
             title: title,
@@ -211,14 +343,21 @@ public enum AICustomActionService {
             iconSymbol: icon,
             kind: kind,
             scriptCode: scriptCode,
-            urlTemplate: action.url,
+            urlTemplate: urlTemplate,
             delivery: delivery,
-            isAsync: isAsync
+            isAsync: isAsync,
+            syntaxWarning: syntaxWarning
         )
     }
 
-    private static func cleanJSONResponse(_ raw: String) -> String {
-        var text = AIRequestSupport.extractResultText(raw).trimmingCharacters(in: .whitespacesAndNewlines)
+    public static func cleanJSONResponse(_ raw: String) -> String {
+        let extracted = AIRequestSupport.extractResultText(raw).trimmingCharacters(in: .whitespacesAndNewlines)
+        if let firstBrace = extracted.firstIndex(of: "{"),
+           let lastBrace = extracted.lastIndex(of: "}"),
+           firstBrace < lastBrace {
+            return String(extracted[firstBrace...lastBrace])
+        }
+        var text = extracted
         if text.hasPrefix("```") {
             let lines = text.components(separatedBy: "\n")
             if lines.count >= 2 {
@@ -229,12 +368,37 @@ public enum AICustomActionService {
         return text
     }
 
-    private static func sanitizeIcon(_ icon: String) -> String {
+    public static func validateJavaScriptSyntax(_ script: String) -> String? {
+        let trimmed = script.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let context = JSContext()
+        let checkScript = "(function() {\n\(trimmed)\n})();"
+        _ = context?.evaluateScript(checkScript)
+        if let exception = context?.exception, !exception.isUndefined {
+            return exception.toString()
+        }
+        return nil
+    }
+
+    private static func defaultIcon(for kind: String) -> String {
+        switch kind {
+        case "url": return "safari"
+        case "shell": return "terminal"
+        case "textsnippet", "snippet": return "text.quote"
+        default: return "wand.and.stars"
+        }
+    }
+
+    private static func sanitizeIcon(_ icon: String, kind: String) -> String {
         var clean = icon.trimmingCharacters(in: .whitespacesAndNewlines)
         if clean.hasPrefix("symbol(") && clean.hasSuffix(")") {
             clean = String(clean.dropFirst(7).dropLast(1))
         }
-        return clean.isEmpty ? "wand.and.stars" : clean
+        clean = clean.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty, NSImage(systemSymbolName: clean, accessibilityDescription: nil) != nil else {
+            return defaultIcon(for: kind)
+        }
+        return clean
     }
 }
 
@@ -372,6 +536,10 @@ public struct AICustomActionBuilderCard: View {
         }
     }
 
+    private var isPromptEmpty: Bool {
+        promptInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     @ViewBuilder
     private var generateButton: some View {
         if #available(macOS 26.0, *) {
@@ -389,6 +557,8 @@ public struct AICustomActionBuilderCard: View {
             .glassEffect(.regular.tint(SettingsDesignTokens.glassButtonBlue.opacity(0.18)).interactive(), in: .capsule)
             .contentShape(Capsule())
             .keyboardShortcut(.return, modifiers: .command)
+            .disabled(isPromptEmpty)
+            .opacity(isPromptEmpty ? 0.45 : 1.0)
         } else {
             Button {
                 startGeneration()
@@ -400,7 +570,7 @@ public struct AICustomActionBuilderCard: View {
             .buttonBorderShape(.capsule)
             .controlSize(.regular)
             .keyboardShortcut(.return, modifiers: .command)
-            .disabled(promptInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .disabled(isPromptEmpty)
         }
     }
 
@@ -532,21 +702,24 @@ public struct AICustomActionBuilderCard: View {
             }
 
             // Mini Code Peek (2-3 lines styled preview or expanded editor)
-            if !synthesis.scriptCode.isEmpty {
+            if !synthesis.payloadContent.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        Text(synthesis.kind == "shell" ? "SHELL SCRIPT" : "JAVASCRIPT (JSC)")
+                        Text(synthesis.payloadHeaderLabel)
                             .font(.system(size: 9, weight: .bold))
                             .foregroundStyle(SettingsDesignTokens.tertiaryText)
 
                         Spacer()
 
-                        Button(isEditingCode ? String(localized: "Done") : String(localized: "Edit Code ↗")) {
+                        Button(isEditingCode ? String(localized: "Done") : (synthesis.kind == "url" ? String(localized: "Edit URL ↗") : String(localized: "Edit Code ↗"))) {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 if !isEditingCode {
-                                    codeDraft = synthesis.scriptCode
+                                    codeDraft = synthesis.payloadContent
                                 } else {
-                                    synthesis.scriptCode = codeDraft
+                                    synthesis.payloadContent = codeDraft
+                                    if synthesis.kind == "javascript" {
+                                        synthesis.syntaxWarning = AICustomActionService.validateJavaScriptSyntax(codeDraft)
+                                    }
                                 }
                                 isEditingCode.toggle()
                             }
@@ -570,7 +743,20 @@ public struct AICustomActionBuilderCard: View {
                                     )
                             )
                     } else {
-                        miniCodeBox(code: synthesis.scriptCode)
+                        miniCodeBox(code: synthesis.payloadContent)
+                    }
+
+                    if let warning = synthesis.syntaxWarning, !warning.isEmpty {
+                        HStack(alignment: .top, spacing: 5) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.orange)
+                            Text(warning)
+                                .font(.system(size: 10))
+                                .foregroundStyle(SettingsDesignTokens.secondaryText)
+                                .lineLimit(2)
+                        }
+                        .padding(.top, 1)
                     }
                 }
             }
@@ -583,6 +769,7 @@ public struct AICustomActionBuilderCard: View {
                 Button(String(localized: "Discard")) {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                         phase = .idle
+                        isEditingCode = false
                     }
                 }
                 .buttonStyle(.plain)
@@ -707,10 +894,12 @@ public struct AICustomActionBuilderCard: View {
                 let result = try await AICustomActionService.generate(userPrompt: trimmed)
                 guard !Task.isCancelled, phase == .generating(prompt: trimmed) else { return }
                 self.synthesis = result
-                self.codeDraft = result.scriptCode
+                self.codeDraft = result.payloadContent
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.78)) {
                     phase = .result
                 }
+            } catch is CancellationError {
+                // Cancelled by user; ignore
             } catch {
                 guard !Task.isCancelled, phase == .generating(prompt: trimmed) else { return }
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
@@ -721,16 +910,13 @@ public struct AICustomActionBuilderCard: View {
     }
 
     private func saveAction() {
-        let currentSynthesis = isEditingCode ? AICustomActionSynthesis(
-            title: synthesis.title,
-            description: synthesis.description,
-            iconSymbol: synthesis.iconSymbol,
-            kind: synthesis.kind,
-            scriptCode: codeDraft,
-            urlTemplate: synthesis.urlTemplate,
-            delivery: synthesis.delivery,
-            isAsync: synthesis.isAsync
-        ) : synthesis
+        var currentSynthesis = synthesis
+        if isEditingCode {
+            currentSynthesis.payloadContent = codeDraft
+            if currentSynthesis.kind == "javascript" {
+                currentSynthesis.syntaxWarning = AICustomActionService.validateJavaScriptSyntax(codeDraft)
+            }
+        }
 
         let id = "custom.\(UUID().uuidString.prefix(8).lowercased())"
         let title = currentSynthesis.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Custom Action" : currentSynthesis.title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -740,13 +926,14 @@ public struct AICustomActionBuilderCard: View {
         let actionType: CustomActionType
         switch currentSynthesis.kind {
         case "url":
-            actionType = .openURL(urlTemplate: currentSynthesis.urlTemplate ?? currentSynthesis.scriptCode)
+            let template = currentSynthesis.payloadContent.trimmingCharacters(in: .whitespacesAndNewlines)
+            actionType = .openURL(urlTemplate: template)
         case "textsnippet", "snippet":
-            actionType = .textSnippet(template: currentSynthesis.scriptCode)
+            actionType = .textSnippet(template: currentSynthesis.payloadContent)
         case "shell":
-            actionType = .shellScript(script: currentSynthesis.scriptCode, replaceSelection: replaceSelection)
+            actionType = .shellScript(script: currentSynthesis.payloadContent, replaceSelection: replaceSelection)
         default: // javascript
-            actionType = .javaScript(script: currentSynthesis.scriptCode, isAsync: currentSynthesis.isAsync, replaceSelection: replaceSelection)
+            actionType = .javaScript(script: currentSynthesis.payloadContent, isAsync: currentSynthesis.isAsync, replaceSelection: replaceSelection)
         }
 
         let newAction = CustomAction(
@@ -772,6 +959,7 @@ public struct AICustomActionBuilderCard: View {
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
             phase = .idle
             promptInput = ""
+            isEditingCode = false
             showSuccessBadge = true
         }
 

@@ -1224,6 +1224,12 @@ public class PopupWindowController {
             let isShift = event.modifierFlags.contains(.shift)
             pendingClickIntent = isShift ? .secondary : .primary
             if !inMain && !inSub && !cardIsModal {
+                // If a mouse-down lands within 100ms of showing the popup, it is likely part of the
+                // multi-click gesture that initiated the selection (e.g. triple-click line selection).
+                if sessionShowTime > 0,
+                   (ProcessInfo.processInfo.systemUptime - sessionShowTime) < 0.1 {
+                    break
+                }
                 hide()
             }
         case .rightMouseDown:
@@ -1463,6 +1469,11 @@ public class PopupWindowController {
         guard let app = (notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)
             ?? NSWorkspace.shared.frontmostApplication else { return }
         if app.bundleIdentifier == Bundle.main.bundleIdentifier { return }
+        // The source app where the selection occurred is allowed to activate without dismissing the popup.
+        if let sourceBundleID = currentContext?.sourceApp.bundleIdentifier,
+           app.bundleIdentifier == sourceBundleID {
+            return
+        }
         // Grace period: when a clipboard manager (Paste, Raycast, Maccy) dismisses itself, macOS
         // delivers a queued didActivateApplication for the destination app. If the popup just
         // opened (< 300 ms ago) this is almost certainly a leftover transition notification —

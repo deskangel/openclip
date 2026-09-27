@@ -6581,6 +6581,34 @@
         }
       }
     },
+    "Edit URL ↗": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "编辑 URL ↗"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "編輯 URL ↗"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modifier l'URL ↗"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "URL を編集 ↗"
+          }
+        }
+      }
+    },
     "Empty group. Drag actions into this group in the actions list.": {
       "localizations": {
         "zh-Hans": {
