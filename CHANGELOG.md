@@ -4,6 +4,31 @@ All notable user-facing changes to OpenClip.
 
 ---
 
+## v1.7.0 - 2026-09-27
+
+### Contextual actions
+- **The popup knows what you selected.** Actions with detection rules — math, links, dates, paths, and definitions — surface first on a matching selection, in their own island. Toggle prioritization per action in Preferences › Contextual Actions.
+- **Inline file previews** in the popup: images, PDFs, and text render in place, with Quick Look for audio/video/office files.
+
+### Build actions with AI
+- **Describe an action and get a working one.** The builder now handles chatty model output, infers async automatically, validates JavaScript syntax inline, and never picks an icon that doesn't exist.
+
+### Interface
+- **The Clip Store**: new branding, and first-release extensions listed under **New**.
+- **Settings rebuilt with Liquid Glass**: borderless sidebar, capsule search, colored tiles, and in-window shortcut recording.
+- **Define**: one display picker — result card, Look Up popover, or Dictionary app.
+- Better embedded PDF previews; the appearance preview renders your desktop wallpaper.
+
+### Fixes
+- Async JavaScript exceptions surface immediately instead of hanging (#48).
+- Multi-click selections are no longer swallowed by the popup's first click.
+- Mouse utilities (Mac Mouse Fix, HazeOver, NotchNook), screen-capture tools (CleanShot, Shottr, Snagit), and fullscreen apps no longer suppress the copy fallback in the app underneath.
+- URL actions open in the frontmost browser window (#112); Ollama reasoning models skip the thinking pass (#115); WeChat selections supported; hold-to-paste anchors to the element under the press.
+
+### Licensing
+- **OpenClip is now AGPL-3.0** (was MIT). Copies obtained under MIT remain MIT. See NOTICE.md.
+
+---
 ## v1.6.2 - 2026-09-20
 
 ### Features & Improvements
