@@ -150,6 +150,14 @@ final class AIProviderTests: XCTestCase {
         let previous = manager.activeProviderRaw
         defer { manager.activeProviderRaw = previous }
 
+        // `activeProviderType` downgrades .apple to .local whenever the on-device model is
+        // unsupported, and a CI runner never has it. Without pinning availability here the .apple
+        // assertion below passed only on a maintainer's Apple-Silicon Mac and failed everywhere
+        // else — which is what kept the build red. The downgrade branch is covered separately by
+        // testAppleIntelligenceSupportCheckAndUnsupportedFallback.
+        AppleIntelligenceAvailability.statusOverride = .available
+        defer { AppleIntelligenceAvailability.statusOverride = nil }
+
         manager.activeProviderType = .apple
         XCTAssertEqual(manager.currentProvider.type, .apple)
 
