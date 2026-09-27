@@ -28,7 +28,6 @@ public enum SettingsCatalog {
             SettingKey.extensionTrustHashes.erased,
             SettingKey.extensionSources.erased,
             SettingKey.extensionTrustMigrated.erased,
-            SettingKey.allowExtensionLocalhost.erased,
 
             // App / behavior toggles
             SettingKey.isAppEnabled.erased,

@@ -700,8 +700,5 @@
   "Moderate": "Modéré",
   "Default": "Par défaut",
   "Wide": "Large",
-  "Maximum": "Maximum",
-  "Developer": "Développeur",
-  "Allow Localhost in Extensions": "Autoriser Localhost dans les extensions",
-  "Allow JavaScript extensions to access local services (127.0.0.1 / localhost) on unprivileged ports (>= 1024).": "Autoriser les extensions JavaScript à accéder aux services locaux (127.0.0.1 / localhost) sur des ports non privilégiés (>= 1024)."
+  "Maximum": "Maximum"
 }

@@ -1709,62 +1709,6 @@
         }
       }
     },
-    "Allow JavaScript extensions to access local services (127.0.0.1 / localhost) on unprivileged ports (>= 1024).": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "允许 JavaScript 扩展在非特权端口（>= 1024）上访问本地服务（127.0.0.1 / localhost）。"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "允許 JavaScript 擴充功能在非特權連接埠（>= 1024）上存取本機服務（127.0.0.1 / localhost）。"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Autoriser les extensions JavaScript à accéder aux services locaux (127.0.0.1 / localhost) sur des ports non privilégiés (>= 1024)."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "JavaScript 機能拡張が非特権ポート（>= 1024）でローカルサービス（127.0.0.1 / localhost）にアクセスすることを許可します。"
-          }
-        }
-      }
-    },
-    "Allow Localhost in Extensions": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "允许扩展访问 Localhost"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "允許擴充功能存取 Localhost"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Autoriser Localhost dans les extensions"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "機能拡張での Localhost アクセスを許可"
-          }
-        }
-      }
-    },
     "An alias jumps straight to an action when you type it in the palette. A hotkey runs it from anywhere.": {
       "localizations": {
         "zh-Hans": {
@@ -5709,34 +5653,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "作成したい内容を説明すると、AI がカスタムアクションを生成します。"
-          }
-        }
-      }
-    },
-    "Developer": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "开发者"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "開發者"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Développeur"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "開発者"
           }
         }
       }

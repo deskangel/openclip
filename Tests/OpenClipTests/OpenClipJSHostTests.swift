@@ -116,10 +116,10 @@ final class OpenClipJSHostTests: XCTestCase {
     }
 
     /// A host whose fetch polyfill resolves through MockURLProtocol instead of the network.
-    private func makeMockedHost(settingsStore: any SettingsStore = DefaultSettingsStore.shared) -> OpenClipJSHost {
+    private func makeMockedHost() -> OpenClipJSHost {
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [MockURLProtocol.self]
-        return OpenClipJSHost(session: URLSession(configuration: config), settingsStore: settingsStore)
+        return OpenClipJSHost(session: URLSession(configuration: config))
     }
 
     func testPasteEffectReturnsPaste() async throws {
@@ -775,9 +775,8 @@ final class OpenClipJSHostTests: XCTestCase {
                       "redirect must not be followed to a loopback host")
     }
 
-    /// When `allowExtensionLocalhost` is enabled, fetching loopback on an allowed unprivileged port
-    /// (e.g. 8000, 11434) must succeed and reach the network.
-    func testFetchAllowsLoopbackWhenEnabledWithSafePort() async throws {
+    /// Fetching loopback on an allowed unprivileged port (e.g. 8000, 11434) must succeed and reach the network.
+    func testFetchAllowsLoopbackWithSafePort() async throws {
         MockURLProtocol.requestHandler = { request in
             let response = HTTPURLResponse(
                 url: request.url!,
@@ -789,9 +788,6 @@ final class OpenClipJSHostTests: XCTestCase {
         }
         defer { MockURLProtocol.requestHandler = nil }
 
-        let store = MemorySettingsStore()
-        store.set(.allowExtensionLocalhost, value: true)
-
         let script = """
         async function action() {
             try {
@@ -802,7 +798,7 @@ final class OpenClipJSHostTests: XCTestCase {
             }
         }
         """
-        let result = try await makeMockedHost(settingsStore: store).run(makeRequest(script: script, isAsync: true))
+        let result = try await makeMockedHost().run(makeRequest(script: script, isAsync: true))
         guard case .text(let text) = result else {
             return XCTFail("Expected .text, got \(result)")
         }
@@ -810,16 +806,12 @@ final class OpenClipJSHostTests: XCTestCase {
         XCTAssertEqual(MockURLProtocol.capturedRequests.values.first?.url?.host, "127.0.0.1")
     }
 
-    /// Even when `allowExtensionLocalhost` is enabled, loopback on a privileged port (< 1024)
-    /// must be rejected.
-    func testFetchRejectsLoopbackOnPrivilegedPortEvenWhenEnabled() async throws {
+    /// Loopback on a privileged port (< 1024) must be rejected.
+    func testFetchRejectsLoopbackOnPrivilegedPort() async throws {
         MockURLProtocol.requestHandler = { _ in
             throw URLError(.unsupportedURL)
         }
         defer { MockURLProtocol.requestHandler = nil }
-
-        let store = MemorySettingsStore()
-        store.set(.allowExtensionLocalhost, value: true)
 
         let script = """
         async function action() {
@@ -831,7 +823,7 @@ final class OpenClipJSHostTests: XCTestCase {
             }
         }
         """
-        let result = try await makeMockedHost(settingsStore: store).run(makeRequest(script: script, isAsync: true))
+        let result = try await makeMockedHost().run(makeRequest(script: script, isAsync: true))
         guard case .text(let text) = result else {
             return XCTFail("Expected .text, got \(result)")
         }
@@ -839,16 +831,12 @@ final class OpenClipJSHostTests: XCTestCase {
         XCTAssertTrue(MockURLProtocol.capturedRequests.values.isEmpty)
     }
 
-    /// Even when `allowExtensionLocalhost` is enabled, sensitive database/daemon ports (e.g. 6379, 5432, 2375)
-    /// must be rejected.
-    func testFetchRejectsLoopbackOnBlockedDatabasePortEvenWhenEnabled() async throws {
+    /// Sensitive database/daemon ports (e.g. 6379, 5432, 2375, 9200) must be rejected.
+    func testFetchRejectsLoopbackOnBlockedDatabasePort() async throws {
         MockURLProtocol.requestHandler = { _ in
             throw URLError(.unsupportedURL)
         }
         defer { MockURLProtocol.requestHandler = nil }
-
-        let store = MemorySettingsStore()
-        store.set(.allowExtensionLocalhost, value: true)
 
         let script = """
         async function action() {
@@ -860,23 +848,38 @@ final class OpenClipJSHostTests: XCTestCase {
             }
         }
         """
-        let result = try await makeMockedHost(settingsStore: store).run(makeRequest(script: script, isAsync: true))
+        let result = try await makeMockedHost().run(makeRequest(script: script, isAsync: true))
         guard case .text(let text) = result else {
             return XCTFail("Expected .text, got \(result)")
         }
         XCTAssertEqual(text, "rejected")
         XCTAssertTrue(MockURLProtocol.capturedRequests.values.isEmpty)
+
+        // Also test Elasticsearch (9200)
+        let esScript = """
+        async function action() {
+            try {
+                await openclip.fetch('http://127.0.0.1:9200/_search');
+                return 'no-error';
+            } catch (e) {
+                return 'rejected';
+            }
+        }
+        """
+        let esResult = try await makeMockedHost().run(makeRequest(script: esScript, isAsync: true))
+        guard case .text(let esText) = esResult else {
+            return XCTFail("Expected .text, got \(esResult)")
+        }
+        XCTAssertEqual(esText, "rejected")
+        XCTAssertTrue(MockURLProtocol.capturedRequests.values.isEmpty)
     }
 
-    /// Enabling localhost must NEVER allow private LAN IP addresses (RFC1918) or link-local addresses.
-    func testFetchStillRejectsPrivateLANWhenLocalhostEnabled() async throws {
+    /// Loopback support must NEVER allow private LAN IP addresses (RFC1918) or link-local addresses.
+    func testFetchStillRejectsPrivateLAN() async throws {
         MockURLProtocol.requestHandler = { _ in
             throw URLError(.unsupportedURL)
         }
         defer { MockURLProtocol.requestHandler = nil }
-
-        let store = MemorySettingsStore()
-        store.set(.allowExtensionLocalhost, value: true)
 
         let script = """
         async function action() {
@@ -888,7 +891,7 @@ final class OpenClipJSHostTests: XCTestCase {
             }
         }
         """
-        let result = try await makeMockedHost(settingsStore: store).run(makeRequest(script: script, isAsync: true))
+        let result = try await makeMockedHost().run(makeRequest(script: script, isAsync: true))
         guard case .text(let text) = result else {
             return XCTFail("Expected .text, got \(result)")
         }

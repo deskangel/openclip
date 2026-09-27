@@ -700,8 +700,5 @@
   "Moderate": "適中",
   "Default": "預設",
   "Wide": "寬",
-  "Maximum": "最大",
-  "Developer": "開發者",
-  "Allow Localhost in Extensions": "允許擴充功能存取 Localhost",
-  "Allow JavaScript extensions to access local services (127.0.0.1 / localhost) on unprivileged ports (>= 1024).": "允許 JavaScript 擴充功能在非特權連接埠（>= 1024）上存取本機服務（127.0.0.1 / localhost）。"
+  "Maximum": "最大"
 }
