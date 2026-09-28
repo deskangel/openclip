@@ -2082,6 +2082,29 @@ public class PopupWindowController {
         /// The selection context captured before any early-close (loading actions), used to re-show
         /// the popup as a preview card. nil when the popup never closed.
         let selection: SelectionContext?
+
+        /// Resolves the effective result and consumed delivery context when a declared secondary
+        /// is present on a secondary click. Consuming the declaration sets `clickIntent` to `.primary`
+        /// and moves `secondaryToast` to `primaryToast` so explicit outcomes (e.g. a declared
+        /// sequence containing `.paste`) are not downgraded by the secondary Clipboard Invariant.
+        func consumeDeclaredSecondary(for result: ActionResult) -> (result: ActionResult, delivery: DeliveryContext) {
+            guard clickIntent == .secondary, let declared = delivery?.secondary else {
+                return (result, self)
+            }
+            let consumed = DeliveryContext(
+                policy: policy,
+                clickIntent: .primary,
+                delivery: ActionDelivery(secondary: nil, primaryToast: delivery?.secondaryToast, secondaryToast: nil),
+                application: application,
+                userOverride: userOverride,
+                recommendedResult: recommendedResult,
+                outputKind: outputKind,
+                actionTitle: actionTitle,
+                actionIcon: actionIcon,
+                selection: selection
+            )
+            return (declared, consumed)
+        }
     }
 
     /// Snapshots the delivery inputs from the current session state. Called on the main actor,
@@ -2140,10 +2163,11 @@ public class PopupWindowController {
         pendingActionID = nil
         pendingActionRecommendedResult = nil
         pendingActionOutputKind = nil
-        if shouldDismiss(result, delivery: resolvedDelivery) {
+        let (effectiveResult, effectiveDelivery) = resolvedDelivery.consumeDeclaredSecondary(for: result)
+        if shouldDismiss(effectiveResult, delivery: effectiveDelivery) {
             hide()
         }
-        handleActionResult(result, delivery: resolvedDelivery, suppressDeliveryToast: result.containsToast)
+        handleActionResult(effectiveResult, delivery: effectiveDelivery, suppressDeliveryToast: effectiveResult.containsToast)
     }
 
     /// Walks an ActionResult produced by a perform, rendering presentation results in the popup and
@@ -2152,16 +2176,26 @@ public class PopupWindowController {
     /// paste-vs-copy inputs; `nil` means the result is an explicit user request never re-decided.
     /// `suppressDeliveryToast` is true when the top-level result contains a `.toast`: every effect's
     /// delivery companion toast is skipped so the script toast wins (one toast per run).
-    func handleActionResult(_ result: ActionResult, delivery: DeliveryContext? = nil, suppressDeliveryToast: Bool = false) {
-        switch result {
+    /// A `.sequence` runs item N+1 only after item N completes (nested sequences recurse).
+    @discardableResult
+    func handleActionResult(_ result: ActionResult, delivery: DeliveryContext? = nil, suppressDeliveryToast: Bool = false) -> Task<Void, Never>? {
+        let (effectiveResult, effectiveDelivery) = delivery?.consumeDeclaredSecondary(for: result) ?? (result, delivery)
+        let effectiveSuppressToast = suppressDeliveryToast || effectiveResult.containsToast
+        switch effectiveResult {
         case .toast(let feedback):
             presentToast(feedback)
+            return nil
         case .openConfiguration(let request):
             presentConfiguration(for: request)
+            return nil
         case .sequence(let items):
-            for item in items { handleActionResult(item, delivery: delivery, suppressDeliveryToast: suppressDeliveryToast) }
+            return Task { @MainActor in
+                for item in items {
+                    await self.handleActionResult(item, delivery: effectiveDelivery, suppressDeliveryToast: effectiveSuppressToast)?.value
+                }
+            }
         default:
-            handleEffect(result, delivery: delivery, suppressDeliveryToast: suppressDeliveryToast)
+            return handleEffect(effectiveResult, delivery: effectiveDelivery, suppressDeliveryToast: effectiveSuppressToast)
         }
     }
 
@@ -2303,14 +2337,15 @@ public class PopupWindowController {
     /// secondary dismisses still dismisses. `canPaste` is irrelevant here — every probe outcome
     /// (an honored paste or a downgraded copy) dismisses.
     private func shouldDismiss(_ result: ActionResult, delivery: DeliveryContext) -> Bool {
+        let (effectiveResult, effectiveDelivery) = delivery.consumeDeclaredSecondary(for: result)
         let resolved = ActionResultDelivery.resolve(
-            raw: result,
-            clickIntent: delivery.clickIntent,
+            raw: effectiveResult,
+            clickIntent: effectiveDelivery.clickIntent,
             canPaste: false,
-            delivery: delivery.delivery ?? .none,
-            preference: delivery.userOverride,
-            recommendedResult: delivery.recommendedResult,
-            outputKind: delivery.outputKind
+            delivery: effectiveDelivery.delivery ?? .none,
+            preference: effectiveDelivery.userOverride,
+            recommendedResult: effectiveDelivery.recommendedResult,
+            outputKind: effectiveDelivery.outputKind
         ).result
         if isText(resolved) { return false }
         if case .file = resolved { return false }
@@ -2376,10 +2411,11 @@ public class PopupWindowController {
                 } else {
                     result = try await action.perform(performContext)
                 }
-                if self.shouldDismiss(result, delivery: delivery) {
+                let (effectiveResult, effectiveDelivery) = delivery.consumeDeclaredSecondary(for: result)
+                if self.shouldDismiss(effectiveResult, delivery: effectiveDelivery) {
                     self.hide()
                 }
-                self.handleActionResult(result, delivery: delivery, suppressDeliveryToast: result.containsToast)
+                self.handleActionResult(effectiveResult, delivery: effectiveDelivery, suppressDeliveryToast: effectiveResult.containsToast)
                 self.inFlightDeliveryContext = nil
             } catch {
                 Log.presentation.error("Action failed (id \(action.id, privacy: .public)): \(error.localizedDescription)")
@@ -2433,7 +2469,8 @@ public class PopupWindowController {
                     self.toastController.hide()
                     return
                 }
-                await self.settleLoadingResult(result, delivery: delivery, suppressDeliveryToast: result.containsToast)
+                let (effectiveResult, effectiveDelivery) = delivery.consumeDeclaredSecondary(for: result)
+                await self.settleLoadingResult(effectiveResult, delivery: effectiveDelivery, suppressDeliveryToast: effectiveResult.containsToast)
             } catch is CancellationError {
                 Log.presentation.info("Loading action cancelled (id \(action.id, privacy: .public))")
                 self.toastController.hide()
@@ -2456,7 +2493,9 @@ public class PopupWindowController {
     /// a `.toast`), the delivery companion is skipped and whatever toast is showing is left alone —
     /// the script toast item in the tree presents itself, one toast per run.
     private func settleLoadingResult(_ result: ActionResult, delivery: DeliveryContext, suppressDeliveryToast: Bool = false) async {
-        switch result {
+        let (effectiveResult, effectiveDelivery) = delivery.consumeDeclaredSecondary(for: result)
+        let effectiveSuppressToast = suppressDeliveryToast || effectiveResult.containsToast
+        switch effectiveResult {
         case .toast(var feedback):
             feedback.keepVisible = false
             toastController.show(feedback)
@@ -2464,34 +2503,34 @@ public class PopupWindowController {
             toastController.hide()
             presentConfiguration(for: request)
         case .sequence(let items):
-            for item in items { await settleLoadingResult(item, delivery: delivery, suppressDeliveryToast: suppressDeliveryToast) }
+            for item in items { await settleLoadingResult(item, delivery: effectiveDelivery, suppressDeliveryToast: effectiveSuppressToast) }
         default:
-            let effect = result
+            let effect = effectiveResult
             do {
-                let resolved = await resolveDelivery(effect, delivery: delivery, suppressDeliveryToast: suppressDeliveryToast)
+                let resolved = await resolveDelivery(effect, delivery: effectiveDelivery, suppressDeliveryToast: effectiveSuppressToast)
                 if case .text(let text) = resolved.result {
                     // Preview preference on a loading action: the popup early-closed for the spinner,
                     // so hide the spinner and re-show the popup as a content-mode card, anchored to
                     // the original selection (captured before the early close). Re-probe so the card
                     // gates its Paste button on the real answer.
                     toastController.hide()
-                    if let selection = delivery.selection {
-                        let canPaste = await pasteProbe.canPaste(in: delivery.application, policy: delivery.policy) ?? false
+                    if let selection = effectiveDelivery.selection {
+                        let canPaste = await pasteProbe.canPaste(in: effectiveDelivery.application, policy: effectiveDelivery.policy) ?? false
                         show(for: selection, pasteAvailable: canPaste)
-                        showResultCard(text: text, isError: false, title: delivery.actionTitle ?? "Action", icon: delivery.actionIcon, session: aiSessionID, canFollowUp: false)
+                        showResultCard(text: text, isError: false, title: effectiveDelivery.actionTitle ?? "Action", icon: effectiveDelivery.actionIcon, session: aiSessionID, canFollowUp: false)
                     }
                     return
                 }
                 if case .file(let filePayload) = resolved.result {
                     toastController.hide()
-                    if let selection = delivery.selection {
-                        let canPaste = await pasteProbe.canPaste(in: delivery.application, policy: delivery.policy) ?? false
+                    if let selection = effectiveDelivery.selection {
+                        let canPaste = await pasteProbe.canPaste(in: effectiveDelivery.application, policy: effectiveDelivery.policy) ?? false
                         show(for: selection, pasteAvailable: canPaste)
                         showResultCard(
                             text: filePayload.displayName,
                             isError: false,
-                            title: delivery.actionTitle ?? filePayload.displayName,
-                            icon: delivery.actionIcon,
+                            title: effectiveDelivery.actionTitle ?? filePayload.displayName,
+                            icon: effectiveDelivery.actionIcon,
                             session: aiSessionID,
                             canFollowUp: false,
                             file: filePayload
@@ -2511,13 +2550,13 @@ public class PopupWindowController {
                     }
                     return nil
                 }()
-                if let toast = toastToShow, !suppressDeliveryToast {
+                if let toast = toastToShow, !effectiveSuppressToast {
                     toastController.swapTo(toast)
-                } else if !suppressDeliveryToast {
+                } else if !effectiveSuppressToast {
                     toastController.hide()
                 }
             } catch {
-                await settleLoadingResult(.toast(StatusFeedback(error: error)), delivery: delivery)
+                await settleLoadingResult(.toast(StatusFeedback(error: error)), delivery: effectiveDelivery)
             }
         }
     }
