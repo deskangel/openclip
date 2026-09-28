@@ -6,6 +6,11 @@ import AppKit
 @MainActor
 final class MacSelectionMonitorTests: XCTestCase {
 
+    override func setUp() async throws {
+        try await super.setUp()
+        await MainActor.run { TestIsolation.reset() }
+    }
+
     func testCommandATriggersSelectionRetrieval() {
         XCTAssertTrue(MacSelectionMonitor.isSelectionTrigger(keyCode: 0x00, flags: [.command]))
         XCTAssertFalse(MacSelectionMonitor.isSelectionTrigger(keyCode: 0x08, flags: [.command]))
@@ -942,6 +947,94 @@ final class MacSelectionMonitorTests: XCTestCase {
 
     // MARK: - System chrome gating
 
+    func testWindowMoveResizeOrCloseDoesNotRetrieveOldSelection() async {
+        let frame = CGRect(x: 100, y: 100, width: 500, height: 400)
+        let changedFrames: [CGRect?] = [frame.offsetBy(dx: 80, dy: 30),
+                                       CGRect(x: 100, y: 100, width: 600, height: 400), nil]
+        for changedFrame in changedFrames {
+            let store = MemorySettingsStore()
+            store.set(.isMouseHoldEnabled, value: false)
+            let monitor = MacSelectionMonitor(settingsStore: store)
+            monitor.isSystemChromeAt = { _ in false }
+            monitor.windowAtPoint = { _ in SelectionGestureWindow(id: 123, frame: frame) }
+            monitor.windowFrame = { _ in changedFrame }
+            monitor.retriever = SelectionRetrievalCoordinator(inspect: {
+                XCTFail("Window gestures must be rejected before reading even an old AX selection")
+                return Self.fixtureTarget(role: "AXTextField", selectedText: "old selection")
+            }, copyCapture: { _ in
+                XCTFail("Window gestures must never attempt Copy")
+                return nil as Core.TextResult?
+            })
+
+            monitor.handleMouseDown(at: CGPoint(x: 100, y: 100))
+            monitor.handleMouseUp(app: MockTestApp(bundleID: "com.apple.TextEdit"),
+                                  cursor: CGPoint(x: 200, y: 150), clickCount: 1)
+            await monitor.debounceTask?.value
+            XCTAssertNil(monitor.debounceTask)
+            XCTAssertNil(monitor.latestSelection)
+        }
+    }
+
+    func testTextDragWithinStationaryWindowStillRetrievesSelection() async {
+        let store = MemorySettingsStore()
+        store.set(.isMouseHoldEnabled, value: false)
+        let monitor = MacSelectionMonitor(settingsStore: store)
+        let frame = CGRect(x: 100, y: 100, width: 500, height: 400)
+        monitor.isSystemChromeAt = { _ in false }
+        monitor.windowAtPoint = { _ in SelectionGestureWindow(id: 123, frame: frame) }
+        monitor.windowFrame = { _ in frame }
+        monitor.policyResolver = { _ in .default }
+        monitor.currentCursorProvider = { .unknown }
+        monitor.retriever = SelectionRetrievalCoordinator(inspect: {
+            Self.fixtureTarget(role: "AXTextField", selectedText: "new selection")
+        }, copyCapture: { _ in nil })
+
+        monitor.handleMouseDown(at: CGPoint(x: 100, y: 100))
+        monitor.handleMouseUp(app: MockTestApp(bundleID: "com.apple.TextEdit"),
+                              cursor: CGPoint(x: 200, y: 150), clickCount: 1)
+        await monitor.debounceTask?.value
+        XCTAssertEqual(monitor.latestSelection?.context.text, "new selection")
+    }
+
+    func testNewPressIncludingSystemChromeCancelsPendingRetrievalAndHold() {
+        for isChrome in [false, true] {
+            let store = MemorySettingsStore()
+            store.set(.isMouseHoldEnabled, value: false)
+            let monitor = MacSelectionMonitor(settingsStore: store)
+            monitor.isSystemChromeAt = { _ in isChrome }
+            let read = Task<Void, Never> { }
+            let hold = Task<Void, Never> { }
+            monitor.debounceTask = read
+            monitor.mouseHoldTask = hold
+            monitor.triggeredByHold = true
+
+            monitor.handleMouseDown(at: CGPoint(x: 100, y: 100))
+
+            XCTAssertTrue(read.isCancelled)
+            XCTAssertTrue(hold.isCancelled)
+            XCTAssertNil(monitor.debounceTask)
+            XCTAssertNil(monitor.mouseHoldTask)
+            XCTAssertFalse(monitor.triggeredByHold)
+        }
+    }
+
+    func testApplicationActivationCancelsPendingAutomaticReads() {
+        let monitor = MacSelectionMonitor(settingsStore: MemorySettingsStore())
+        let read = Task<Void, Never> { }
+        let hold = Task<Void, Never> { }
+        monitor.debounceTask = read
+        monitor.mouseHoldTask = hold
+        monitor.triggeredByHold = true
+
+        monitor.cancelPendingSelection()
+
+        XCTAssertTrue(read.isCancelled)
+        XCTAssertTrue(hold.isCancelled)
+        XCTAssertNil(monitor.debounceTask)
+        XCTAssertNil(monitor.mouseHoldTask)
+        XCTAssertFalse(monitor.triggeredByHold)
+    }
+
     /// Regression: a drag that starts in a window and overshoots onto the menu bar or Dock — the
     /// normal way of selecting text against a screen edge — was discarded because the *release*
     /// point tested as chrome. Only the press decides whether the interaction is chrome.
@@ -1282,4 +1375,3 @@ private final class MockTestApp: NSRunningApplication {
 
     override var bundleIdentifier: String? { bundleID }
 }
-

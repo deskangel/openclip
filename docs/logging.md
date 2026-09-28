@@ -60,7 +60,7 @@ Each subsystem owns a dedicated `LogChannel` property on `Log` under the `com.op
 | `coordinator`    | action coordination / enablement evaluation                 |
 | `shell`          | `ShellProcessRunner` (subprocess watchdog, timeout)         |
 | `js`             | `OpenClipJSHost` runtime                                    |
-| `selection`      | `SelectionRetrievalCoordinator` + strategies / `MacSelectionMonitor` (gate decisions, mode routing, AX + pasteboard + keyboard retrieval); `PasteAvailabilityProbe` limit and time-limit results |
+| `selection`      | `SelectionRetrievalCoordinator` + strategies / `MacSelectionMonitor` (gate decisions, window gesture rejection, mode routing, AX + pasteboard + keyboard retrieval); `AutomaticCopyCapture` authorization skips and posted copy triggers (PID only); `PasteAvailabilityProbe` limit and time-limit results |
 | `extensions`     | `ExtensionManager`, remote installer, extension store/onboarding install & uninstall, **manifest decode/validation rejections** |
 | `ai`             | AI providers and preset persistence                         |
 | `permissions`    | TCC / accessibility permission management                   |
