@@ -1281,7 +1281,168 @@ final class ActionResultDeliveryTests: XCTestCase {
         assertCase(handler.results[1], .openURL(url))
     }
 
+    // MARK: - Greptile review regression tests: feedback preservation & declared sequence paste
+
+    /// Issue 1: When a primary perform returns a sequence containing a toast, and a secondary
+    /// click has a declared outcome with `secondaryToast`, suppression must be based on the outcome
+    /// that actually runs. The declared outcome's `secondaryToast` must not be suppressed by the
+    /// discarded primary toast.
+    @MainActor
+    func testDiscardedPrimarySequenceToastDoesNotSuppressDeclaredSecondaryToast() async throws {
+        let handler = RecordingHandler()
+        let toast = ToastPanelController(autoDismissNanoseconds: 60_000_000_000)
+        let controller = shownController(resultHandler: handler,
+                                         pasteProbe: FixedProbe(result: true),
+                                         appPolicy: .default,
+                                         toastController: toast)
+        defer { controller.hide(); toast.hide() }
+
+        let scriptToast = StatusFeedback(message: "discarded", style: .info)
+        let secondaryToast = StatusFeedback(message: "declared secondary feedback", style: .success)
+        let url = URL(string: "https://alt")!
+        let stub = DeclaredDeliveryStub(
+            delivery: ActionDelivery(secondary: .openURL(url), secondaryToast: secondaryToast),
+            performResult: .sequence([.toast(scriptToast), .paste("primary")])
+        )
+        controller.runAction(stub, with: controllerCurrentContext(controller), isSecondaryClick: true)
+
+        assertCase(try await awaitDelivery(from: handler), .openURL(url))
+        await awaitToastMessage(toast, "declared secondary feedback")
+        XCTAssertEqual(toast.currentFeedback, secondaryToast,
+                       "the declared secondary toast must not be suppressed by the discarded primary sequence toast")
+    }
+
+    /// Issue 1 (loading path): When a loading action returns a sequence containing a toast and the
+    /// secondary click replaces it with an outcome without a companion toast, the spinner must fade
+    /// (not get stuck showing) because suppression is based on the outcome that actually runs.
+    @MainActor
+    func testDiscardedPrimarySequenceToastDoesNotLeaveLoadingSpinnerOnSecondaryClick() async throws {
+        let handler = RecordingHandler()
+        let toast = ToastPanelController(autoDismissNanoseconds: 100_000_000)
+        let controller = shownController(resultHandler: handler,
+                                         pasteProbe: FixedProbe(result: true),
+                                         appPolicy: .default,
+                                         toastController: toast)
+        defer { controller.hide(); toast.hide() }
+
+        let scriptToast = StatusFeedback(message: "discarded", style: .info)
+        let url = URL(string: "https://alt")!
+        let stub = DeclaredDeliveryStub(
+            delivery: ActionDelivery(secondary: .openURL(url)),
+            performResult: .sequence([.toast(scriptToast), .paste("primary")]),
+            showsLoading: true
+        )
+        controller.runLoadingAction(stub, with: controllerCurrentContext(controller), isSecondaryClick: true)
+
+        assertCase(try await awaitDelivery(from: handler), .openURL(url))
+        await awaitLoadingFade(toast: toast)
+        XCTAssertFalse(toast.isLoading, "the loading indicator must fade when the running outcome has no companion toast")
+    }
+
+    /// Issue 1 (loading path with secondaryToast): When a loading action returns a sequence
+    /// containing a toast and the secondary click replaces it with an outcome that declares
+    /// `secondaryToast`, the spinner transitions to that declared toast.
+    @MainActor
+    func testDiscardedPrimarySequenceToastPreservesDeclaredSecondaryToastOnLoading() async throws {
+        let handler = RecordingHandler()
+        let toast = ToastPanelController(autoDismissNanoseconds: 60_000_000_000)
+        let controller = shownController(resultHandler: handler,
+                                         pasteProbe: FixedProbe(result: true),
+                                         appPolicy: .default,
+                                         toastController: toast)
+        defer { controller.hide(); toast.hide() }
+
+        let scriptToast = StatusFeedback(message: "discarded", style: .info)
+        let secondaryToast = StatusFeedback(message: "loading secondary feedback", style: .success)
+        let url = URL(string: "https://alt")!
+        let stub = DeclaredDeliveryStub(
+            delivery: ActionDelivery(secondary: .openURL(url), secondaryToast: secondaryToast),
+            performResult: .sequence([.toast(scriptToast), .paste("primary")]),
+            showsLoading: true
+        )
+        controller.runLoadingAction(stub, with: controllerCurrentContext(controller), isSecondaryClick: true)
+
+        assertCase(try await awaitDelivery(from: handler), .openURL(url))
+        await awaitToastMessage(toast, "loading secondary feedback")
+        XCTAssertEqual(toast.currentFeedback, secondaryToast,
+                       "the declared secondary toast must surface for loading action secondary click")
+    }
+
+    /// Issue 2: A declared secondary that is a sequence containing `.paste` must NOT have that
+    /// paste converted to `.copy` when the target can paste. The author explicitly declared `.paste`
+    /// as the secondary outcome.
+    @MainActor
+    func testDeclaredSequenceSecondaryPastesWhenCanPaste() async throws {
+        let handler = RecordingHandler()
+        let controller = shownController(resultHandler: handler,
+                                         pasteProbe: FixedProbe(result: true),
+                                         appPolicy: .default)
+        defer { controller.hide() }
+
+        let url = URL(string: "https://alt")!
+        let stub = DeclaredDeliveryStub(
+            delivery: ActionDelivery(secondary: .sequence([.paste("declared_paste"), .openURL(url)])),
+            performResult: .sequence([.copy("a")])
+        )
+        controller.runAction(stub, with: controllerCurrentContext(controller), isSecondaryClick: true)
+
+        assertCase(try await awaitDelivery(from: handler), .paste("declared_paste"))
+        try await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertEqual(handler.results.count, 2)
+        assertCase(handler.results[1], .openURL(url))
+    }
+
+    /// Issue 2 (cannot paste): If the declared sequence contains `.paste` but the target cannot paste,
+    /// the probe still downgrades `.paste` to `.copy`.
+    @MainActor
+    func testDeclaredSequenceSecondaryDowngradesToCopyWhenCannotPaste() async throws {
+        let handler = RecordingHandler()
+        let controller = shownController(resultHandler: handler,
+                                         pasteProbe: FixedProbe(result: false),
+                                         appPolicy: .default)
+        defer { controller.hide() }
+
+        let url = URL(string: "https://alt")!
+        let stub = DeclaredDeliveryStub(
+            delivery: ActionDelivery(secondary: .sequence([.paste("declared_paste"), .openURL(url)])),
+            performResult: .sequence([.copy("a")])
+        )
+        controller.runAction(stub, with: controllerCurrentContext(controller), isSecondaryClick: true)
+
+        assertCase(try await awaitDelivery(from: handler), .copy("declared_paste"))
+        try await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertEqual(handler.results.count, 2)
+        assertCase(handler.results[1], .openURL(url))
+    }
+
+    /// Issue 2 (loading path): A declared secondary sequence containing `.paste` on the loading
+    /// settle path also preserves `.paste` when paste is available.
+    @MainActor
+    func testDeclaredLoadingSequenceSecondaryPastesWhenCanPaste() async throws {
+        let handler = RecordingHandler()
+        let toast = ToastPanelController(autoDismissNanoseconds: 100_000_000)
+        let controller = shownController(resultHandler: handler,
+                                         pasteProbe: FixedProbe(result: true),
+                                         appPolicy: .default,
+                                         toastController: toast)
+        defer { controller.hide(); toast.hide() }
+
+        let url = URL(string: "https://alt")!
+        let stub = DeclaredDeliveryStub(
+            delivery: ActionDelivery(secondary: .sequence([.paste("declared_paste"), .openURL(url)])),
+            performResult: .sequence([.copy("a")]),
+            showsLoading: true
+        )
+        controller.runLoadingAction(stub, with: controllerCurrentContext(controller), isSecondaryClick: true)
+
+        assertCase(try await awaitDelivery(from: handler), .paste("declared_paste"))
+        try await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertEqual(handler.results.count, 2)
+        assertCase(handler.results[1], .openURL(url))
+    }
+
     // MARK: - Declared .paste secondary probes even on a secondary click
+
 
     /// A declared `.paste` secondary is pasted on a secondary click: the probe must still run (the
     /// force-copy short-circuit only applies when the click's outcome is a copy). With paste
