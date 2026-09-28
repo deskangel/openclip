@@ -186,6 +186,7 @@ jobs:
       #     --signer-workflow ganeshmshetty/openclip/.github/workflows/release.yml
       - name: Attest Build Provenance
         uses: actions/attest-build-provenance@v4
+        continue-on-error: true
         with:
           subject-path: |
             build/release/*.zip
