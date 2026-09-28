@@ -231,7 +231,6 @@ public final class ActionRegistry: ObservableObject, Sendable {
         registeredActions.removeAll(where: isMatch)
         registeredActions.append(contentsOf: newActions)
         sortActions()
-        pruneActionOrder()
     }
 
     public func pruneActionOrder() {

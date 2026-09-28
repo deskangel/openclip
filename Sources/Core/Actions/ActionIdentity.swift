@@ -53,7 +53,7 @@ public enum ActionIdentity {
     public static func isEligibleForGrouping(_ action: any Action) -> Bool {
         !isAIPreset(action) &&
         !action.chrome.launchesAI &&
-        action.id != "builtin.ai_tools" &&
+        action.id != "builtin.aiTools" &&
         !isCompletionPseudoAction(action) &&
         action.id != "builtin.completion" &&
         action.chrome.popupBehavior != .showSubActions &&

@@ -125,12 +125,6 @@ public enum ActionSearchKeywords {
             "ia", "intelligence artificielle", "assistant",
             "AI", "人工知能", "アシスタント"
         ],
-        "builtin.ai_tools": [
-            "ai", "intelligence", "assistant", "bot", "smart",
-            "智能", "助手", "人工智能", "大模型", "助理",
-            "ia", "intelligence artificielle", "assistant",
-            "AI", "人工知能", "アシスタント"
-        ],
 
         // AI Presets
         "proofread": [

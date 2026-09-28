@@ -539,6 +539,43 @@ final class ActionRegistryTests: XCTestCase {
         XCTAssertEqual(Self.palette(registry), ["ai.preset.rewrite", "ai.preset.proofread", "builtin.cut"])
     }
 
+    /// Regression test: replaceRegisteredActions replaces a known subset of actions and must NOT
+    /// prune action.order against registeredActions, which would drop saved positions of actions
+    /// not yet registered (e.g. AIToolsAction during startup).
+    @MainActor
+    func testReplaceRegisteredActionsPreservesSavedActionOrderAcrossInitialSync() {
+        let store = MemorySettingsStore()
+        let savedOrder = ["builtin.search", "builtin.aiTools", "builtin.copy"]
+        store.set(.actionOrder, value: savedOrder)
+        let registry = ActionRegistry(settingsStore: store)
+
+        // Presets are replaced (as in AIActionSync.sync() on launch) before builtin.aiTools is registered.
+        registry.replaceRegisteredActions(
+            matching: { ActionIdentity.isAIPreset($0) },
+            with: [Self.aiPreset("ai.preset.proofread"), Self.aiPreset("ai.preset.rewrite")]
+        )
+
+        // The saved order must not have been pruned.
+        XCTAssertEqual(store.get(.actionOrder), savedOrder)
+
+        // Register the launcher and surrounding actions.
+        registry.register(action: MockAction(id: "builtin.copy", shouldBeEnabled: true))
+        registry.register(action: MockLauncherAction(id: "builtin.aiTools"))
+        registry.register(action: MockAction(id: "builtin.search", shouldBeEnabled: true))
+
+        // Saved order remains intact and dictates the action positions.
+        XCTAssertEqual(store.get(.actionOrder), savedOrder)
+        // In the catalog, top-level actions follow saved order while presets trail their parent launcher.
+        XCTAssertEqual(
+            registry.actions.filter { !ActionIdentity.isAIPreset($0) }.map(\.id),
+            ["builtin.search", "builtin.aiTools", "builtin.copy"]
+        )
+        XCTAssertEqual(
+            registry.actions.map(\.id),
+            ["builtin.search", "builtin.aiTools", "ai.preset.proofread", "ai.preset.rewrite", "builtin.copy"]
+        )
+    }
+
     /// A disabled AI preset is gone from the palette too — the toggle in AI → Actions is the same
     /// promise as the one in Preferences → Actions.
     @MainActor
