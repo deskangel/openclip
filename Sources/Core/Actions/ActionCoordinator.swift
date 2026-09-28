@@ -324,7 +324,7 @@ public final class ActionCoordinator: ObservableObject, Sendable {
         let trimmed = actionID.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return false }
         guard trimmed != groupID && !trimmed.hasPrefix("vgroup.") else { return false }
-        guard trimmed != "builtin.ai_tools" && trimmed != "builtin.completion" else { return false }
+        guard trimmed != "builtin.aiTools" && trimmed != "builtin.completion" else { return false }
         if actionGroupDefs.contains(where: { $0.id == trimmed }) { return false }
         for def in actionGroupDefs where def.id != groupID {
             if def.memberActionIDs.contains(trimmed) { return false }

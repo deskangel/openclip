@@ -627,13 +627,13 @@ final class ActionsOutlineDropTests: XCTestCase {
 
     func testAnIneligibleActionIsNeverGrouped() {
         let aiTools = DummyAction(
-            id: "builtin.ai_tools",
+            id: "builtin.aiTools",
             title: "AI Tools",
             chrome: ActionChrome(badge: .none, rowStyle: .standard, popupBehavior: .showSubActions, source: .builtin)
         )
         coordinator.register(action: aiTools)
 
-        XCTAssertNil(outlineCoordinator.dropOntoOutcome(draggedID: "builtin.ai_tools", target: standalone("action.1")),
+        XCTAssertNil(outlineCoordinator.dropOntoOutcome(draggedID: "builtin.aiTools", target: standalone("action.1")),
                      "dragging something that cannot be grouped")
         XCTAssertNil(
             outlineCoordinator.dropOntoOutcome(

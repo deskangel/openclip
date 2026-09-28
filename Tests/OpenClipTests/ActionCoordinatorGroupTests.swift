@@ -201,7 +201,7 @@ final class ActionCoordinatorGroupTests: XCTestCase {
 
     func testCoordinatorPreventsIneligibleActionsFromEnteringGroup() {
         let aiTools = DummyAction(
-            id: "builtin.ai_tools",
+            id: "builtin.aiTools",
             title: "AI Tools",
             chrome: ActionChrome(popupBehavior: .perform, launchesAI: true)
         )
@@ -223,7 +223,7 @@ final class ActionCoordinatorGroupTests: XCTestCase {
         coordinator.createGroup(
             title: "Mixed Group",
             iconName: "folder",
-            memberActionIDs: ["action.1", "builtin.ai_tools", "builtin.completion", "preset.proofread"]
+            memberActionIDs: ["action.1", "builtin.aiTools", "builtin.completion", "preset.proofread"]
         )
         let group = coordinator.actionGroupDefs.first(where: { $0.title == "Mixed Group" })
         XCTAssertNotNil(group)
@@ -232,8 +232,8 @@ final class ActionCoordinatorGroupTests: XCTestCase {
         guard let groupID = group?.id else { return }
 
         // Try adding AI tools
-        coordinator.addToGroup(actionID: "builtin.ai_tools", groupID: groupID)
-        XCTAssertFalse(coordinator.actionGroupDefs[0].memberActionIDs.contains("builtin.ai_tools"))
+        coordinator.addToGroup(actionID: "builtin.aiTools", groupID: groupID)
+        XCTAssertFalse(coordinator.actionGroupDefs[0].memberActionIDs.contains("builtin.aiTools"))
 
         // Try adding word completion
         coordinator.addToGroup(actionID: "builtin.completion", groupID: groupID)
