@@ -55,8 +55,8 @@ public struct PreferencesView: View {
     /// The Actions list measure.
     private static let customizeListMaxWidth: CGFloat = SettingsLayout.contentMaxWidth
 
-    @State private var disabledActionIDs: Set<String> = []
-    @State private var disabledPackages: Set<String> = []
+    @Setting(SettingKey.disabledActionIDs) private var disabledActionIDs
+    @Setting(SettingKey.disabledPackages) private var disabledPackages
     /// The Customize list's selection, kept here so the toolbar's New Group can seed a group with it.
     @State private var selectedRowIDs: Set<String> = []
     /// The Customize list's search text.
@@ -116,7 +116,6 @@ public struct PreferencesView: View {
                 router.select(initialPage)
             }
             syncToolbar()
-            loadDisabledState()
             Task {
                 await storeViewModel.resetAndFetch(limit: 100)
                 await ExtensionUpdateManager.shared.checkForUpdates()
@@ -127,7 +126,6 @@ public struct PreferencesView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .openClipExtensionsDidChange)) { _ in
             packageReloadToken += 1
-            loadDisabledState()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSColor.systemColorsDidChangeNotification)) { _ in
             systemColorsToken += 1
@@ -192,11 +190,9 @@ public struct PreferencesView: View {
             syncToolbar()
         }
         .onChange(of: disabledActionIDs) { _, _ in
-            saveDisabledState()
             syncToolbar()
         }
         .onChange(of: disabledPackages) { _, _ in
-            saveDisabledState()
             syncToolbar()
         }
         .onChange(of: packageDetails) { _, _ in syncToolbar() }
@@ -248,8 +244,10 @@ public struct PreferencesView: View {
             if info.commands.count == 1 && !info.isGroup {
                 return nil
             }
+            let isAllCommandsDisabled = !info.commands.isEmpty && info.commands.allSatisfy { disabledActionIDs.contains($0.id) }
+            let isEnabled = info.gatedReason == nil && !disabledPackages.contains(id) && !isAllCommandsDisabled
             return SettingsToolbarToggle(
-                isOn: info.gatedReason == nil && !disabledPackages.contains(id),
+                isOn: isEnabled,
                 label: String(localized: "Enable \(info.name)")
             )
         default:
@@ -263,6 +261,15 @@ public struct PreferencesView: View {
             aiManager.isAIEnabled = isOn
         case .extensionPackage(let id):
             guard let info = InstalledExtensionInfo.info(for: id, in: coordinator.actions) else { return }
+            if isOn {
+                for cmd in info.commands {
+                    disabledActionIDs.remove(cmd.id)
+                }
+            } else {
+                for cmd in info.commands {
+                    disabledActionIDs.insert(cmd.id)
+                }
+            }
             ActionEnablement.packageBinding(
                 packageID: id,
                 gatedReason: info.gatedReason,
@@ -862,7 +869,12 @@ public struct PreferencesView: View {
                info.commands.count == 1,
                !info.isGroup,
                let singleAction = info.commands.first {
-                ActionEditorPage(action: singleAction, isSidebarPage: true)
+                ActionEditorPage(
+                    action: singleAction,
+                    isSidebarPage: true,
+                    disabledActionIDs: $disabledActionIDs,
+                    disabledPackages: $disabledPackages
+                )
             } else {
                 ExtensionPackagePage(
                     packageID: id,
@@ -874,7 +886,12 @@ public struct PreferencesView: View {
             }
         case .builtinAction(let id):
             if let action = coordinator.actions.first(where: { $0.id == id }) {
-                ActionEditorPage(action: action, isSidebarPage: true)
+                ActionEditorPage(
+                    action: action,
+                    isSidebarPage: true,
+                    disabledActionIDs: $disabledActionIDs,
+                    disabledPackages: $disabledPackages
+                )
             } else {
                 Color.clear.onAppear { router.select(.customize) }
             }
@@ -907,20 +924,14 @@ public struct PreferencesView: View {
             if action.chrome.rowStyle == .actionGroup {
                 GroupEditorPage(groupID: action.id)
             } else {
-                ActionEditorPage(action: action)
+                ActionEditorPage(
+                    action: action,
+                    disabledActionIDs: $disabledActionIDs,
+                    disabledPackages: $disabledPackages
+                )
             }
         } else {
             Color.clear.onAppear { router.pop() }
         }
-    }
-
-    private func loadDisabledState() {
-        disabledActionIDs = DefaultSettingsStore.shared.get(.disabledActionIDs)
-        disabledPackages = DefaultSettingsStore.shared.get(.disabledPackages)
-    }
-
-    private func saveDisabledState() {
-        DefaultSettingsStore.shared.set(.disabledActionIDs, value: disabledActionIDs)
-        DefaultSettingsStore.shared.set(.disabledPackages, value: disabledPackages)
     }
 }

@@ -27,8 +27,8 @@ public struct ActionEditorPage: View {
     @ObservedObject private var router = SettingsRouter.shared
     @ObservedObject private var coordinator = ActionCoordinator.shared
     @ObservedObject private var customizationManager = ActionCustomizationManager.shared
-    @Setting(SettingKey.disabledActionIDs) private var disabledActionIDs: Set<String>
-    @Setting(SettingKey.disabledPackages) private var disabledPackages: Set<String>
+    @Binding var disabledActionIDs: Set<String>
+    @Binding var disabledPackages: Set<String>
 
     @State private var customTitle: String = ""
     @State private var iconSymbol: String = ""
@@ -94,10 +94,14 @@ public struct ActionEditorPage: View {
 
     public init(
         action: any Action,
-        isSidebarPage: Bool = false
+        isSidebarPage: Bool = false,
+        disabledActionIDs: Binding<Set<String>> = .constant([]),
+        disabledPackages: Binding<Set<String>> = .constant([])
     ) {
         self.action = action
         self.isSidebarPage = isSidebarPage
+        self._disabledActionIDs = disabledActionIDs
+        self._disabledPackages = disabledPackages
         let initialDelivery: String
         if let pref = ActionCustomizationManager.shared.override(for: action.id)?.deliveryPreference {
             initialDelivery = pref.rawValue
