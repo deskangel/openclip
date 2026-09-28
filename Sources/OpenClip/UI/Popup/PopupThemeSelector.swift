@@ -7,6 +7,7 @@
 // Styled with modern SettingsCard, icon tiles, and hairline dividers.
 
 import SwiftUI
+import AppKit
 import Core
 
 @MainActor
@@ -14,7 +15,7 @@ struct PopupThemeSelector: View {
     @Setting(SettingKey.popupTheme) private var theme
     @Setting(SettingKey.popupThemeColor) private var themeColor
     @Setting(SettingKey.popupScale) private var popupScale
-    @Setting(SettingKey.popupBarWidth) private var barWidthLevel
+    @Setting(SettingKey.popupPageSize) private var pageSize
     @Setting(SettingKey.popupAlignment) private var popupAlignment
     @Setting(SettingKey.popupVerticalPosition) private var popupVerticalPosition
     @Setting(SettingKey.contextualActionsEnabled) private var contextualActionsEnabled
@@ -70,7 +71,7 @@ struct PopupThemeSelector: View {
         theme == SettingKey.popupTheme.defaultValue &&
         themeColor == SettingKey.popupThemeColor.defaultValue &&
         popupScale == SettingKey.popupScale.defaultValue &&
-        barWidthLevel == SettingKey.popupBarWidth.defaultValue &&
+        pageSize == SettingKey.popupPageSize.defaultValue &&
         popupAlignment == SettingKey.popupAlignment.defaultValue &&
         popupVerticalPosition == SettingKey.popupVerticalPosition.defaultValue &&
         contextualActionsEnabled == SettingKey.contextualActionsEnabled.defaultValue &&
@@ -81,7 +82,7 @@ struct PopupThemeSelector: View {
         theme = SettingKey.popupTheme.defaultValue
         themeColor = SettingKey.popupThemeColor.defaultValue
         popupScale = SettingKey.popupScale.defaultValue
-        barWidthLevel = SettingKey.popupBarWidth.defaultValue
+        pageSize = SettingKey.popupPageSize.defaultValue
         popupAlignment = SettingKey.popupAlignment.defaultValue
         popupVerticalPosition = SettingKey.popupVerticalPosition.defaultValue
         contextualActionsEnabled = SettingKey.contextualActionsEnabled.defaultValue
@@ -103,17 +104,6 @@ struct PopupThemeSelector: View {
         case 4: return "110%"
         case 5: return "122%"
         default: return "100%"
-        }
-    }
-
-    private func widthLabel(for level: Int) -> String {
-        switch level {
-        case 1: return String(localized: "Compact")
-        case 2: return String(localized: "Moderate")
-        case 3: return String(localized: "Default")
-        case 4: return String(localized: "Wide")
-        case 5: return String(localized: "Maximum")
-        default: return String(localized: "Default")
         }
     }
 
@@ -188,15 +178,16 @@ struct PopupThemeSelector: View {
                 SettingsDivider()
 
                 SettingsRow(
-                    title: "Popup Width"
+                    title: "Actions Per Page"
                 ) {
                     stepSlider(
                         value: Binding(
-                            get: { barWidthLevel },
-                            set: { barWidthLevel = $0 }
+                            get: { pageSize },
+                            set: { pageSize = $0 }
                         ),
-                        accessibilityLabel: "Popup Width",
-                        labelText: widthLabel(for: barWidthLevel)
+                        range: 3...12,
+                        accessibilityLabel: "Actions Per Page",
+                        labelText: "\(pageSize)"
                     )
                 }
             }
@@ -313,6 +304,7 @@ struct PopupThemeSelector: View {
 
     private func stepSlider(
         value: Binding<Int>,
+        range: ClosedRange<Int> = 1...5,
         accessibilityLabel: LocalizedStringKey,
         labelText: String
     ) -> some View {
@@ -320,9 +312,15 @@ struct PopupThemeSelector: View {
             Slider(
                 value: Binding(
                     get: { Double(value.wrappedValue) },
-                    set: { value.wrappedValue = max(1, min(5, Int(round($0)))) }
+                    set: { newValue in
+                        let clamped = max(range.lowerBound, min(range.upperBound, Int(round(newValue))))
+                        if clamped != value.wrappedValue {
+                            value.wrappedValue = clamped
+                            NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .default)
+                        }
+                    }
                 ),
-                in: 1...5,
+                in: Double(range.lowerBound)...Double(range.upperBound),
                 step: 1
             )
             .accessibilityLabel(accessibilityLabel)

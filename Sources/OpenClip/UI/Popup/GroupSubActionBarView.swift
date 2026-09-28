@@ -30,7 +30,7 @@ public struct GroupSubActionBarView: View {
     /// `chrome.isInlineResult` shows its computed text in place of its icon, exactly like the main bar.
     @ObservedObject private var modeStore: PopupModeStore
 
-    @Setting(SettingKey.popupBarWidth) private var barWidthLevel
+    @Setting(SettingKey.popupPageSize) private var pageSize
 
     private var buttonWidth: CGFloat { PopupMetrics.actionButtonWidth * scale }
     private var barButtonHeight: CGFloat { PopupMetrics.barButtonHeight * scale }
@@ -119,13 +119,22 @@ public struct GroupSubActionBarView: View {
     }
 
     private var maxSubBarBudget: CGFloat {
-        PopupMetrics.barWidth(for: barWidthLevel) * scale
+        (NSScreen.main?.visibleFrame.width ?? 1440.0) * PopupMetrics.maxScreenFraction
     }
 
     private var pages: [[any Action]] {
         // Inline children re-pack at their rendered text width once a preview lands, mirroring the
         // main bar; reading `modeStore.inlineResults` is what makes the view re-evaluate.
-        PopupPageLayout.computePages(actions: subActions, inlineResults: modeStore.inlineResults, leadingWidth: 0, trailingWidth: 0, maxBudget: maxSubBarBudget, scale: scale, presenter: presenter)
+        PopupPageLayout.computePages(
+            actions: subActions,
+            inlineResults: modeStore.inlineResults,
+            leadingWidth: 0,
+            trailingWidth: 0,
+            maxBudget: maxSubBarBudget,
+            maxItemsPerPage: pageSize,
+            scale: scale,
+            presenter: presenter
+        )
     }
 
     private var totalPages: Int {

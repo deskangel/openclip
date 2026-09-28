@@ -147,4 +147,53 @@ final class PopupPageLayoutTests: XCTestCase {
         )
         XCTAssertEqual(withChevrons, 29.0 + 34.0 + 68.0 + 58.0)
     }
+
+    func testMaxScreenFractionAndMaxBarWidth() {
+        XCTAssertEqual(PopupMetrics.maxScreenFraction, 0.50)
+        XCTAssertEqual(PopupMetrics.maxBarWidth(for: 1440.0), 720.0)
+        XCTAssertEqual(PopupMetrics.maxBarWidth(for: 1920.0), 960.0)
+    }
+
+    func testComputePagesLimitsByMaxItemsPerPage() {
+        // 10 icon actions. Even if maxBudget is enormous (e.g. 2000pt),
+        // maxItemsPerPage: 4 must paginate into chunks of at most 4 items.
+        let actions = (0..<10).map {
+            StubAction(id: "act.\($0)", title: "Action \($0)", icon: .symbol("star"))
+        }
+
+        let pages = PopupPageLayout.computePages(
+            actions: actions,
+            maxBudget: 2000.0,
+            maxItemsPerPage: 4
+        )
+
+        XCTAssertEqual(pages.count, 3)
+        XCTAssertEqual(pages[0].count, 4)
+        XCTAssertEqual(pages[1].count, 4)
+        XCTAssertEqual(pages[2].count, 2)
+        let flat = pages.flatMap { $0.map { $0.id } }
+        XCTAssertEqual(flat, actions.map(\.id))
+    }
+
+    func testComputePagesPaginatesWhenBudgetExceededBeforeMaxItemsPerPage() {
+        // 10 icon actions with maxItemsPerPage: 8.
+        // But maxBudget is 150pt (fits ~4 icon actions of 34pt + chevrons).
+        let actions = (0..<10).map {
+            StubAction(id: "act.\($0)", title: "Action \($0)", icon: .symbol("star"))
+        }
+
+        let pages = PopupPageLayout.computePages(
+            actions: actions,
+            maxBudget: 150.0,
+            maxItemsPerPage: 8
+        )
+
+        // Must split into more than 2 pages because budget < 8 * 34pt
+        XCTAssertGreaterThan(pages.count, 2)
+        for page in pages {
+            XCTAssertLessThanOrEqual(page.count, 8)
+        }
+        let flat = pages.flatMap { $0.map { $0.id } }
+        XCTAssertEqual(flat, actions.map(\.id))
+    }
 }

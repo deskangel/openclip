@@ -61,7 +61,7 @@ final class SettingsStoreTests: XCTestCase {
 
     @MainActor
     func testPopupPageSizeReadWrite() {
-        XCTAssertEqual(store.get(.popupPageSize), 7)
+        XCTAssertEqual(store.get(.popupPageSize), 6)
         store.set(.popupPageSize, value: 5)
         XCTAssertEqual(store.get(.popupPageSize), 5)
     }

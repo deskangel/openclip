@@ -308,6 +308,7 @@ public class PopupWindowController {
             actions: activeActions,
             allActions: activeActions,
             context: actionContext,
+            screenWidth: screenBounds.width,
             initialAICardAboveBar: cardAbove,
             modeStore: modeStore,
             sessionID: aiSession,

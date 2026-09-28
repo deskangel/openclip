@@ -68,6 +68,7 @@ public enum PopupPageLayout {
         leadingWidth: CGFloat = 0,
         trailingWidth: CGFloat = 0,
         maxBudget: CGFloat,
+        maxItemsPerPage: Int = Int.max,
         scale: CGFloat = 1.0,
         presenter: any ActionPresenting = ActionCustomizationManager.shared
     ) -> [[any Action]] {
@@ -78,8 +79,8 @@ public enum PopupPageLayout {
             sum + estimatedItemWidth(for: action, inlineResult: inlineResults[action.id], scale: scale, presenter: presenter)
         }
 
-        // Single page optimization: if everything fits without pagination chevrons, return one page.
-        if leadingWidth + trailingWidth + totalActionsWidth <= maxBudget {
+        // Single page optimization: if everything fits within count and budget without pagination chevrons, return one page.
+        if actions.count <= maxItemsPerPage && (leadingWidth + trailingWidth + totalActionsWidth <= maxBudget) {
             return [actions]
         }
 
@@ -95,7 +96,10 @@ public enum PopupPageLayout {
             let neededChevrons = (hasLeft ? effectiveChevron : 0) + (remainingAfterThis > 0 ? effectiveChevron : 0)
             let pageFixedOverhead = leadingWidth + trailingWidth + neededChevrons
 
-            if !isFirstInPage && (currentActionsWidth + itemWidth + pageFixedOverhead > maxBudget) {
+            let wouldExceedBudget = currentActionsWidth + itemWidth + pageFixedOverhead > maxBudget
+            let wouldExceedCount = currentPage.count >= maxItemsPerPage
+
+            if !isFirstInPage && (wouldExceedBudget || wouldExceedCount) {
                 pages.append(currentPage)
                 currentPage = [action]
                 currentActionsWidth = itemWidth

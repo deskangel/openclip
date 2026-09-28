@@ -160,6 +160,14 @@ public enum PopupMetrics {
         }
     }
 
+    /// Maximum screen fraction the popup bar can occupy before wrapping to the next page.
+    public static let maxScreenFraction: CGFloat = 0.50
+
+    /// Maximum allowable bar width based on the screen width (half the screen width).
+    public static func maxBarWidth(for screenWidth: CGFloat) -> CGFloat {
+        screenWidth * maxScreenFraction
+    }
+
     /// Converts a 1...5 discrete bar width level to a maximum baseline width budget (pt at 1.0 scale).
     /// Level 3 is the standard default (540 pt).
     public static func barWidth(for level: Int) -> CGFloat {

@@ -93,12 +93,13 @@ public struct PopupView: View {
     public let onHideTooltip: (@MainActor () -> Void)?
     /// True when this is a static preview — hover tracking is disabled entirely so the
     /// preview never reacts to (or leaks into) the real popup's shared hover state.
+    public let screenWidth: CGFloat
     private let isStatic: Bool
 
     @Setting(SettingKey.popupTheme) private var selectedTheme
     @Setting(SettingKey.popupThemeColor) private var themeColor
     @Setting(SettingKey.popupScale) private var popupScale
-    @Setting(SettingKey.popupBarWidth) private var barWidthLevel
+    @Setting(SettingKey.popupPageSize) private var pageSize
     @Setting(SettingKey.contextualActionsEnabled) private var contextualActionsEnabled
     @Setting(SettingKey.disabledContextualActionIDs) private var disabledContextualIDs
     @Environment(\.colorScheme) private var colorScheme
@@ -169,6 +170,7 @@ public struct PopupView: View {
         actions: [any Action],
         allActions: [any Action]? = nil,
         context: ActionContext,
+        screenWidth: CGFloat = NSScreen.main?.visibleFrame.width ?? 1440.0,
         initialAICardAboveBar: Bool = false,
         hoverState: PopupHoverState = .shared,
         presenter: any ActionPresenting = ActionCustomizationManager.shared,
@@ -239,6 +241,7 @@ public struct PopupView: View {
         self.onShowTooltip = onShowTooltip
         self.onHideTooltip = onHideTooltip
         self.isStatic = isStatic
+        self.screenWidth = screenWidth
         self.hoverState = hoverState
         self.presenter = presenter
         self.sessionID = sessionID
@@ -298,7 +301,7 @@ public struct PopupView: View {
     }
 
     private var maxBarBudget: CGFloat {
-        PopupMetrics.barWidth(for: barWidthLevel) * scale
+        PopupMetrics.maxBarWidth(for: screenWidth)
     }
 
     /// Matching prioritized contextual actions (e.g. Calculate for math, Open Link for URLs, Calendar for dates).
@@ -349,6 +352,7 @@ public struct PopupView: View {
             leadingWidth: leadingWidth,
             trailingWidth: trailingWidth,
             maxBudget: standardMaxBudget,
+            maxItemsPerPage: pageSize,
             scale: scale,
             presenter: presenter
         )
