@@ -7,10 +7,13 @@ All notable user-facing changes to OpenClip.
 ## v1.7.1 - 2026-09-28
 
 ### Fixes & Improvements
-- **Sequence execution**: Multi-step action sequences now run deterministically item-by-item, preserving delivery feedback and paste intent.
-- **Extensions**: Safely allows `nativeFetch` to connect to local development servers on localhost with system port protection.
-- **AI Bar Button**: Fixed AI launcher position retention and ordering across app restarts.
+- **Sequence execution**: Multi-step action sequences now run deterministically item-by-item, preserving delivery feedback and paste intent (by @md786-dotcom in [#103](https://github.com/ganeshmshetty/openclip/pull/103)).
+- **AI Bar Button**: Fixed AI launcher position retention and ordering across app restarts (by @vynexor in [#120](https://github.com/ganeshmshetty/openclip/pull/120)).
+- **Extensions**: Safely allows `nativeFetch` to connect to local development servers on localhost with system port protection ([#122](https://github.com/ganeshmshetty/openclip/pull/122)).
 - **Preferences**: Added drag-and-drop reordering for actions within custom groups.
+
+### Contributors
+Thanks to @md786-dotcom and @vynexor for their contributions to this release!
 
 ---
 
