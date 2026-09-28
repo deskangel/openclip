@@ -35,7 +35,6 @@ struct PopupSwatch: View {
 
     @Setting(SettingKey.popupTheme) private var storedTheme
     @Setting(SettingKey.popupThemeColor) private var storedColor
-    @Setting(SettingKey.popupScale) private var storedScale
     @Environment(\.colorScheme) private var systemScheme
 
     private var category: PopupThemeModel.Category {
@@ -49,10 +48,6 @@ struct PopupSwatch: View {
 
     private var effectiveScheme: ColorScheme {
         PopupThemeModel.effectiveScheme(appearance: storedColor, systemIsDark: systemScheme == .dark)
-    }
-
-    private var scale: CGFloat {
-        PopupMetrics.scaleMultiplier(for: storedScale)
     }
 
     private var modeStore: PopupModeStore {
@@ -73,7 +68,6 @@ struct PopupSwatch: View {
                 isStatic: true,
                 modeStore: modeStore
             ) { _ in }
-            .scaleEffect(scale)
             .padding(.top, topInset)
         }
         .frame(maxWidth: .infinity)

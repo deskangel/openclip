@@ -106,6 +106,17 @@ struct PopupThemeSelector: View {
         }
     }
 
+    private func widthLabel(for level: Int) -> String {
+        switch level {
+        case 1: return String(localized: "Compact")
+        case 2: return String(localized: "Moderate")
+        case 3: return String(localized: "Default")
+        case 4: return String(localized: "Wide")
+        case 5: return String(localized: "Maximum")
+        default: return String(localized: "Default")
+        }
+    }
+
     var body: some View {
         VStack(spacing: 20) {
             SettingsCard("Theme & Style") {
@@ -174,6 +185,20 @@ struct PopupThemeSelector: View {
                     )
                 }
 
+                SettingsDivider()
+
+                SettingsRow(
+                    title: "Popup Width"
+                ) {
+                    stepSlider(
+                        value: Binding(
+                            get: { barWidthLevel },
+                            set: { barWidthLevel = $0 }
+                        ),
+                        accessibilityLabel: "Popup Width",
+                        labelText: widthLabel(for: barWidthLevel)
+                    )
+                }
             }
 
             SettingsCard("Behavior") {
@@ -302,13 +327,15 @@ struct PopupThemeSelector: View {
             )
             .accessibilityLabel(accessibilityLabel)
             .accessibilityValue(labelText)
-            .frame(width: 110)
+            .frame(width: 104)
 
             Text(labelText)
                 .font(.system(size: 12, weight: .medium))
                 .monospacedDigit()
                 .foregroundStyle(SettingsDesignTokens.secondaryText)
-                .frame(width: 52, alignment: .trailing)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(width: 58, alignment: .trailing)
         }
         .frame(width: 170, height: 24, alignment: .trailing)
     }
