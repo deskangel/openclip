@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/ganeshmshetty/OpenSelection",
       "state" : {
-        "revision" : "57f5b5593ac81916581cd083bb86accbed557221",
-        "version" : "0.2.8"
+        "revision" : "14716dcdf9997c727d7479b5030b2554243f121b",
+        "version" : "0.2.11"
       }
     },
     {

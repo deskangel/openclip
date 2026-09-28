@@ -390,6 +390,22 @@ areas; stale debt notes are worse than none.
 
 ## Selection Retrieval
 
+- **Automatic copy is authorized separately from AX text evidence.** OpenClip's monitor injects
+  OpenSelection's `AutomaticCopyCapture` through the coordinator's copy-capture seam. Before a passive copy it
+  requires an enabled menu item with the Command-C key equivalent (Command alone, independent
+  of the translated title). The menu probe runs off the main actor with a 150 ms aggregate
+  deadline and a per-message timeout; only one probe runs at a time. Unavailable or unreadable
+  commands fail closed. Native AX reads and the explicit hotkey retain their existing paths.
+  New presses and application activation cancel pending monitoring tasks; the capture rechecks
+  cancellation, target PID and the existing overlay guard before posting. Each authorized copy
+  trigger is logged without selected text or clipboard data.
+- **Window gestures are rejected before retrieval.** OpenSelection's `SelectionGestureWindow`
+  supplies the geometry snapshot; OpenClip's monitor records the top normal window
+  under the initial press and compares that window's frame on release. A move, resize or missing
+  window cancels retrieval even if the focused editor still exposes an old selection. Missing
+  initial window metadata leaves ordinary selection detection intact; the copy authorization
+  above still applies. This geometry check does not classify every custom control drag, or a
+  window moved away and back to exactly its original frame within one gesture.
 - **The coordinator runs a targeted strategy chain with native AX prioritization.**
   `retrievalMode` picks the entry point; retrieval runs that strategy and its fallbacks
   (native text controls fall back to keyboard copy unless strictly native; web areas cascade

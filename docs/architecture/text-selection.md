@@ -34,6 +34,18 @@ The subsystem consists of three primary components:
 2. **`SelectionRetrievalCoordinator`** (from `OpenSelection` package via [`OpenSelectionBridge`](../../Sources/OpenClip/Platform/Selection/OpenSelectionBridge.swift)): Applies the gate, resolves the app's retrieval mode from [`AppPolicyContext`](../../Sources/Core/Rules/AppRule.swift), and routes to the matching strategy.
 3. **Context assembly**: `MacSelectionMonitor` resolves app rules via [`RuleEngine`](../../Sources/Core/Rules/RuleEngine.swift), builds a [`SelectionContext`](../../Sources/Core/Selection/SelectionContext.swift), and notifies subscriber callbacks (such as `PopupWindowController`).
 
+The monitor snapshots the window under a mouse press and rejects the release if that window
+moved, resized or disappeared. This avoids retrieving an old selection from the editor that
+remains focused while its title bar is dragged. New presses and application activation also
+cancel pending automatic reads. At the copy boundary, OpenSelection's [`AutomaticCopyCapture`](https://github.com/ganeshmshetty/OpenSelection#passive-monitoring)
+requires an enabled Command-C menu shortcut, then rechecks cancellation, the frontmost process
+and the overlay guard before invoking the copy trigger. The bounded menu probe runs off the
+main actor. Native AX retrieval and the explicit hotkey use their existing behavior. See
+[current limitations](known-debt.md#selection-retrieval).
+
+The shared capture and window-geometry implementations live in OpenSelection. OpenClip retains
+only its app-specific monitor lifecycle (including hold-to-trigger and cached selections).
+
 ---
 
 ## Retrieval: Resolver, Gate, and Strategies

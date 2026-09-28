@@ -24,8 +24,10 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
     public internal(set) var latestSelection: (context: SelectionContext, canPaste: Bool?)?
     private var mouseDownMonitor: Any?
     private var mouseDragMonitor: Any?
+    private var appActivationObserver: NSObjectProtocol?
     internal var mouseHoldTask: Task<Void, Never>?
     private var mouseDownLocation: CGPoint?
+    private var mouseDownWindow: SelectionGestureWindow?
     /// Whether the press that started the current gesture landed on system chrome. Gate on this
     /// (the press), not on where the pointer is released: a drag that begins in a window and
     /// overshoots onto the menu bar or Dock is still a selection, while one that begins on chrome is not.
@@ -41,7 +43,9 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
     /// reads AppKit live, tests force it true.
     internal var primaryButtonPressed: @MainActor () -> Bool = { NSEvent.pressedMouseButtons & 1 != 0 }
     internal var now: @MainActor () -> Date = { Date() }
-    internal var retriever = SelectionRetrievalCoordinator()
+    internal var retriever = SelectionRetrievalCoordinator(configuration: .default, copyCapture: { trigger in
+        await AutomaticCopyCapture.capture(trigger: trigger)
+    })
     internal var fallbackPasteboard: NSPasteboard = .general
     /// Exclusion predicate over the target app's bundle ID (tests bypass the self-exclusion
     /// pattern, which otherwise matches the test host process itself).
@@ -57,6 +61,8 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
     /// Whether `point` sits on on-screen system chrome (the menu bar or Dock). Injectable so tests
     /// can exercise the gesture gating against a fixed geometry.
     internal var isSystemChromeAt: @MainActor (CGPoint) -> Bool = { MacSelectionMonitor.isSystemChromeLocation($0) }
+    internal var windowAtPoint: @MainActor (CGPoint) -> SelectionGestureWindow? = { SelectionGestureWindow.at($0) }
+    internal var windowFrame: @MainActor (CGWindowID) -> CGRect? = { SelectionGestureWindow.currentFrame(for: $0) }
     /// Whether the press at `point` is over editable text, decided structurally (AX hit-test plus
     /// focused-element correlation), never by cursor shape. Anchors the hold's clipboard fallback
     /// to the field actually under the finger, rather than whichever element happens to be focused —
@@ -250,6 +256,12 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
     
     internal func start() {
         guard monitor == nil else { return }
+
+        appActivationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.cancelPendingSelection() }
+        }
         
         mouseDownMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] _ in
             let point = NSEvent.mouseLocation
@@ -328,6 +340,11 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
         mouseHoldTask?.cancel()
         mouseHoldTask = nil
         clearSelection()
+        mouseDownWindow = nil
+        if let appActivationObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(appActivationObserver)
+            self.appActivationObserver = nil
+        }
         if let monitor = monitor {
             NSEvent.removeMonitor(monitor)
             self.monitor = nil
@@ -362,7 +379,19 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
     
     // MARK: - Event handling
 
+    /// A new press or application activation invalidates any earlier automatic copy attempt.
+    internal func cancelPendingSelection() {
+        debounceTask?.cancel()
+        debounceTask = nil
+        mouseHoldTask?.cancel()
+        mouseHoldTask = nil
+        triggeredByHold = false
+        clearSelection()
+    }
+
     internal func handleMouseDown(at point: CGPoint) {
+        cancelPendingSelection()
+        mouseDownWindow = nil
         if isSystemChromeAt(point) {
             mouseDownLocation = nil
             mouseDownWasSystemChrome = true
@@ -370,6 +399,7 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
         }
         mouseDownWasSystemChrome = false
         mouseDownLocation = point
+        mouseDownWindow = windowAtPoint(point)
         triggeredByHold = false
         mouseHoldTask?.cancel()
 
@@ -402,6 +432,7 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
             guard !Task.isCancelled else { return }
             currentPoint = currentMouseLocation()
             guard Self.holdStationary(downPoint: self.mouseDownLocation, pointer: currentPoint, buttonPressed: self.primaryButtonPressed()) else { return }
+            if let window = self.mouseDownWindow, self.windowFrame(window.id) != window.frame { return }
 
             guard let app = frontmostAppProvider() else { return }
             guard !self.shouldSuppress(for: app.bundleIdentifier) else { return }
@@ -511,6 +542,17 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
     }
 
     internal func handleMouseUp(app: NSRunningApplication, cursor: CGPoint, clickCount: Int) {
+        let gestureWindow = mouseDownWindow
+        mouseDownWindow = nil
+        if let gestureWindow, windowFrame(gestureWindow.id) != gestureWindow.frame {
+            // Moving/resizing/closing a window is not a text-selection gesture, even if its
+            // focused editor still exposes an old selection or an enabled Copy command.
+            cancelPendingSelection()
+            mouseDownLocation = nil
+            mouseDownWasSystemChrome = false
+            Log.selection.debug("monitor: skipped window move or resize")
+            return
+        }
         // Decide from pre-mutation state: once the hold timer has fired, `mouseHoldTask` is no
         // longer a pending timer but a delivery job whose AX retrieval + paste probe typically
         // outlasts the physical hold — cancelling it here killed every normal-speed release
@@ -558,7 +600,7 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
         }
 
         debounceTask = Task { @MainActor in
-            guard !self.shouldSuppress(for: app.bundleIdentifier) else { return }
+            guard !Task.isCancelled, !self.shouldSuppress(for: app.bundleIdentifier) else { return }
             if let bundleID = app.bundleIdentifier, AppFilter.isExcluded(bundleID: bundleID) {
                 return
             }
