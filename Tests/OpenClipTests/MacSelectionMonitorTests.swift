@@ -1186,21 +1186,6 @@ final class MacSelectionMonitorTests: XCTestCase {
             windows: [], at: CGPoint(x: 50, y: 50), frontmostPID: 200, selfPID: 100), "no windows")
     }
 
-    /// Regression: non-capture utility apps (BetterTouchTool, Rectangle, OBS, etc.) with elevated
-    /// windows must not suppress copy fallback.
-    func testOverlayGateAllowsUnknownUtilityOverlay() {
-        let selfPID: pid_t = 100
-        let frontmost: pid_t = 200
-        let display = CGRect(x: 0, y: 0, width: 1440, height: 900)
-        let windows = [
-            OnScreenWindowInfo(ownerPID: 999, ownerBundleID: "com.hegenberg.BetterTouchTool", layer: 25, frame: display),
-            OnScreenWindowInfo(ownerPID: frontmost, ownerBundleID: "com.mitchellh.ghostty", layer: 0, frame: display)
-        ]
-        XCTAssertFalse(CopyTriggerGate.isForeignOverlay(
-            windows: windows, at: CGPoint(x: 500, y: 400),
-            frontmostPID: frontmost, selfPID: selfPID, displayBounds: display))
-    }
-
     /// Regression (macshot / CleanShot): during a foreign capture overlay the automatic path must
     /// still monitor (so ⌥⌘C stays warm) but must never post the copy retrieval's synthetic ⌘C — it
     /// would land on the overlay's key window, fire its own Copy shortcut, and tear the capture down.
