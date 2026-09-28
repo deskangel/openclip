@@ -4,6 +4,16 @@ All notable user-facing changes to OpenClip.
 
 ---
 
+## v1.7.1 - 2026-09-28
+
+### Fixes & Improvements
+- **Sequence execution**: Multi-step action sequences now run deterministically item-by-item, preserving delivery feedback and paste intent.
+- **Extensions**: Safely allows `nativeFetch` to connect to local development servers on localhost with system port protection.
+- **AI Bar Button**: Fixed AI launcher position retention and ordering across app restarts.
+- **Preferences**: Added drag-and-drop reordering for actions within custom groups.
+
+---
+
 ## v1.7.0 - 2026-09-27
 
 ### Contextual actions
