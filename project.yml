@@ -85,8 +85,7 @@ targets:
 packages:
   OpenSelection:
     url: https://github.com/ganeshmshetty/OpenSelection
-    # Review pin for OpenSelection PR #3; replace with its release after merge.
-    revision: e62cf539005c3614cd7aedbb5c0c4a326f1d91af
+    exactVersion: 0.2.11
   KeyboardShortcuts:
     url: https://github.com/sindresorhus/KeyboardShortcuts
     from: 3.1.0
