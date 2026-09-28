@@ -643,4 +643,63 @@ final class ActionsOutlineDropTests: XCTestCase {
             "dropping onto something that cannot be grouped"
         )
     }
+
+    func testCustomGroupMemberReorderingValidateDropReturnsMove() {
+        coordinator.createGroup(title: "Group 1", iconName: "folder", memberActionIDs: ["action.1", "action.2", "action.3"])
+        _ = outlineCoordinator.rebuildTree()
+        let groupID = coordinator.actionGroupDefs[0].id
+        guard let groupNode = outlineCoordinator.rootNodes.first(where: { $0.id == groupID }) else {
+            return XCTFail("Group node not found")
+        }
+
+        let outlineView = NSOutlineView()
+        let info = MockDraggingInfo(actionID: "action.3")
+        let op = outlineCoordinator.outlineView(outlineView, validateDrop: info, proposedItem: groupNode, proposedChildIndex: 0)
+        XCTAssertEqual(op, .move, "Reordering a member inside its own group should return .move")
+    }
+
+    func testCustomGroupMemberReorderingAcceptDropUpdatesOrder() {
+        coordinator.createGroup(title: "Group 1", iconName: "folder", memberActionIDs: ["action.1", "action.2", "action.3"])
+        _ = outlineCoordinator.rebuildTree()
+        let groupID = coordinator.actionGroupDefs[0].id
+        guard let groupNode = outlineCoordinator.rootNodes.first(where: { $0.id == groupID }) else {
+            return XCTFail("Group node not found")
+        }
+
+        let outlineView = NSOutlineView()
+        let info = MockDraggingInfo(actionID: "action.3")
+        let success = outlineCoordinator.outlineView(outlineView, acceptDrop: info, item: groupNode, childIndex: 0)
+        XCTAssertTrue(success)
+
+        XCTAssertEqual(coordinator.actionGroupDefs[0].memberActionIDs, ["action.3", "action.1", "action.2"])
+        XCTAssertEqual(coordinator.actions.map(\.id), [groupID, "action.3", "action.1", "action.2", "action.4"])
+    }
+}
+
+private final class MockDraggingInfo: NSObject, NSDraggingInfo {
+    var draggingDestinationWindow: NSWindow?
+    var draggingSourceOperationMask: NSDragOperation = .every
+    var draggingLocation: NSPoint = .zero
+    var draggedImageLocation: NSPoint = .zero
+    var draggedImage: NSImage?
+    let draggingPasteboard: NSPasteboard
+
+    @MainActor
+    init(actionID: String) {
+        let pb = NSPasteboard.withUniqueName()
+        let item = NSPasteboardItem()
+        item.setString(actionID, forType: NSPasteboard.PasteboardType("com.openclip.action-id"))
+        pb.writeObjects([item])
+        self.draggingPasteboard = pb
+    }
+
+    var draggingSource: Any?
+    var draggingSequenceNumber: Int = 0
+    func slideDraggedImage(to screenPoint: NSPoint) {}
+    var draggingFormation: NSDraggingFormation = .default
+    var animatesToDestination: Bool = false
+    var numberOfValidItemsForDrop: Int = 1
+    func enumerateDraggingItems(options: NSDraggingItemEnumerationOptions = [], for view: NSView?, classes: [AnyClass], searchOptions: [NSPasteboard.ReadingOptionKey : Any] = [:], using block: (NSDraggingItem, Int, UnsafeMutablePointer<ObjCBool>) -> Void) {}
+    var springLoadingHighlight: NSSpringLoadingHighlight = .none
+    func resetSpringLoading() {}
 }

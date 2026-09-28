@@ -409,6 +409,7 @@ public final class ActionCoordinator: ObservableObject, Sendable {
         updated[targetIndex].memberActionIDs = members
         actionGroupDefs = updated
         saveAndApplyGroupDefs(pruningEmptiedFrom: hadMembers)
+        syncCatalogOrder(for: groupID, memberIDs: members)
     }
 
     public func memberActionIDs(for groupID: String) -> [String] {

@@ -328,5 +328,6 @@ private struct GroupMemberRowView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
+        .contentShape(Rectangle())
     }
 }

@@ -880,6 +880,9 @@ final class ActionsOutlineCoordinator: NSObject, NSOutlineViewDataSource, NSOutl
         // Case 1: Hovering over or inside a custom group. A multi-row selection is judged by
         // whichever dragged actions could actually join, not just the first pasteboard item.
         if let targetNode = item as? OutlineNode, case .customGroup(let def, _) = targetNode.kind {
+            if index >= 0 && def.memberActionIDs.contains(draggedID) {
+                return .move
+            }
             let candidates = draggedIDs.filter { couldJoinGroup($0, def: def) }
             guard !candidates.isEmpty else { return [] }
             if index == NSOutlineViewDropOnItemIndex || index >= 0 {
@@ -898,13 +901,24 @@ final class ActionsOutlineCoordinator: NSObject, NSOutlineViewDataSource, NSOutl
 
         // Case 3: Hovering ON an item that can hold nothing -> retarget to insert between rows!
         if item != nil && index == NSOutlineViewDropOnItemIndex {
+            if let targetNode = item as? OutlineNode,
+               let parentItem = outlineView.parent(forItem: targetNode) as? OutlineNode {
+                let isSameCustomGroup = parent.coordinator.actionGroupDefs.first(where: { $0.id == parentItem.id })?.memberActionIDs.contains(draggedID) == true
+                let isSameExtensionGroup = extensionGroupID(ofSubActionWithID: draggedID) == parentItem.id
+                if (isSameCustomGroup || isSameExtensionGroup),
+                   let childIndex = parentItem.children.firstIndex(where: { $0.id == targetNode.id }) {
+                    outlineView.setDropItem(parentItem, dropChildIndex: childIndex)
+                    return .move
+                }
+            }
             // Resolve the top-level ancestor of the hovered item and use its root index.
             var topLevel = item
             while let candidate = topLevel, let parent = outlineView.parent(forItem: candidate) {
                 topLevel = parent
             }
             if let node = topLevel as? OutlineNode,
-               let rootIndex = rootNodes.firstIndex(where: { $0.id == node.id }) {
+               let rootIndex = rootNodes.firstIndex(where: { $0.id == node.id }),
+               extensionGroupID(ofSubActionWithID: draggedID) == nil {
                 outlineView.setDropItem(nil, dropChildIndex: rootIndex)
                 return .move
             }
@@ -943,7 +957,32 @@ final class ActionsOutlineCoordinator: NSObject, NSOutlineViewDataSource, NSOutl
             expandedNodeIDs.insert(owningGroupID)
             rebuildTree()
             outlineView.reloadData()
-            outlineView.expandItem(targetNode)
+            if let updated = rootNodes.first(where: { $0.id == owningGroupID }) {
+                outlineView.expandItem(updated)
+            }
+            return true
+        }
+
+        // Reordered inside its own custom group
+        if let targetNode = item as? OutlineNode,
+           case .customGroup(let def, _) = targetNode.kind,
+           def.memberActionIDs.contains(draggedID),
+           index >= 0 {
+            let members = def.memberActionIDs
+            let reordered = Self.reordered(members, moving: draggedID, toChildIndex: index)
+            guard reordered != members else { return false }
+            parent.coordinator.updateGroup(
+                groupID: def.id,
+                title: def.title,
+                iconName: def.iconName,
+                memberActionIDs: reordered
+            )
+            expandedNodeIDs.insert(def.id)
+            rebuildTree()
+            outlineView.reloadData()
+            if let updated = rootNodes.first(where: { $0.id == def.id }) {
+                outlineView.expandItem(updated)
+            }
             return true
         }
 
