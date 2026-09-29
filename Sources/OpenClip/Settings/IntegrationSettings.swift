@@ -27,6 +27,7 @@ enum IntegrationSettings {
             SettingKey.popupAlignment.erased,
             SettingKey.popupVerticalPosition.erased,
             SettingKey.popupScale.erased,
+            SettingKey.popupPageSize.erased,
             SettingKey.popupBarWidth.erased
         ]
     }
@@ -52,6 +53,7 @@ enum IntegrationSettings {
         store.set(.popupAlignment, value: SettingKey.popupAlignment.defaultValue)
         store.set(.popupVerticalPosition, value: SettingKey.popupVerticalPosition.defaultValue)
         store.set(.popupScale, value: SettingKey.popupScale.defaultValue)
+        store.set(.popupPageSize, value: SettingKey.popupPageSize.defaultValue)
         store.set(.popupBarWidth, value: SettingKey.popupBarWidth.defaultValue)
     }
 

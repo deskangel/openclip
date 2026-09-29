@@ -163,6 +163,29 @@ public enum Log: Sendable {
         sinks.removeAll()
     }
 
+    public static func removeSink(_ sink: any LogSink) {
+        lock.lock()
+        defer { lock.unlock() }
+        sinks.removeAll { existing in
+            if let a = existing as? AnyObject, let b = sink as? AnyObject {
+                return a === b
+            }
+            return false
+        }
+    }
+
+    public static func currentSinks() -> [any LogSink] {
+        lock.lock()
+        defer { lock.unlock() }
+        return sinks
+    }
+
+    public static func restoreSinks(_ previousSinks: [any LogSink]) {
+        lock.lock()
+        defer { lock.unlock() }
+        sinks = previousSinks
+    }
+
     public static func record(date: Date, category: String, level: LogLevel, message: String) {
         lock.lock()
         let currentSinks = sinks

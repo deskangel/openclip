@@ -1349,6 +1349,37 @@ final class MacSelectionMonitorTests: XCTestCase {
         XCTAssertNil(monitor.latestSelection, "⌘A on a row container must not post a synthetic copy")
     }
 
+    func testCancelledTaskDoesNotDeliverSelectionAfterInlineAwait() async {
+        let store = MemorySettingsStore()
+        store.set(.isAppEnabled, value: true)
+        store.set(.isMouseHoldEnabled, value: false)
+        let monitor = MacSelectionMonitor(settingsStore: store)
+        let frame = CGRect(x: 100, y: 100, width: 500, height: 400)
+        monitor.isSystemChromeAt = { _ in false }
+        monitor.windowAtPoint = { _ in SelectionGestureWindow(id: 123, frame: frame) }
+        monitor.windowFrame = { _ in frame }
+        monitor.policyResolver = { _ in .default }
+        monitor.currentCursorProvider = { .unknown }
+        monitor.retriever = SelectionRetrievalCoordinator(inspect: {
+            Self.fixtureTarget(role: "AXTextField", selectedText: "first selection")
+        }, copyCapture: { _ in nil })
+
+        var deliveredSelections: [String] = []
+        monitor.onSelection = { context, _ in
+            deliveredSelections.append(context.text)
+        }
+
+        monitor.handleMouseDown(at: CGPoint(x: 100, y: 100))
+        monitor.handleMouseUp(app: MockTestApp(bundleID: "com.apple.TextEdit"),
+                              cursor: CGPoint(x: 200, y: 150), clickCount: 1)
+
+        // Cancel pending selection immediately while task is executing
+        monitor.cancelPendingSelection()
+        await monitor.debounceTask?.value
+
+        XCTAssertTrue(deliveredSelections.isEmpty, "Cancelled task must never deliver selection to onSelection")
+    }
+
     private func makeKeyboardMonitor(overlay: Bool, bundleID: String, role: String) -> MacSelectionMonitor {
         let monitor = MacSelectionMonitor()
         monitor.isExcludedBundle = { _ in false }

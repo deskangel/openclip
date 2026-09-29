@@ -196,4 +196,19 @@ final class PopupPageLayoutTests: XCTestCase {
         let flat = pages.flatMap { $0.map { $0.id } }
         XCTAssertEqual(flat, actions.map(\.id))
     }
+
+    func testComputePagesClampsZeroOrNegativeMaxItemsPerPage() {
+        let actions = (0..<4).map {
+            StubAction(id: "act.\($0)", title: "Action \($0)", icon: .symbol("star"))
+        }
+
+        // A restored 0 or negative pageSize must not fragment into 1-action pages when all 4 fit
+        let pagesZero = PopupPageLayout.computePages(actions: actions, maxBudget: 2000.0, maxItemsPerPage: 0)
+        XCTAssertEqual(pagesZero.count, 1)
+        XCTAssertEqual(pagesZero[0].count, 4)
+
+        let pagesNeg = PopupPageLayout.computePages(actions: actions, maxBudget: 2000.0, maxItemsPerPage: -5)
+        XCTAssertEqual(pagesNeg.count, 1)
+        XCTAssertEqual(pagesNeg[0].count, 4)
+    }
 }

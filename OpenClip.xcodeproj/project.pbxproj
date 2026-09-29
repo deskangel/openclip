@@ -2466,8 +2466,8 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/ganeshmshetty/OpenSelection";
 			requirement = {
-				branch = "feat/diagnostics-and-inspector";
-				kind = branch;
+				kind = revision;
+				revision = 23d3f1d4a6ebfe876391db7795701e3959239f50;
 			};
 		};
 		0BBBF5D087479FC9C36D0D54 /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */ = {

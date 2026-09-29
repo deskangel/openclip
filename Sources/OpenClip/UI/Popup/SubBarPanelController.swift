@@ -73,13 +73,15 @@ public final class SubBarPanelController {
         )
         self.activeState = state
         self.mainBarScreenFrame = mainBarScreenFrame
-        panel.horizontalAnchor = .none
+        let screen = NSScreen.screens.first { $0.frame.contains(CGPoint(x: parentButtonScreenFrame.midX, y: parentButtonScreenFrame.midY)) } ?? NSScreen.main
+        let screenWidth = screen?.visibleFrame.width ?? 1440.0
 
         let contentView = SubBarContentView(
             subActions: subActions,
             effectiveTheme: effectiveTheme,
             effectiveColorScheme: effectiveColorScheme,
             scale: scale,
+            screenWidth: screenWidth,
             context: context,
             presenter: presenter,
             modeStore: modeStore,
@@ -144,8 +146,6 @@ public final class SubBarPanelController {
         }
 
         let panelX = contentX - shadowInset
-
-        let screen = NSScreen.screens.first { $0.frame.contains(CGPoint(x: parentButtonScreenFrame.midX, y: parentButtonScreenFrame.midY)) } ?? NSScreen.main
         let screenBounds = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 800, height: 600)
         let minX = screenBounds.minX + PopupMetrics.popupPadding
         let maxX = max(minX, screenBounds.maxX - panelWidth - PopupMetrics.popupPadding)
@@ -346,6 +346,7 @@ private struct SubBarContentView: View {
     let effectiveTheme: String
     let effectiveColorScheme: ColorScheme
     let scale: CGFloat
+    let screenWidth: CGFloat?
     let context: ActionContext
     let presenter: any ActionPresenting
     let modeStore: PopupModeStore
@@ -396,7 +397,8 @@ private struct SubBarContentView: View {
             presenter: presenter,
             effectiveTheme: effectiveTheme,
             hoveredTarget: hoveredTarget,
-            scale: scale
+            scale: scale,
+            screenWidth: screenWidth
         )
 
         let styledSubBar = subBar

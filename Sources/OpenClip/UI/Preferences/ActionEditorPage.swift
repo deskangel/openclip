@@ -95,8 +95,8 @@ public struct ActionEditorPage: View {
     public init(
         action: any Action,
         isSidebarPage: Bool = false,
-        disabledActionIDs: Binding<Set<String>> = .constant([]),
-        disabledPackages: Binding<Set<String>> = .constant([])
+        disabledActionIDs: Binding<Set<String>>,
+        disabledPackages: Binding<Set<String>>
     ) {
         self.action = action
         self.isSidebarPage = isSidebarPage

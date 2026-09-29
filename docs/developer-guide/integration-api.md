@@ -152,7 +152,8 @@ are readable or writable; anything else is reported in `skipped`.
 | `popupAlignment` | String | `"left"` | `left` \| `center` \| `right` |
 | `popupVerticalPosition` | String | `"auto"` | `auto` \| `above` \| `below` |
 | `popupScale` | Int | `3` | 1–5 |
-| `popupBarWidth` | Int | `3` | 1–5 |
+| `popupPageSize` | Int | `6` | 3–12 |
+| `popupBarWidth` | Int | `3` | 1–5 (deprecated, retained for compatibility) |
 
 ### Deliberately never exposed
 

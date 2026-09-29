@@ -33,6 +33,7 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
     /// overshoots onto the menu bar or Dock is still a selection, while one that begins on chrome is not.
     internal var mouseDownWasSystemChrome: Bool = false
     internal var triggeredByHold: Bool = false
+    internal var lastGestureTimestamp: TimeInterval = 0
     private let settingsStore: SettingsStore
 
     /// Injectable seams for headless tests; production uses live system state.
@@ -260,7 +261,24 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
         appActivationObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.cancelPendingSelection() }
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                guard let app = self.frontmostAppProvider() ?? NSWorkspace.shared.frontmostApplication else { return }
+                if app.bundleIdentifier == Bundle.main.bundleIdentifier { return }
+                if let frontmostID = self.frontmostAppProvider()?.bundleIdentifier,
+                   app.bundleIdentifier == frontmostID {
+                    return
+                }
+                if let sourceBundleID = self.latestSelection?.context.sourceApp.bundleIdentifier,
+                   app.bundleIdentifier == sourceBundleID {
+                    return
+                }
+                if self.lastGestureTimestamp > 0,
+                   (ProcessInfo.processInfo.systemUptime - self.lastGestureTimestamp) < PopupMetrics.focusSwitchGracePeriod {
+                    return
+                }
+                self.cancelPendingSelection()
+            }
         }
         
         mouseDownMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] _ in
@@ -390,6 +408,7 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
     }
 
     internal func handleMouseDown(at point: CGPoint) {
+        lastGestureTimestamp = ProcessInfo.processInfo.systemUptime
         cancelPendingSelection()
         mouseDownWindow = nil
         if isSystemChromeAt(point) {
@@ -520,6 +539,7 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
             latestSelection = (context, canPaste)
             prewarmInlineActions(for: context)
             await InlineResultEvaluator.shared.awaitPrewarmed(timeout: 0.025)
+            guard !Task.isCancelled else { return }
             self.onSelection?(context, canPaste)
         }
     }
@@ -542,6 +562,7 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
     }
 
     internal func handleMouseUp(app: NSRunningApplication, cursor: CGPoint, clickCount: Int) {
+        lastGestureTimestamp = ProcessInfo.processInfo.systemUptime
         let gestureWindow = mouseDownWindow
         mouseDownWindow = nil
         if let gestureWindow, windowFrame(gestureWindow.id) != gestureWindow.frame {
@@ -643,6 +664,7 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
     /// now-frontmost app). `isSelectAll` marks a whole-container gesture (⌘A / ⌘L), which retrieval
     /// refuses on a row/list container (row selection in Finder/Mail/table views).
     internal func handleSelectionTrigger(isSelectAll: Bool) {
+        lastGestureTimestamp = ProcessInfo.processInfo.systemUptime
         debounceTask?.cancel()
         guard settingsStore.get(.pauseUntilTimestamp) <= Date().timeIntervalSince1970 else { return }
         guard !shouldSuppress() else { return }
@@ -734,6 +756,7 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
         guard !Task.isCancelled else { return }
         latestSelection = (context, canPaste)
         await InlineResultEvaluator.shared.awaitPrewarmed(timeout: 0.025)
+        guard !Task.isCancelled else { return }
         // "Appear Automatically" (isAppEnabled) is the global form of the per-app `hotkeyOnly`
         // rule: it suppresses the passive auto-show for mouse-release and keyboard selections
         // while leaving the explicit hold gesture (delivered in `handleMouseDown`, which never

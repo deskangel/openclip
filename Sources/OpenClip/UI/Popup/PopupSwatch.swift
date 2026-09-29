@@ -15,8 +15,23 @@ import Core
 @MainActor
 struct PopupSwatch: View {
     /// The canonical action set the preview shows, independent of the user's own bar so the
-    /// preview is about appearance, not content.
-    static let actions: [any Action] = [SearchAction(), CopyAction(), CutAction(), PasteAction()]
+    /// preview is about appearance, not content. Has enough actions (13) to exercise pagination
+    /// across the full 3–12 Actions Per Page slider range.
+    static let actions: [any Action] = [
+        SearchAction(),
+        CopyAction(),
+        CutAction(),
+        PasteAction(),
+        DefineAction(),
+        CalculateAction(),
+        CalendarAction(),
+        CustomAction(id: "swatch.uppercase", title: "Uppercase", iconName: "textformat.size.larger", type: .textSnippet(template: "")),
+        CustomAction(id: "swatch.lowercase", title: "Lowercase", iconName: "textformat.size.smaller", type: .textSnippet(template: "")),
+        CustomAction(id: "swatch.share", title: "Share", iconName: "square.and.arrow.up", type: .textSnippet(template: "")),
+        CustomAction(id: "swatch.translate", title: "Translate", iconName: "character.book.closed", type: .textSnippet(template: "")),
+        CustomAction(id: "swatch.summarize", title: "Summarize", iconName: "doc.text.magnifyingglass", type: .textSnippet(template: "")),
+        CustomAction(id: "swatch.notes", title: "Add to Notes", iconName: "note.text.badge.plus", type: .textSnippet(template: ""))
+    ]
 
     /// A resting hover state the preview never observes, so it never reacts to — or leaks into —
     /// the real popup's shared state.

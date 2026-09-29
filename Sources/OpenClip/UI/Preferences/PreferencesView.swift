@@ -261,15 +261,6 @@ public struct PreferencesView: View {
             aiManager.isAIEnabled = isOn
         case .extensionPackage(let id):
             guard let info = InstalledExtensionInfo.info(for: id, in: coordinator.actions) else { return }
-            if isOn {
-                for cmd in info.commands {
-                    disabledActionIDs.remove(cmd.id)
-                }
-            } else {
-                for cmd in info.commands {
-                    disabledActionIDs.insert(cmd.id)
-                }
-            }
             ActionEnablement.packageBinding(
                 packageID: id,
                 gatedReason: info.gatedReason,

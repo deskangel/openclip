@@ -36,6 +36,8 @@ public struct GroupSubActionBarView: View {
     private var barButtonHeight: CGFloat { PopupMetrics.barButtonHeight * scale }
     private var cornerRadius: CGFloat { PopupMetrics.popupCornerRadius * scale }
 
+    public let screenWidth: CGFloat?
+
     public init(
         subActions: [any Action],
         currentPage: Binding<Int>,
@@ -53,7 +55,8 @@ public struct GroupSubActionBarView: View {
         presenter: any ActionPresenting,
         effectiveTheme: String,
         hoveredTarget: PopupHoverTarget?,
-        scale: CGFloat
+        scale: CGFloat,
+        screenWidth: CGFloat? = nil
     ) {
         self.subActions = subActions
         self._currentPage = currentPage
@@ -72,6 +75,7 @@ public struct GroupSubActionBarView: View {
         self.effectiveTheme = effectiveTheme
         self.hoveredTarget = hoveredTarget
         self.scale = scale
+        self.screenWidth = screenWidth
     }
 
     // MARK: - Width-Budgeted Pagination helpers
@@ -119,7 +123,7 @@ public struct GroupSubActionBarView: View {
     }
 
     private var maxSubBarBudget: CGFloat {
-        (NSScreen.main?.visibleFrame.width ?? 1440.0) * PopupMetrics.maxScreenFraction
+        (screenWidth ?? NSScreen.main?.visibleFrame.width ?? 1440.0) * PopupMetrics.maxScreenFraction
     }
 
     private var pages: [[any Action]] {

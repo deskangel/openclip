@@ -1095,10 +1095,12 @@ final class SelectionRetrievalCoordinatorTests: XCTestCase {
             }
         }
 
+        let previousSinks = Log.currentSinks()
         let testSink = TestLogSink()
         Log.addSink(testSink)
         defer {
-            Log.removeAllSinks()
+            Log.restoreSinks(previousSinks)
+            DiagnosticsHub.shared.reset()
         }
 
         let diagnosticsSink = OpenClipDiagnosticsSink(minimumLevel: .trace)

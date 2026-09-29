@@ -341,6 +341,10 @@ public struct PopupView: View {
         return max(buttonWidth * 3, maxBarBudget - contextualIslandWidth - islandGap)
     }
 
+    private var standardMaxItemsPerPage: Int {
+        max(1, pageSize - contextualActions.count)
+    }
+
     private var pages: [[any Action]] {
         let leadingWidth = hasCompletions ? (chevronWidth) : 0
         let trailingWidth = buttonWidth // search button
@@ -352,7 +356,7 @@ public struct PopupView: View {
             leadingWidth: leadingWidth,
             trailingWidth: trailingWidth,
             maxBudget: standardMaxBudget,
-            maxItemsPerPage: pageSize,
+            maxItemsPerPage: standardMaxItemsPerPage,
             scale: scale,
             presenter: presenter
         )
