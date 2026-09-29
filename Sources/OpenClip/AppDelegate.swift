@@ -40,9 +40,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         Log.addSink(rotatingSink)
         _ = DebugLogStore.shared
 
-        OpenSelection.logger = { message in
-            Log.selection.debug("\(message, privacy: .public)")
-        }
+        DiagnosticsHub.shared.install(OpenClipDiagnosticsSink())
+        DiagnosticsHub.shared.setReportMode(.onFailureOrSlow)
 
         // Remove temporary calendar .ics files a previous session left behind before its
         // deferred cleanup could run (crash or quit during the delay window).

@@ -13,6 +13,7 @@ public typealias AppIdentity = Core.AppIdentity
 public typealias SelectionGatePolicy = Core.SelectionGatePolicy
 public typealias CursorClass = Core.CursorClass
 public typealias TextResult = Core.TextResult
+public typealias LogLevel = Core.LogLevel
 
 extension SelectionRetrievalCoordinator {
     /// Convenience initializer preserving compatibility with OpenClip's TextResult-based copy captures.
@@ -23,8 +24,8 @@ extension SelectionRetrievalCoordinator {
         scriptRunner: @escaping ScriptRunner = SelectionRetrievalCoordinator.defaultScriptRunner
     ) {
         let mappedCapture: CopyCapture? = copyCapture.map { cc in
-            { @Sendable trigger in
-                if let res = await cc(trigger) {
+            { @Sendable (request: CopyRequest) in
+                if let res = await cc(request.trigger) {
                     return OpenSelection.SelectionResult(
                         text: res.text,
                         bounds: res.bounds,
@@ -196,4 +197,79 @@ extension OpenSelection {
         )
     }
 }
+
+/// Diagnostics sink bridging OpenSelection structured events and cascade reports to OpenClip's logging pipeline.
+public struct OpenClipDiagnosticsSink: OpenSelectionDiagnosticsSink {
+    public let minimumLevel: OpenSelection.LogLevel
+
+    public init(minimumLevel: OpenSelection.LogLevel = .debug) {
+        self.minimumLevel = minimumLevel
+    }
+
+    public func record(_ event: DiagnosticEvent) {
+        let coreLevel: Core.LogLevel
+        switch event.level {
+        case .trace, .debug:
+            coreLevel = .debug
+        case .info:
+            coreLevel = .info
+        case .warning:
+            coreLevel = .warning
+        case .error:
+            coreLevel = .error
+        case .fault:
+            coreLevel = .fault
+        }
+
+        let formattedFields = event.fields.map { "\($0.key)=\(Self.format($0.value))" }.sorted().joined(separator: " ")
+        let line = formattedFields.isEmpty
+            ? "[\(event.traceID)] [\(event.category.rawValue)] \(event.message)"
+            : "[\(event.traceID)] [\(event.category.rawValue)] \(event.message) [\(formattedFields)]"
+
+        Log.selection.log(level: coreLevel, Core.LogMessage(stringValue: line))
+    }
+
+    public func finish(_ report: CascadeReport) {
+        let isSuccess: Bool
+        switch report.outcome {
+        case .selection:
+            isSuccess = true
+        case .none, .cancelled:
+            isSuccess = false
+        }
+
+        let level: Core.LogLevel = isSuccess ? .info : .warning
+        let outcomeDesc: String
+        switch report.outcome {
+        case .selection(let strategy, let presence):
+            outcomeDesc = "selection(\(strategy.rawValue), \(presence.rawValue))"
+        case .none:
+            outcomeDesc = "none"
+        case .cancelled:
+            outcomeDesc = "cancelled"
+        }
+
+        let bundleID = report.target?.bundleID ?? "unknown"
+        let msg = "[CascadeReport] [\(report.traceID)] bundle=\(bundleID) outcome=\(outcomeDesc) total=\(report.totalMicros)µs attempts=\(report.attempts.count)"
+        Log.selection.log(level: level, Core.LogMessage(stringValue: msg))
+    }
+
+    private static func format(_ value: OpenSelection.FieldValue) -> String {
+        switch value {
+        case .int(let v):
+            return "\(v)"
+        case .bool(let v):
+            return v ? "true" : "false"
+        case .micros(let v):
+            return "\(v)µs"
+        case .presence(let v):
+            return v.rawValue
+        case .ax(let v):
+            return v.rawValue
+        case .token(let v):
+            return v
+        }
+    }
+}
+
 

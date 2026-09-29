@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/ganeshmshetty/OpenSelection",
       "state" : {
-        "revision" : "14716dcdf9997c727d7479b5030b2554243f121b",
-        "version" : "0.2.11"
+        "branch" : "feat/diagnostics-and-inspector",
+        "revision" : "e34d9619bf270f88ede79883940138649db12d65"
       }
     },
     {

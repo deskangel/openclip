@@ -43,8 +43,8 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
     /// reads AppKit live, tests force it true.
     internal var primaryButtonPressed: @MainActor () -> Bool = { NSEvent.pressedMouseButtons & 1 != 0 }
     internal var now: @MainActor () -> Date = { Date() }
-    internal var retriever = SelectionRetrievalCoordinator(configuration: .default, copyCapture: { trigger in
-        await AutomaticCopyCapture.capture(trigger: trigger)
+    internal var retriever = SelectionRetrievalCoordinator(configuration: .default, copyCapture: { request in
+        await AutomaticCopyCapture.capture(request: request)
     })
     internal var fallbackPasteboard: NSPasteboard = .general
     /// Exclusion predicate over the target app's bundle ID (tests bypass the self-exclusion

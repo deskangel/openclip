@@ -1,6 +1,7 @@
 import XCTest
 import ApplicationServices
 import CoreGraphics
+import os
 @testable import Core
 @testable import OpenClip
 
@@ -1082,6 +1083,41 @@ final class SelectionRetrievalCoordinatorTests: XCTestCase {
         XCTAssertTrue(pptScript?.contains("com.microsoft.Powerpoint") == true)
         XCTAssertTrue(pptScript?.contains("selection of active window") == true)
         XCTAssertTrue(pptScript?.contains("selection type text") == true)
+    }
+
+    func testOpenClipDiagnosticsSinkRecordsEventsAndReports() async {
+        final class TestLogSink: LogSink, @unchecked Sendable {
+            let messages = OSAllocatedUnfairLock<[String]>(initialState: [])
+            func record(date: Date, category: String, level: Core.LogLevel, message: String) {
+                if category == "selection" {
+                    messages.withLock { $0.append(message) }
+                }
+            }
+        }
+
+        let testSink = TestLogSink()
+        Log.addSink(testSink)
+        defer {
+            Log.removeAllSinks()
+        }
+
+        let diagnosticsSink = OpenClipDiagnosticsSink(minimumLevel: .trace)
+        DiagnosticsHub.shared.reset()
+        DiagnosticsHub.shared.install(diagnosticsSink)
+        DiagnosticsHub.shared.setReportMode(.always)
+
+        let trace = SelectionTrace.create(trigger: .mouseUp)
+        trace.log(.info, .cascade, "Testing diagnostic event", fields: ["testKey": .token("testValue")])
+
+        let report = trace.buildReport(outcome: .selection(strategy: .axTextControl, presence: .nonEmpty))
+        DiagnosticsHub.shared.emitReport(report)
+
+        await DiagnosticsHub.shared.flush()
+
+        let msgs = testSink.messages.withLock { $0 }
+
+        XCTAssertTrue(msgs.contains { $0.contains("Testing diagnostic event") && $0.contains("testKey=testValue") })
+        XCTAssertTrue(msgs.contains { $0.contains("[CascadeReport]") && $0.contains("outcome=selection(ax-text-control, nonEmpty)") })
     }
 }
 
