@@ -18,7 +18,7 @@ public typealias LogLevel = Core.LogLevel
 extension SelectionRetrievalCoordinator {
     /// Convenience initializer preserving compatibility with OpenClip's TextResult-based copy captures.
     public init(
-        inspect: @escaping TargetProvider = { AXElementInspector.inspect() },
+        inspect: @escaping TargetProvider = { trace in AXElementInspector.inspect(trace: trace) },
         copyCapture: (@Sendable (CopyTrigger) async -> Core.TextResult?)?,
         menuPress: @escaping MenuPress = SelectionRetrievalCoordinator.pressEditCopyMenu,
         scriptRunner: @escaping ScriptRunner = SelectionRetrievalCoordinator.defaultScriptRunner
@@ -41,6 +41,21 @@ extension SelectionRetrievalCoordinator {
             configuration: .default,
             inspect: inspect,
             copyCapture: mappedCapture,
+            menuPress: menuPress,
+            scriptRunner: scriptRunner
+        )
+    }
+
+    /// Convenience initializer accepting parameterless SimpleTargetProvider.
+    public init(
+        inspect: @escaping SimpleTargetProvider,
+        copyCapture: (@Sendable (CopyTrigger) async -> Core.TextResult?)?,
+        menuPress: @escaping MenuPress = SelectionRetrievalCoordinator.pressEditCopyMenu,
+        scriptRunner: @escaping ScriptRunner = SelectionRetrievalCoordinator.defaultScriptRunner
+    ) {
+        self.init(
+            inspect: { _ in inspect() },
+            copyCapture: copyCapture,
             menuPress: menuPress,
             scriptRunner: scriptRunner
         )

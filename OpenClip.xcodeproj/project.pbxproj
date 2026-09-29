@@ -2467,7 +2467,7 @@
 			repositoryURL = "https://github.com/ganeshmshetty/OpenSelection";
 			requirement = {
 				kind = revision;
-				revision = 23d3f1d4a6ebfe876391db7795701e3959239f50;
+				revision = 6e1eb6d81f36c92263c2b75a57e460e3be463f3b;
 			};
 		};
 		0BBBF5D087479FC9C36D0D54 /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */ = {
