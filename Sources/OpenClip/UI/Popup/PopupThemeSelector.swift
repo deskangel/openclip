@@ -185,7 +185,7 @@ struct PopupThemeSelector: View {
                             get: { pageSize },
                             set: { pageSize = $0 }
                         ),
-                        range: 3...12,
+                        range: 2...12,
                         accessibilityLabel: "Actions Per Page",
                         labelText: "\(pageSize)"
                     )

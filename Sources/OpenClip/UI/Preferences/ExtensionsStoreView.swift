@@ -12,18 +12,23 @@ import Core
 public enum StoreSort: String, CaseIterable, Identifiable, Sendable {
     /// The catalogue's own order, with the curated showcase on top. The default.
     case featured
+    /// Kept for compatibility with older callers; it is no longer offered in the Store menu.
     case name
     case downloads
     case recentlyAdded
+
+    /// Store pages exposed by the sort menu. Name sorting remains available to older callers,
+    /// but the user-facing Store now has All, Popular, and New pages.
+    public static let allCases: [StoreSort] = [.featured, .downloads, .recentlyAdded]
 
     public var id: String { rawValue }
 
     public var title: String {
         switch self {
-        case .featured: return String(localized: "Featured")
+        case .featured: return String(localized: "All")
         case .name: return String(localized: "Name")
-        case .downloads: return String(localized: "Downloads")
-        case .recentlyAdded: return String(localized: "Recently Added")
+        case .downloads: return String(localized: "Popular")
+        case .recentlyAdded: return String(localized: "New")
         }
     }
 
@@ -137,9 +142,7 @@ public final class ExtensionsStoreViewModel: ObservableObject {
         return v == "1.0.0" || v.hasPrefix("1.0.0")
     }
 
-    /// Curated featured/popular items (first few for the showcase section).
-    /// Uses server-provided curated extensions from the API when available,
-    /// or filters loaded catalog extensions by curated IDs.
+    /// Curated picks for the Featured section.
     public var featuredSectionItems: [ExtensionItem] {
         if !featuredItems.isEmpty {
             return Array(featuredItems.prefix(4))
@@ -149,19 +152,14 @@ public final class ExtensionsStoreViewModel: ObservableObject {
         return Array(curated.prefix(4))
     }
 
-    /// Top new items for the showcase section: freshly added packages still on
-    /// their first release. Updated packages (past 1.0.0) are excluded, so an
-    /// update is never presented as new. When nothing is on a first release the
-    /// section falls back to the most recently added/updated packages (newest
-    /// first), so it is never empty.
+    /// Four showcase items: new releases first, with updates filling any remaining slots.
     public var newSectionItems: [ExtensionItem] {
-        if !newItems.isEmpty {
-            return Array(newItems.prefix(4))
-        }
-        let featuredIDs = Set(featuredSectionItems.map { $0.id.lowercased() })
-        let pool = extensions.filter { !featuredIDs.contains($0.id.lowercased()) }
-        let fresh = pool.filter { Self.isNew($0) }
-        return Array((fresh.isEmpty ? Self.sorted(pool, by: .recentlyAdded) : fresh).prefix(4))
+        // A featured extension may also be new. Keep it in this section so users can discover
+        // the complete new list without losing the Featured showcase above it.
+        var seen = Set<String>()
+        let pool = (newItems + extensions).filter { seen.insert($0.id.lowercased()).inserted }
+        let recent = Self.sorted(pool, by: .recentlyAdded, apiNewItems: newItems)
+        return Array(recent.prefix(4))
     }
 
     /// The remaining catalog items for the "All Extensions" section,
@@ -249,7 +247,8 @@ public final class ExtensionsStoreViewModel: ObservableObject {
                 return left.offset < right.offset
             }
 
-            return (newestFirst + ranked).map(\.element)
+            let recent = (newestFirst + ranked).map(\.element)
+            return recent.filter { isNew($0) } + recent.filter { !isNew($0) }
         }
     }
 
@@ -351,6 +350,16 @@ public final class ExtensionsStoreViewModel: ObservableObject {
     public func refreshCatalog() async {
         await api.invalidateCache()
         await resetAndFetch(limit: max(pageLimit, 100), keepPrevious: false, ignoreCache: true)
+    }
+}
+
+private struct StoreSectionRow: Identifiable {
+    let id: String
+    let item: ExtensionItem
+
+    init(section: String, item: ExtensionItem) {
+        self.id = "\(section):\(item.id.lowercased())"
+        self.item = item
     }
 }
 
@@ -494,7 +503,12 @@ public struct ExtensionStoreView: View {
 
                 if !viewModel.newSectionItems.isEmpty {
                     sectionHeader(String(localized: "New"))
-                    ForEach(Array(viewModel.newSectionItems.enumerated()), id: \.element.id) { index, ext in
+                    // New may intentionally repeat an item from Featured. Namespace these row
+                    // identities so SwiftUI does not treat the duplicate as the same view and
+                    // drop the New row during reconciliation.
+                    ForEach(viewModel.newSectionItems.map { StoreSectionRow(section: "new", item: $0) }) { row in
+                        let ext = row.item
+                        let index = viewModel.newSectionItems.firstIndex { $0.id == ext.id } ?? 0
                         if index > 0 {
                             rowDivider
                         }
@@ -544,9 +558,9 @@ public struct ExtensionStoreView: View {
         case .featured, .name:
             return String(localized: "All Extensions")
         case .downloads:
-            return String(localized: "Most Downloaded")
+            return String(localized: "Popular")
         case .recentlyAdded:
-            return String(localized: "Recently Added")
+            return String(localized: "New")
         }
     }
 

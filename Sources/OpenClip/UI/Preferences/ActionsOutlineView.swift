@@ -335,10 +335,6 @@ final class ActionsScrollView: NSScrollView {
         if abs(contentInsets.top - desiredTop) > 0.5 {
             contentInsets = NSEdgeInsets(top: desiredTop, left: 0, bottom: 0, right: 0)
         }
-        if let outline = documentView as? NSOutlineView {
-            outline.autoresizesOutlineColumn = false
-            outline.sizeLastColumnToFit()
-        }
     }
 }
 
@@ -412,7 +408,10 @@ struct ActionsOutlineView: NSViewRepresentable {
         outlineView.allowsMultipleSelection = true
         outlineView.indentationPerLevel = 18
         outlineView.autoresizingMask = [.width]
-        outlineView.autoresizesOutlineColumn = false
+        // Let AppKit resize the sole column with the scroll view. Resizing it from every layout
+        // pass feeds the outline's preferred width back into SwiftUI and can make the settings
+        // window repeatedly change width on the Customize page.
+        outlineView.autoresizesOutlineColumn = true
         outlineView.columnAutoresizingStyle = .uniformColumnAutoresizingStyle
 
         outlineView.dataSource = context.coordinator

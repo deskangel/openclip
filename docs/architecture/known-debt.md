@@ -491,3 +491,10 @@ areas; stale debt notes are worse than none.
 - **`chrome` category is reserved but unused** — no popup-window-chrome code logs yet.
 - **`RotatingFileLogSink` keeps all non-`Sendable` state on its serial queue**, including
   its `DateFormatter`; its `@unchecked Sendable` depends on that rule (#45).
+# Popup appearance preview and pagination
+
+The appearance preview uses one contextual sample (Calculate), text labels for Copy/Cut/Paste,
+and fixed SF Symbol sample actions, with a presenter that ignores saved action customizations.
+Its stable preview viewport pins the contextual island at a left inset as the main bar grows.
+Per-action contextual exclusions do not change the static sample. The main bar's Actions Per Page setting
+and width budget apply to the standard island independently of the contextual island.

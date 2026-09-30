@@ -25,7 +25,9 @@ final class ActionCoordinatorTests: XCTestCase {
 
     @MainActor
     func testActionCoordinatorResolvesActionsForContext() async {
-        let coordinator = ActionCoordinator.shared
+        let settingsStore = MemorySettingsStore()
+        let registry = ActionRegistry(settingsStore: settingsStore)
+        let coordinator = ActionCoordinator(registry: registry, settingsStore: settingsStore)
         await coordinator.loadInitialState(
             extensionsDirectory: tempExtensionsDir,
             rulesURL: tempRulesURL

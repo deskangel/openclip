@@ -953,23 +953,10 @@ public struct PopupSearchView: View {
         return parts.joined(separator: " ")
     }
 
-    /// Rows are strictly [icon | text]: a text icon in the icon column would duplicate the title, so
-    /// resolve symbol-first (custom override, then the action's SF Symbol preference), matching the
-    /// preferences table.
+    /// Rows are strictly [icon | text], so use the table presentation icon. This preserves the
+    /// underlying glyph when the popup bar has been configured to show the action title as text.
     private func rowIcon(for action: any Action) -> ActionIcon {
-        if ActionIdentity.isAIPreset(action) {
-            return .symbol(Constants.defaultAIIconSymbol)
-        }
-        let resolved = action.displayIcon(using: presenter)
-        switch resolved {
-        case .symbol, .url, .local:
-            return resolved
-        case .text:
-            if let configurable = action as? any ConfigurableAction {
-                return .symbol(configurable.preferenceIconName)
-            }
-            return resolved
-        }
+        presenter.tableIcon(for: action)
     }
 
     private func iconView(for icon: ActionIcon) -> some View {
@@ -1100,4 +1087,3 @@ struct CommandDigitCatcher: NSViewRepresentable {
         }
     }
 }
-

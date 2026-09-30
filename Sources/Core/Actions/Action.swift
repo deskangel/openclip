@@ -137,5 +137,7 @@ public extension Action {
 public protocol ActionPresenting: Sendable {
     func displayTitle(for action: any Action) -> String
     func popupIcon(for action: any Action) -> ActionIcon
+    /// The icon for rows that always reserve an icon slot, such as settings and search results.
+    /// This preserves the action's underlying icon when the popup bar is configured to show text.
+    func tableIcon(for action: any Action) -> ActionIcon
 }
-

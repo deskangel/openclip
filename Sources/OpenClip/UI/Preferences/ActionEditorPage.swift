@@ -1182,7 +1182,9 @@ public struct ActionEditorPage: View {
             deliveryPrefString = Self.defaultDeliveryPrefString(for: action)
         }
         initialStoredSymbol = Self.sanitizedStoredSymbol(override?.customIconSymbol, actionIcon: action.icon)
-        seedBaseline(from: ActionCustomizationManager.shared.popupIcon(for: action))
+        // The editor always previews the icon that will return if the user switches back to
+        // Show Icon. A Show Text popup override must not replace that baseline with title text.
+        seedBaseline(from: ActionCustomizationManager.shared.tableIcon(for: action))
         displayMode = Self.initialDisplayMode(override: override, actionIcon: action.icon)
         if let customAction = action as? CustomAction {
             manifestState = nil

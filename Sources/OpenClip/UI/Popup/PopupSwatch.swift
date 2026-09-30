@@ -16,15 +16,15 @@ import Core
 struct PopupSwatch: View {
     /// The canonical action set the preview shows, independent of the user's own bar so the
     /// preview is about appearance, not content. Has enough actions (13) to exercise pagination
-    /// across the full 3–12 Actions Per Page slider range.
+    /// across the full 2–12 Actions Per Page slider range.
     static let actions: [any Action] = [
-        SearchAction(),
+        CalculateAction(),
+        CustomAction(id: "swatch.search", title: "Search", iconName: "magnifyingglass", type: .textSnippet(template: "")),
         CopyAction(),
         CutAction(),
         PasteAction(),
-        DefineAction(),
-        CalculateAction(),
-        CalendarAction(),
+        CustomAction(id: "swatch.define", title: "Define", iconName: "book.closed", type: .textSnippet(template: "")),
+        CustomAction(id: "swatch.calendar", title: "Add Event", iconName: "calendar.badge.plus", type: .textSnippet(template: "")),
         CustomAction(id: "swatch.uppercase", title: "Uppercase", iconName: "textformat.size.larger", type: .textSnippet(template: "")),
         CustomAction(id: "swatch.lowercase", title: "Lowercase", iconName: "textformat.size.smaller", type: .textSnippet(template: "")),
         CustomAction(id: "swatch.share", title: "Share", iconName: "square.and.arrow.up", type: .textSnippet(template: "")),
@@ -65,28 +65,40 @@ struct PopupSwatch: View {
         PopupThemeModel.effectiveScheme(appearance: storedColor, systemIsDark: systemScheme == .dark)
     }
 
-    private var modeStore: PopupModeStore {
+    @StateObject private var modeStore: PopupModeStore = {
         let store = PopupModeStore()
         store.subBarAbove = true
         return store
-    }
+    }()
 
     var body: some View {
         let context = ActionContext(selection: mockContext.selection, modifiers: [])
-        ZStack {
-            backdrop
-
-            PopupView(
-                actions: Self.actions,
-                context: context,
-                hoverState: Self.hoverState,
-                isStatic: true,
-                modeStore: modeStore
-            ) { _ in }
-            .padding(.top, topInset)
-        }
+        // The stage owns its size. Overlay content cannot enlarge the settings pane when
+        // pagination or scale increases the popup's intrinsic width.
+        Color.clear
         .frame(maxWidth: .infinity)
         .frame(height: height)
+        .background {
+            GeometryReader { geometry in
+                backdrop
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .clipped()
+            }
+        }
+        .overlay {
+            PopupPreviewLayout {
+                PopupView(
+                    actions: Self.actions,
+                    context: context,
+                    hoverState: Self.hoverState,
+                    presenter: PopupPreviewPresenter(),
+                    isStatic: true,
+                    modeStore: modeStore
+                ) { _ in }
+                .fixedSize(horizontal: true, vertical: false)
+                .padding(.top, topInset)
+            }
+        }
         .clipShape(RoundedRectangle(cornerRadius: PopupMetrics.cardCornerRadius, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: PopupMetrics.cardCornerRadius, style: .continuous)
@@ -153,5 +165,34 @@ struct PopupSwatch: View {
             appPolicy: .default
         )
         return ActionContext(selection: context, modifiers: [])
+    }
+}
+
+/// Preview glyphs are fixed samples rather than the user's saved action customizations.
+@MainActor
+private struct PopupPreviewPresenter: ActionPresenting {
+    func displayTitle(for action: any Action) -> String { action.title }
+    func popupIcon(for action: any Action) -> ActionIcon { action.icon }
+    func tableIcon(for action: any Action) -> ActionIcon { action.icon }
+}
+
+/// Keep the contextual island at the start of the stage as the main bar grows beside it.
+/// Placement never changes the size proposed by the preview stage.
+private struct PopupPreviewLayout: Layout {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        proposal.replacingUnspecifiedDimensions()
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard let popup = subviews.first else { return }
+        let size = popup.sizeThatFits(.unspecified)
+        popup.place(
+            at: CGPoint(
+                x: bounds.minX + 16,
+                y: bounds.midY - size.height / 2
+            ),
+            anchor: .topLeading,
+            proposal: ProposedViewSize(size)
+        )
     }
 }

@@ -308,7 +308,7 @@ public struct PopupView: View {
     private var contextualActions: [any Action] {
         guard contextualActionsEnabled else { return [] }
         return displayActions.filter { action in
-            !disabledContextualIDs.contains(action.id) && action.isContextual
+            (isStatic || !disabledContextualIDs.contains(action.id)) && action.isContextual
         }
     }
 
@@ -318,31 +318,8 @@ public struct PopupView: View {
             return displayActions
         }
         return displayActions.filter { action in
-            disabledContextualIDs.contains(action.id) || !action.isContextual
+            (!isStatic && disabledContextualIDs.contains(action.id)) || !action.isContextual
         }
-    }
-
-    private var contextualIslandWidth: CGFloat {
-        guard !contextualActions.isEmpty else { return 0 }
-        return contextualActions.reduce(CGFloat(0)) { sum, action in
-            sum + PopupPageLayout.estimatedItemWidth(
-                for: action,
-                inlineResult: modeStore.inlineResults[action.id],
-                scale: scale,
-                presenter: presenter
-            )
-        }
-    }
-
-    private var standardMaxBudget: CGFloat {
-        if contextualActions.isEmpty {
-            return maxBarBudget
-        }
-        return max(buttonWidth * 3, maxBarBudget - contextualIslandWidth - islandGap)
-    }
-
-    private var standardMaxItemsPerPage: Int {
-        max(1, pageSize - contextualActions.count)
     }
 
     private var pages: [[any Action]] {
@@ -355,8 +332,9 @@ public struct PopupView: View {
             inlineResults: modeStore.inlineResults,
             leadingWidth: leadingWidth,
             trailingWidth: trailingWidth,
-            maxBudget: standardMaxBudget,
-            maxItemsPerPage: standardMaxItemsPerPage,
+            // The contextual island has its own width and does not consume main-bar slots.
+            maxBudget: maxBarBudget,
+            maxItemsPerPage: max(1, pageSize),
             scale: scale,
             presenter: presenter
         )

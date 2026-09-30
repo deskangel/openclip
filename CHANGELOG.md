@@ -4,6 +4,23 @@ All notable user-facing changes to OpenClip.
 
 ---
 
+## v1.7.2 - 2026-09-30
+
+### Features & Improvements
+- **Popup pagination**: Choose how many actions appear per page, from 2 to 12; the contextual action island no longer reduces the main bar's page size.
+- **Extension Store**: Browse the catalog as **All**, **Popular**, or **New**. New releases can also appear in the Featured showcase, and updates fill out the New preview when needed.
+- **Selection reliability**: Hardened selection and inline-result capture with editability checks, shared gesture guards, and richer diagnostics in OpenClip's logs. OpenClip now uses OpenSelection 2.15.0; this is a dependency update, not an OpenSelection release.
+- **Accessibility permissions**: Opening Accessibility settings no longer resets macOS permission state. TCC reset is reserved for the explicit recovery action.
+- **Appearance preview**: The popup preview keeps a stable viewport as its width and page size change, and its sample icons stay independent of personal action customizations.
+
+### Fixes & Stability
+- Fixed action and extension enablement staying out of sync between the editor and toolbar.
+- Fixed selection action icons when the popup is configured to show action titles as text.
+- Fixed settings window width feedback from the Actions outline view.
+- Improved selection safety around window gestures, weak Accessibility evidence, and inline results.
+
+---
+
 ## v1.7.1 - 2026-09-28
 
 ### Fixes & Improvements

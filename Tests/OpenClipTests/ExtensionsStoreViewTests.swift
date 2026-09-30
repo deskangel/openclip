@@ -163,9 +163,11 @@ final class ExtensionsStoreViewTests: XCTestCase {
         XCTAssertEqual(viewModel.displayedExtensions.map(\.id),
                        ["com.openclip.quick-translate", "com.openclip.render-html", "com.openclip.basic-tool"])
         XCTAssertEqual(viewModel.featuredSectionItems.map(\.id), ["com.openclip.quick-translate"])
-        XCTAssertEqual(viewModel.newSectionItems.map(\.id), ["com.openclip.basic-tool"],
-                       "only the package still on its first release counts as new")
-        XCTAssertEqual(viewModel.remainingAllSectionItems.map(\.id), ["com.openclip.render-html"])
+        XCTAssertEqual(viewModel.newSectionItems.map(\.id),
+                       ["com.openclip.quick-translate", "com.openclip.basic-tool", "com.openclip.render-html"],
+                       "new releases lead the New section and updated items fill its remaining slots")
+        XCTAssertTrue(viewModel.remainingAllSectionItems.isEmpty,
+                      "items already shown in Featured or New are omitted from All")
 
         viewModel.selectedSort = .name
         XCTAssertEqual(viewModel.displayedExtensions.map(\.name), ["Basic Tool", "Quick Translate", "Render HTML"])
@@ -178,7 +180,7 @@ final class ExtensionsStoreViewTests: XCTestCase {
 
         viewModel.selectedSort = .recentlyAdded
         let recent = viewModel.displayedExtensions.map(\.id)
-        XCTAssertEqual(recent.first, "com.openclip.render-html", "kept in the curated recent list")
+        XCTAssertEqual(recent.first, "com.openclip.quick-translate", "new releases lead the recent list")
         XCTAssertEqual(Set(recent), everything)
     }
 
@@ -286,7 +288,8 @@ final class ExtensionsStoreViewTests: XCTestCase {
 
         XCTAssertEqual(viewModel.currentPage, 2)
         XCTAssertEqual(viewModel.extensions.last?.id, "com.openclip.quick-translate")
-        XCTAssertEqual(viewModel.remainingAllSectionItems.map(\.id), ["com.openclip.basic-tool"])
+        XCTAssertTrue(viewModel.remainingAllSectionItems.isEmpty,
+                      "the New showcase also contains updated items when it has room")
         XCTAssertEqual(viewModel.featuredSectionItems.map(\.id), ["com.openclip.quick-translate"])
 
         // The final rendered item in the sectioned view is the last item of remainingAllSectionItems.
@@ -315,8 +318,8 @@ final class ExtensionsStoreViewTests: XCTestCase {
         await showcaseInitial.value
 
         XCTAssertTrue(showcaseOnlyVM.remainingAllSectionItems.isEmpty)
-        XCTAssertEqual(showcaseOnlyVM.lastRenderedSectionedItemID, "com.openclip.render-html")
-        XCTAssertTrue(showcaseOnlyVM.shouldTriggerSectionedPagination(for: "com.openclip.render-html"))
+        XCTAssertEqual(showcaseOnlyVM.lastRenderedSectionedItemID, "com.openclip.quick-translate")
+        XCTAssertTrue(showcaseOnlyVM.shouldTriggerSectionedPagination(for: "com.openclip.quick-translate"))
     }
 
     /// Sorting reorders the catalogue, so the row rendered last is not the item fetched last.
