@@ -33,7 +33,7 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
     /// overshoots onto the menu bar or Dock is still a selection, while one that begins on chrome is not.
     internal var mouseDownWasSystemChrome: Bool = false
     internal var triggeredByHold: Bool = false
-    internal var lastGestureTimestamp: TimeInterval = 0
+    private var selectionSourceApp: NSRunningApplication?
     private let settingsStore: SettingsStore
 
     /// Injectable seams for headless tests; production uses live system state.
@@ -44,8 +44,8 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
     /// reads AppKit live, tests force it true.
     internal var primaryButtonPressed: @MainActor () -> Bool = { NSEvent.pressedMouseButtons & 1 != 0 }
     internal var now: @MainActor () -> Date = { Date() }
-    internal var retriever = SelectionRetrievalCoordinator(configuration: .default, copyCapture: { request in
-        await AutomaticCopyCapture.capture(request: request)
+    internal lazy var retriever = SelectionRetrievalCoordinator(configuration: .default, copyCapture: { [weak self] request in
+        await self?.captureAutomaticCopy(request)
     })
     internal var fallbackPasteboard: NSPasteboard = .general
     /// Exclusion predicate over the target app's bundle ID (tests bypass the self-exclusion
@@ -69,7 +69,9 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
     /// to the field actually under the finger, rather than whichever element happens to be focused —
     /// a hold on a window background must not inherit the clipboard just because a text field
     /// elsewhere is focused. Inert under XCTest; inject for tests.
-    internal var isPressOverEditableText: @MainActor (CGPoint) -> Bool = { MacSelectionMonitor.pressIsOverEditableText(at: $0) }
+    internal var isPressOverEditableText: @MainActor (CGPoint, pid_t) async -> Bool = { point, pid in
+        await MacSelectionMonitor.pressIsOverEditableText(at: point, pid: pid)
+    }
     /// Overlay gate: true when a *foreign* window (a screenshot/annotation tool's full-screen picker,
     /// a non-activating HUD) sits above the frontmost app at `point`. The automatic path stands down
     /// while one is up, because copy-based retrieval posts a real ⌘C that lands on that overlay's key
@@ -107,150 +109,36 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
         OpenSelectionMonitor.isSystemChromeLocation(point)
     }
 
-    /// Roles that mean "the pointer is over an editable text field" for the hold's paste fallback.
-    private static let editableTextRoles: Set<String> = ["AXTextField", "AXTextArea", "AXSearchField", "AXComboBox"]
-
-    /// Slack allowed when testing the press point against the focused field's frame, in points.
-    private static let focusedFrameTolerance: CGFloat = 12
-
-    /// Structural "is the press over editable text" for the hold's paste fallback. Deliberately
-    /// NOT the cursor shape: browsers render an I-beam over *read-only* selectable text, so the
-    /// beam re-admitted the exact false positive the fallback exists to prevent (a hold over a
-    /// web article pasting the clipboard). Two structural signals, strongest first:
-    ///
-    /// 1. An AX hit-test at the press point resolves to an editable text control (or sits inside
-    ///    one, walking a few ancestors).
-    /// 2. The frontmost app's focused element is an editable text control whose frame covers the
-    ///    press point. Web code editors (CodeMirror, Monaco) focus a hidden textarea that is
-    ///    IME-anchored at the caret the press just placed, so the press lands on it even though the
-    ///    hit-test finds the content div above.
-    ///
-    /// Deliberately *not* widened to "the press and the focused field share a web area": that admits
-    /// any read-only page text whenever an input elsewhere on the page still holds focus, which
-    /// re-creates the very leak this gate exists to prevent. A missed web editor is a false negative
-    /// (no clipboard fallback offered), which is the safe direction to fail.
-    ///
-    /// Inert under XCTest so tests drive the decision through the `isPressOverEditableText` seam;
-    /// the classification itself is covered headlessly via `pressIsOverEditableText(hitIsEditableControl:focusedIsEditableControl:focusedFrame:pressAXPoint:)`.
-    internal static func pressIsOverEditableText(at point: CGPoint) -> Bool {
+    /// Capture screen geometry on the main actor, then run the deadline-bounded AX lookup
+    /// off the UI thread. The PID belongs to the hold's source app, not a later frontmost app.
+    internal static func pressIsOverEditableText(at point: CGPoint, pid: pid_t) async -> Bool {
         guard NSClassFromString("XCTestCase") == nil else { return false }
-        // This runs on the main actor inside the hold task, so the whole probe shares one AX budget:
-        // every attribute read is capped at `axReadTimeout` *and* the ancestor walk stops at the same
-        // deadline, so an unresponsive target app cannot stack per-level timeouts into a multi-second
-        // stall of the event monitors and the popup.
-        let deadline = Date().addingTimeInterval(Constants.axReadTimeout)
-        let axPoint = axPoint(fromCocoa: point)
-        let hit = elementAt(axPoint: axPoint)
-        let hitIsEditable = hit.map { isOrContainsEditableTextControl($0, deadline: deadline) } ?? false
-        let focused = focusedElement(deadline: deadline)
-        return pressIsOverEditableText(
-            hitIsEditableControl: hitIsEditable,
-            focusedIsEditableControl: focused.map { isEditableTextControl($0) } ?? false,
-            focusedFrame: focused.flatMap { axFrame(of: $0) },
-            pressAXPoint: axPoint
-        )
+        let primaryHeight = NSScreen.screens.first(where: { $0.frame.origin == .zero })?.frame.height
+            ?? NSScreen.screens.first?.frame.height
+            ?? 0
+        let axPoint = CGPoint(x: point.x, y: primaryHeight - point.y)
+        return await SelectionEditabilityProbe.default.isEditable(at: axPoint, pid: pid)
     }
 
     /// The classification itself, free of AX and of screen state so it is directly testable: the press
     /// counts as over editable text when the hit-test found a text control, or when a focused text
-    /// control's frame actually covers the press (within `focusedFrameTolerance`).
+    /// control's frame actually covers the press (within the supplied tolerance).
     internal static func pressIsOverEditableText(
         hitIsEditableControl: Bool,
         focusedIsEditableControl: Bool,
         focusedFrame: CGRect?,
         pressAXPoint: CGPoint,
-        tolerance: CGFloat = focusedFrameTolerance
+        tolerance: CGFloat = 12
     ) -> Bool {
-        if hitIsEditableControl { return true }
-        guard focusedIsEditableControl, let focusedFrame else { return false }
-        return focusedFrame.insetBy(dx: -tolerance, dy: -tolerance).contains(pressAXPoint)
+        SelectionEditabilityProbe.isEditable(
+            hitIsEditableControl: hitIsEditableControl,
+            focusedIsEditableControl: focusedIsEditableControl,
+            focusedFrame: focusedFrame,
+            pressAXPoint: pressAXPoint,
+            tolerance: tolerance
+        )
     }
 
-    /// The frontmost app's focused element, or nil when it cannot be read promptly.
-    private static func focusedElement(deadline: Date) -> AXUIElement? {
-        guard let app = NSWorkspace.shared.frontmostApplication,
-              Date() < deadline else { return nil }
-        let appElement = AXUIElementCreateApplication(app.processIdentifier)
-        applyTimeout(to: appElement)
-        var focusedRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(appElement, kAXFocusedUIElementAttribute as CFString, &focusedRef) == .success,
-              let focused = focusedRef else { return nil }
-        // swiftlint:disable:next force_cast
-        return focused as! AXUIElement
-    }
-
-    /// Cocoa (bottom-left origin) → AX global (top-left origin) conversion about the primary display.
-    private static func axPoint(fromCocoa point: CGPoint) -> CGPoint {
-        let primaryHeight = NSScreen.screens.first(where: { $0.frame.origin == .zero })?.frame.height
-            ?? NSScreen.screens.first?.frame.height
-            ?? 0
-        return CGPoint(x: point.x, y: primaryHeight - point.y)
-    }
-
-    /// Cap an element's messaging timeout before reading from it. Applied to *every* element touched,
-    /// including each parent returned by a walk — an element read at the default multi-second timeout
-    /// is what turns a shallow walk into a main-actor stall.
-    private static func applyTimeout(to element: AXUIElement) {
-        AXUIElementSetMessagingTimeout(element, Float(Constants.axReadTimeout))
-    }
-
-    /// The AX element at an AX-coordinate point, with the messaging timeout capped so an
-    /// unresponsive target app cannot freeze the hold task or the event monitors.
-    private static func elementAt(axPoint: CGPoint) -> AXUIElement? {
-        let systemWide = AXUIElementCreateSystemWide()
-        applyTimeout(to: systemWide)
-        var element: AXUIElement?
-        guard AXUIElementCopyElementAtPosition(systemWide, Float(axPoint.x), Float(axPoint.y), &element) == .success else { return nil }
-        return element
-    }
-
-    /// Whether `element` or one of its near ancestors is an editable text control. A window
-    /// background, toolbar, or static text resolves to something else, so a hold there no longer
-    /// inherits the clipboard from a focused field. Bounded by both depth and the shared deadline.
-    private static func isOrContainsEditableTextControl(_ start: AXUIElement, deadline: Date) -> Bool {
-        var current: AXUIElement? = start
-        var depth = 0
-        while let el = current, depth < 6, Date() < deadline {
-            if isEditableTextControl(el) { return true }
-            current = axParent(of: el)
-            depth += 1
-        }
-        return false
-    }
-
-    /// Editable iff the role is a text control.
-    ///
-    /// Role only, on purpose. "Settable `AXSelectedTextRange`" was tried as a broader signal and
-    /// rejected: a read-only but selectable control (a non-editable `NSTextView`, a PDF text layer)
-    /// exposes a settable selection range while refusing edits, so it admitted a clipboard fallback
-    /// over exactly the read-only text this gate must reject.
-    private static func isEditableTextControl(_ element: AXUIElement) -> Bool {
-        applyTimeout(to: element)
-        var roleRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleRef) == .success,
-              let role = roleRef as? String else { return false }
-        return editableTextRoles.contains(role)
-    }
-
-    private static func axParent(of element: AXUIElement) -> AXUIElement? {
-        applyTimeout(to: element)
-        var parentRef: CFTypeRef?
-        AXUIElementCopyAttributeValue(element, kAXParentAttribute as CFString, &parentRef)
-        // swiftlint:disable:next force_cast
-        return parentRef.map { $0 as! AXUIElement }
-    }
-
-    private static func axFrame(of element: AXUIElement) -> CGRect? {
-        applyTimeout(to: element)
-        var frameRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, "AXFrame" as CFString, &frameRef) == .success,
-              let frameRef, CFGetTypeID(frameRef) == AXValueGetTypeID() else { return nil }
-        var frame = CGRect.zero
-        // swiftlint:disable:next force_cast
-        guard AXValueGetValue(frameRef as! AXValue, .cgRect, &frame) else { return nil }
-        return frame
-    }
-    
     internal init(settingsStore: SettingsStore = DefaultSettingsStore.shared) {
         self.settingsStore = settingsStore
     }
@@ -260,27 +148,13 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
 
         appActivationObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
-        ) { [weak self] _ in
+        ) { [weak self] notification in
+            let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
             MainActor.assumeIsolated {
-                guard let self else { return }
-                guard let app = self.frontmostAppProvider() ?? NSWorkspace.shared.frontmostApplication else { return }
-                if app.bundleIdentifier == Bundle.main.bundleIdentifier { return }
-                if let frontmostID = self.frontmostAppProvider()?.bundleIdentifier,
-                   app.bundleIdentifier == frontmostID {
-                    return
-                }
-                if let sourceBundleID = self.latestSelection?.context.sourceApp.bundleIdentifier,
-                   app.bundleIdentifier == sourceBundleID {
-                    return
-                }
-                if self.lastGestureTimestamp > 0,
-                   (ProcessInfo.processInfo.systemUptime - self.lastGestureTimestamp) < PopupMetrics.focusSwitchGracePeriod {
-                    return
-                }
-                self.cancelPendingSelection()
+                self?.handleApplicationActivation(app)
             }
         }
-        
+
         mouseDownMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] _ in
             let point = NSEvent.mouseLocation
             // Global monitors run on the main thread. Creating `Task { @MainActor in }` here
@@ -358,6 +232,7 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
         mouseHoldTask?.cancel()
         mouseHoldTask = nil
         clearSelection()
+        selectionSourceApp = nil
         mouseDownWindow = nil
         if let appActivationObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(appActivationObserver)
@@ -404,12 +279,45 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
         mouseHoldTask?.cancel()
         mouseHoldTask = nil
         triggeredByHold = false
+        selectionSourceApp = nil
         clearSelection()
     }
 
-    internal func handleMouseDown(at point: CGPoint) {
-        lastGestureTimestamp = ProcessInfo.processInfo.systemUptime
+    internal func handleApplicationActivation(_ app: NSRunningApplication?) {
+        guard let frontmost = frontmostAppProvider() else {
+            cancelPendingSelection()
+            return
+        }
+        let activated = app ?? frontmost
+        // Ignore queued notifications for an app that is no longer frontmost, and our own
+        // popup activation. A real switch to a different source always invalidates the read.
+        guard activated.processIdentifier == frontmost.processIdentifier else { return }
+        guard activated.bundleIdentifier != Bundle.main.bundleIdentifier else { return }
+        guard activated.processIdentifier != selectionSourceApp?.processIdentifier else { return }
         cancelPendingSelection()
+    }
+
+    private func isSelectionSourceActive(_ app: NSRunningApplication) -> Bool {
+        guard !Task.isCancelled, !shouldSuppress(for: app.bundleIdentifier),
+              let frontmost = frontmostAppProvider() else { return false }
+        return frontmost.processIdentifier == app.processIdentifier
+    }
+
+    /// The package protects focus changes during capture. Also validate the original source
+    /// before capture starts, since AX retrieval may have yielded while another app activated.
+    internal func captureAutomaticCopy(
+        _ request: CopyRequest,
+        capture: @MainActor (CopyRequest) async -> SelectionResult? = { request in
+            await AutomaticCopyCapture.capture(request: request)
+        }
+    ) async -> SelectionResult? {
+        guard let source = selectionSourceApp, isSelectionSourceActive(source) else { return nil }
+        return await capture(request)
+    }
+
+    internal func handleMouseDown(at point: CGPoint) {
+        cancelPendingSelection()
+        selectionSourceApp = frontmostAppProvider()
         mouseDownWindow = nil
         if isSystemChromeAt(point) {
             mouseDownLocation = nil
@@ -496,6 +404,7 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
             }
 
             let canPaste = await probeTask?.value
+            guard self.isSelectionSourceActive(app) else { return }
 
             // If no text was actively selected, only inherit clipboard content when the press is
             // actually over editable text, decided structurally (see `pressIsOverEditableText`).
@@ -504,7 +413,8 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
             // earlier I-beam signal did the same over read-only web text — browsers show a beam
             // over selectable text whether or not it is editable.
             if retrievedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                let isEditableContext = isPressOverEditableText(point)
+                let isEditableContext = await isPressOverEditableText(point, app.processIdentifier)
+                guard self.isSelectionSourceActive(app) else { return }
                 if isEditableContext && canPaste != false,
                    let clipboard = fallbackPasteboard.string(forType: .string),
                    !clipboard.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -534,12 +444,12 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
                 flavors: selectionFlavors
             )
             guard !Task.isCancelled else { return }
-            guard !self.shouldSuppress(for: appIdentity.bundleIdentifier) else { return }
-            delivered = true
-            latestSelection = (context, canPaste)
+            guard self.isSelectionSourceActive(app) else { return }
             prewarmInlineActions(for: context)
             await InlineResultEvaluator.shared.awaitPrewarmed(timeout: 0.025)
-            guard !Task.isCancelled else { return }
+            guard self.isSelectionSourceActive(app) else { return }
+            delivered = true
+            latestSelection = (context, canPaste)
             self.onSelection?(context, canPaste)
         }
     }
@@ -562,7 +472,7 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
     }
 
     internal func handleMouseUp(app: NSRunningApplication, cursor: CGPoint, clickCount: Int) {
-        lastGestureTimestamp = ProcessInfo.processInfo.systemUptime
+        selectionSourceApp = app
         let gestureWindow = mouseDownWindow
         mouseDownWindow = nil
         if let gestureWindow, windowFrame(gestureWindow.id) != gestureWindow.frame {
@@ -621,7 +531,7 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
         }
 
         debounceTask = Task { @MainActor in
-            guard !Task.isCancelled, !self.shouldSuppress(for: app.bundleIdentifier) else { return }
+            guard self.isSelectionSourceActive(app) else { return }
             if let bundleID = app.bundleIdentifier, AppFilter.isExcluded(bundleID: bundleID) {
                 return
             }
@@ -650,6 +560,7 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
             if Task.isCancelled { return }
             await self.deliverSelection(
                 result: result,
+                app: app,
                 appIdentity: appIdentity,
                 policy: policy,
                 cursor: cursor,
@@ -664,7 +575,7 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
     /// now-frontmost app). `isSelectAll` marks a whole-container gesture (⌘A / ⌘L), which retrieval
     /// refuses on a row/list container (row selection in Finder/Mail/table views).
     internal func handleSelectionTrigger(isSelectAll: Bool) {
-        lastGestureTimestamp = ProcessInfo.processInfo.systemUptime
+        selectionSourceApp = frontmostAppProvider()
         debounceTask?.cancel()
         guard settingsStore.get(.pauseUntilTimestamp) <= Date().timeIntervalSince1970 else { return }
         guard !shouldSuppress() else { return }
@@ -677,7 +588,8 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
             if Task.isCancelled { return }
 
             guard let app = self.frontmostAppProvider() else { return }
-            guard !self.shouldSuppress(for: app.bundleIdentifier) else { return }
+            self.selectionSourceApp = app
+            guard self.isSelectionSourceActive(app) else { return }
 
             if self.isExcludedBundle(app.bundleIdentifier) {
                 return
@@ -689,14 +601,15 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
             }
             let appIdentity = AppIdentity(app)
             let probeTask = self.preparePasteProbe?(app, policy)
-            // Same overlay guard as the mouse-up path: keep caching, but never post a synthetic ⌘C
-            // into another app's key window (see the mouse-up comment for the mechanism).
+            // Match the mouse-up path: passive caching stays AX-only when automatic appearance
+            // is disabled, this app is hotkey-only, or a foreign overlay owns the key window.
             let result = await retriever.retrieve(
                 for: appIdentity,
                 policy: policy,
                 cursor: self.currentCursorProvider(),
                 isSelectAll: isSelectAll,
-                allowCopyFallback: !self.isOverlayPresent(self.currentMouseLocation()),
+                allowCopyFallback: self.settingsStore.get(.isAppEnabled) && !policy.hotkeyOnly
+                    && !self.isOverlayPresent(self.currentMouseLocation()),
                 requireCopyEvidence: false
             )
             if Task.isCancelled { return }
@@ -707,6 +620,7 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
             )
             await self.deliverSelection(
                 result: result,
+                app: app,
                 appIdentity: appIdentity,
                 policy: policy,
                 cursor: anchor,
@@ -726,13 +640,14 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
     /// `onSelection` with the paste-probe result. Used by both the mouse and keyboard paths.
     private func deliverSelection(
         result: TextResult?,
+        app: NSRunningApplication,
         appIdentity: AppIdentity,
         policy: AppPolicyContext,
         cursor: CGPoint,
         mouseDownLocation: CGPoint?,
         probeTask: Task<Bool?, Never>?
     ) async {
-        guard !Task.isCancelled else { return }
+        guard isSelectionSourceActive(app) else { return }
         guard let result,
               TextSanitizer.isSubstantial(result.text),
               result.text.utf8.count <= Constants.maxTextLength else {
@@ -753,10 +668,10 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
         )
         prewarmInlineActions(for: context)
         let canPaste = await probeTask?.value
-        guard !Task.isCancelled else { return }
-        latestSelection = (context, canPaste)
+        guard isSelectionSourceActive(app) else { return }
         await InlineResultEvaluator.shared.awaitPrewarmed(timeout: 0.025)
-        guard !Task.isCancelled else { return }
+        guard isSelectionSourceActive(app) else { return }
+        latestSelection = (context, canPaste)
         // "Appear Automatically" (isAppEnabled) is the global form of the per-app `hotkeyOnly`
         // rule: it suppresses the passive auto-show for mouse-release and keyboard selections
         // while leaving the explicit hold gesture (delivered in `handleMouseDown`, which never

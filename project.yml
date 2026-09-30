@@ -85,7 +85,7 @@ targets:
 packages:
   OpenSelection:
     url: https://github.com/ganeshmshetty/OpenSelection
-    revision: 6e1eb6d81f36c92263c2b75a57e460e3be463f3b
+    exactVersion: 2.15.0
   KeyboardShortcuts:
     url: https://github.com/sindresorhus/KeyboardShortcuts
     from: 3.1.0

@@ -399,6 +399,16 @@ areas; stale debt notes are worse than none.
   New presses and application activation cancel pending monitoring tasks; the capture rechecks
   cancellation, target PID and the existing overlay guard before posting. Each authorized copy
   trigger is logged without selected text or clipboard data.
+- **Automatic reads are tied to the selection source process.** The monitor uses the activated app
+  from the workspace notification and cancels pending reads and clears the cached selection on a
+  switch away from the source. Queued notifications for apps no longer frontmost, activation of
+  the source itself, and OpenClip's own popup activation are ignored. Delivery rechecks the source
+  PID and suppression after asynchronous retrieval, paste probing, editability probing, and inline
+  prewarming, so a late result cannot show over another app. The injected copy capture also checks
+  the original source PID before entering OpenSelection's capture, covering a switch that happens
+  during AX retrieval before the package snapshots the frontmost PID. Mouse and keyboard passive monitoring
+  both withhold copy fallback when automatic appearance is disabled or the app is `hotkeyOnly`;
+  native AX reads still populate the shortcut cache.
 - **Window gestures are rejected before retrieval.** OpenSelection's `SelectionGestureWindow`
   supplies the geometry snapshot; OpenClip's monitor records the top normal window
   under the initial press and compares that window's frame on release. A move, resize or missing
@@ -432,9 +442,13 @@ areas; stale debt notes are worse than none.
   A "shared web area" widening was also rejected: it admitted any read-only page text while an
   input elsewhere held focus, which is the leak the gate exists to prevent. Residual limit: a
   custom-drawn editor exposing no AX text control at all (rare outside terminals, which are
-  policy-excluded) will not fall back. The whole probe shares one `axReadTimeout` budget — every
-  attribute read is capped and the ancestor walk stops at the same deadline, because it runs on
-  the main actor inside the hold task.
+  policy-excluded) will not fall back. `SelectionEditabilityProbe` runs the lookup on a dedicated
+  concurrent queue, with the press coordinates and source PID captured before dispatch. A watchdog
+  returns false at `axReadTimeout`; each AX message uses the remaining shared budget and no new
+  read starts after the deadline. Actual workers are capped at `axMaxConcurrentInspects` and keep
+  their permits until they exit, so timed-out workers cannot accumulate unbounded threads.
+  Saturation fails closed (no clipboard fallback) while those workers finish. The main actor
+  remains responsive throughout.
 
 
 ## Test Isolation

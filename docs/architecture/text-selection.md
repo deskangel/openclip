@@ -36,8 +36,11 @@ The subsystem consists of three primary components:
 
 The monitor snapshots the window under a mouse press and rejects the release if that window
 moved, resized or disappeared. This avoids retrieving an old selection from the editor that
-remains focused while its title bar is dragged. New presses and application activation also
-cancel pending automatic reads. At the copy boundary, OpenSelection's [`AutomaticCopyCapture`](https://github.com/ganeshmshetty/OpenSelection#passive-monitoring)
+remains focused while its title bar is dragged. New presses and switches away from the source
+process cancel pending automatic reads and clear the shortcut cache. Queued notifications for
+apps no longer frontmost, the source app's own activation, and OpenClip's popup activation are
+ignored. The monitor rechecks the source PID before caching or presenting results after async
+work. At the copy boundary, OpenSelection's [`AutomaticCopyCapture`](https://github.com/ganeshmshetty/OpenSelection#passive-monitoring)
 requires an enabled Command-C menu shortcut, then rechecks cancellation, the frontmost process
 and the overlay guard before invoking the copy trigger. The bounded menu probe runs off the
 main actor. Native AX retrieval and the explicit hotkey use their existing behavior. See
@@ -136,7 +139,11 @@ The retrieval path above applies to *passive selection monitoring*. The global t
    - The context is flagged `SelectionContext.isClipboardFallback`; `PopupWindowController.show` filters available actions down to **Paste** (and AI Tools launcher).
 3. **Empty Context Fallback**: If the clipboard is also empty, an empty selection context is created with the frontmost app's identity, allowing standalone actions to run.
 
-Passive selection monitoring continues even when "Appear Automatically" is disabled (`isAppEnabled == false` or `hotkeyOnly: true`), updating `latestSelection` and pre-warming the search index in the background so pressing the shortcut opens the palette with zero perceptual delay. `isAppEnabled` is the global form of the per-app `hotkeyOnly` rule: it gates only the monitor's passive (mouse-release/keyboard) auto-show. The explicit hold gesture delivers straight from `handleMouseDown` and stays unaffected.
+Passive selection monitoring continues even when "Appear Automatically" is disabled (`isAppEnabled == false` or `hotkeyOnly: true`), updating `latestSelection` and pre-warming the search index in the background so pressing the shortcut opens the palette with zero perceptual delay. Both passive mouse and keyboard paths withhold synthetic copy fallback under those settings; native AX reads still populate the cache. The explicit hold gesture delivers straight from `handleMouseDown` and stays unaffected by `isAppEnabled`.
+
+The hold's editable-field lookup runs off the main actor through `SelectionEditabilityProbe`,
+bound to the original source PID and one `axReadTimeout` deadline. If the lookup times out,
+clipboard fallback is refused; the UI thread keeps processing events.
 
 ---
 
@@ -145,3 +152,10 @@ Passive selection monitoring continues even when "Appear Automatically" is disab
 - **No Clipboard Pollution (AX modes)**: `ax-text-control`, `ax-web-area`, and `browser-script` never write to `NSPasteboard` — they read the live accessibility tree or the browser's AppleScript bridge.
 - **Copy modes are archive-and-restore**: `menu-copy`/`keyboard-copy` temporarily place the selected text on the general pasteboard, then restore the archived items tagged with the nspasteboard transient markers so clipboard managers don't treat the restore as a user copy.
 - **Ignored Fields**: Secure text fields (such as password inputs or masked text areas) do not expose `kAXSelectedTextAttribute` through AX APIs, ensuring password security.
+
+## Inline Action Match Context
+
+Inline result evaluation receives the same per-action regex match context as click execution. The
+selection remains available as `openclip.input.text`, while `openclip.input.matchedText` and
+`openclip.input.captures` carry the regex match and capture groups. This lets inline actions such as
+Currency Converter evaluate a value embedded in a longer selected passage.

@@ -77,6 +77,36 @@ final class InlineResultEvaluatorTests: XCTestCase {
         XCTAssertEqual(result, "Fast Result")
     }
 
+    func testInlineJavaScriptReceivesRegexMatchedTextFromLongSelection() async {
+        let evaluator = InlineResultEvaluator()
+        let selection = "Dhruval @dhruvalgolakiya 23, full time building products. part time code, design, and posting what i’m on. scaled solo dev agency to $200K built - http://appgrowkit.com Trending now"
+        let action = JavaScriptAction(
+            id: "test.inline-currency",
+            title: "Convert Currency",
+            scriptCode: "function action(){ return openclip.input.matchedText + '|' + openclip.input.captures[0]; }",
+            chrome: ActionChrome(isInlineResult: true),
+            optionStore: SettingsActionOptionStore(store: MemorySettingsStore()),
+            rules: ExtensionActionRules(requirements: ActionRequirements(regex: #"\$([0-9]+)K?"#))
+        )
+        let context = ActionContext(selection: SelectionContext(text: selection))
+
+        let result = await evaluator.evaluateAsync(action: action, context: context)
+
+        XCTAssertEqual(result, "$200K|200")
+
+        let bareAmountContext = ActionContext(selection: SelectionContext(text: "$200"))
+        let bareAmountResult = await evaluator.evaluateAsync(action: action, context: bareAmountContext)
+        XCTAssertEqual(bareAmountResult, "$200|200")
+
+        evaluator.prewarm(actions: [action], context: context)
+        await evaluator.awaitPrewarmed(timeout: 2.0)
+        XCTAssertEqual(
+            evaluator.prewarmedResult(for: action, textHash: selection.hashValue),
+            "$200K|200",
+            "Prewarming must use the same regex match as click execution"
+        )
+    }
+
     func testTextResultPreservesWhitespaceButWhitespaceOnlyIsEmpty() async {
         struct TextInlineAction: Action {
             let id: String

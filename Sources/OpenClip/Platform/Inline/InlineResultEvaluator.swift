@@ -102,11 +102,28 @@ public final class InlineResultEvaluator {
         timeout: TimeInterval
     ) async -> String? {
         do {
+            // Inline evaluation runs before the user clicks the action, so it cannot rely on
+            // the click path to populate ActionContext.match. Resolve the same match here so
+            // regex based inline actions receive their matched substring (for example `$200`
+            // inside a longer selection) instead of trying to parse the entire selection.
+            let matchedContext: ActionContext
+            if context.match != nil {
+                matchedContext = context
+            } else if let match = action.matchInfo(for: context) {
+                matchedContext = ActionContext(
+                    selection: context.selection,
+                    modifiers: context.modifiers,
+                    isSecondaryClick: context.isSecondaryClick,
+                    match: match
+                )
+            } else {
+                matchedContext = context
+            }
             let result: ActionResult
             if let javaScriptAction = javaScriptAction(from: action) {
-                result = try await javaScriptAction.perform(context, timeout: timeout)
+                result = try await javaScriptAction.perform(matchedContext, timeout: timeout)
             } else {
-                result = try await action.perform(context)
+                result = try await action.perform(matchedContext)
             }
             switch result {
             case .text(let text):
