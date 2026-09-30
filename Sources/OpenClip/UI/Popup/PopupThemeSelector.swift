@@ -20,6 +20,7 @@ struct PopupThemeSelector: View {
     @Setting(SettingKey.popupVerticalPosition) private var popupVerticalPosition
     @Setting(SettingKey.contextualActionsEnabled) private var contextualActionsEnabled
     @Setting(SettingKey.disabledContextualActionIDs) private var disabledContextualActionIDs
+    @Setting(SettingKey.contextualPillPosition) private var contextualPillPosition
 
     @State private var isShowingContextualPopover = false
 
@@ -75,7 +76,8 @@ struct PopupThemeSelector: View {
         popupAlignment == SettingKey.popupAlignment.defaultValue &&
         popupVerticalPosition == SettingKey.popupVerticalPosition.defaultValue &&
         contextualActionsEnabled == SettingKey.contextualActionsEnabled.defaultValue &&
-        disabledContextualActionIDs == SettingKey.disabledContextualActionIDs.defaultValue
+        disabledContextualActionIDs == SettingKey.disabledContextualActionIDs.defaultValue &&
+        contextualPillPosition == SettingKey.contextualPillPosition.defaultValue
     }
 
     private func resetToDefaults() {
@@ -87,6 +89,7 @@ struct PopupThemeSelector: View {
         popupVerticalPosition = SettingKey.popupVerticalPosition.defaultValue
         contextualActionsEnabled = SettingKey.contextualActionsEnabled.defaultValue
         disabledContextualActionIDs = SettingKey.disabledContextualActionIDs.defaultValue
+        contextualPillPosition = SettingKey.contextualPillPosition.defaultValue
     }
 
     private var themeSelection: Binding<String> {
@@ -221,6 +224,22 @@ struct PopupThemeSelector: View {
                             .controlSize(.small)
                             .accessibilityLabel(String(localized: "Enable Contextual Actions"))
                     }
+                }
+
+                SettingsRow(
+                    title: "Contextual Pill",
+                    subtitle: "Show contextual actions to the left or right of the main bar."
+                ) {
+                    segmentedPicker(
+                        selection: $contextualPillPosition,
+                        options: [
+                            AppearanceOption(label: "Left", value: "left"),
+                            AppearanceOption(label: "Right", value: "right"),
+                        ],
+                        label: "Contextual Pill Position",
+                        width: 120
+                    )
+                    .disabled(!contextualActionsEnabled)
                 }
             }
 

@@ -33,6 +33,13 @@ final class SettingsStoreTests: XCTestCase {
     }
 
     @MainActor
+    func testContextualPillPositionDefaultsToLeft() {
+        XCTAssertEqual(store.get(.contextualPillPosition), "left")
+        store.set(.contextualPillPosition, value: "right")
+        XCTAssertEqual(store.get(.contextualPillPosition), "right")
+    }
+
+    @MainActor
     func testActionOptionKeyNameAndRoundTrip() {
         let key = SettingKey.actionOption(actionID: "com.test.action", optionID: "prefix")
         XCTAssertEqual(key.name, "action.com.test.action.option.prefix")

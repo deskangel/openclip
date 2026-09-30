@@ -4229,6 +4229,62 @@
         }
       }
     },
+    "Contextual Pill": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上下文胶囊"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "情境膠囊"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pastille contextuelle"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "コンテキストピル"
+          }
+        }
+      }
+    },
+    "Contextual Pill Position": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上下文胶囊位置"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "情境膠囊位置"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Position de la pastille contextuelle"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "コンテキストピルの位置"
+          }
+        }
+      }
+    },
     "Continue": {
       "localizations": {
         "zh-Hans": {
@@ -16293,6 +16349,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "補完を表示"
+          }
+        }
+      }
+    },
+    "Show contextual actions to the left or right of the main bar.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在主栏的左侧或右侧显示上下文操作。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在主列的左側或右側顯示情境動作。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher les actions contextuelles à gauche ou à droite de la barre principale."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "コンテキストアクションをメインバーの左側または右側に表示します。"
           }
         }
       }

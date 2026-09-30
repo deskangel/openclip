@@ -705,5 +705,8 @@
   "Selection": "選択範囲",
   "Clipboard": "クリップボード",
   "Tab to switch text source": "Tab キーでテキストソースを切り替え",
-  "Press Tab to switch between selection and clipboard": "Tab キーで選択範囲とクリップボードを切り替え"
+  "Press Tab to switch between selection and clipboard": "Tab キーで選択範囲とクリップボードを切り替え",
+  "Contextual Pill": "コンテキストピル",
+  "Show contextual actions to the left or right of the main bar.": "コンテキストアクションをメインバーの左側または右側に表示します。",
+  "Contextual Pill Position": "コンテキストピルの位置"
 }
