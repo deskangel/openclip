@@ -14,14 +14,14 @@ signature, the hardened runtime enabled, a stapled notarization ticket, and a Ga
 
 Signing is **opt-in**, and everything works without it.
 
-| | Ad-hoc (default) | Developer ID |
-|---|---|---|
-| Apple Developer account | not needed | required |
-| Network access | not needed | required (timestamp + notary) |
-| Hardened runtime | yes | yes |
-| Entitlements | yes | yes |
-| Opens on another Mac | no | yes |
-| Used for | local builds, tests, PR/fork CI | releases |
+| | Ad-hoc (default) | Local self-signed | Developer ID |
+|---|---|---|---|
+| Apple Developer account | not needed | not needed | required |
+| Network access | not needed | not needed | required (timestamp + notary) |
+| Hardened runtime | yes | yes | yes |
+| Entitlements | yes | yes | yes |
+| Opens on another Mac | no | no | yes |
+| Used for | local builds, tests, PR/fork CI | local builds with a stable signing identity | releases |
 
 A fresh clone builds, packages, and runs with no certificate at all. The only thing an ad-hoc build
 cannot do is leave the machine that produced it: Gatekeeper has nothing to trust, so it refuses to
@@ -30,11 +30,83 @@ identical in both modes, so a contributor is exercising the same code path a rel
 
 ```bash
 ./scripts/package_app.sh                                # ad-hoc
+OPENCLIP_DEV_SIGN_IDENTITY="OpenClip Local Development" ./scripts/dev_run.sh # stable local identity
 OPENCLIP_SIGN_IDENTITY=auto ./scripts/package_app.sh    # Developer ID signed
 OPENCLIP_SIGN_IDENTITY=auto OPENCLIP_NOTARIZE=1 \
     ./scripts/package_app.sh                            # signed, notarized, stapled
 ./scripts/release_update.sh 1.4.0                       # full release; signing is mandatory
 ```
+
+### Recommended: Xcode-managed development signing
+
+Apple recommends automatic signing: add your Apple account in **Xcode → Settings → Accounts**,
+select your team, and let Xcode create an **Apple Development** certificate. A Personal Team is
+available without paid program membership. You can also create the certificate from **Manage
+Certificates → + → Apple Development**.
+
+Use the team identifier from your Apple developer account for local builds:
+
+```bash
+OPENCLIP_DEV_TEAM="YOUR_TEAM_ID" ./scripts/dev_run.sh
+```
+
+This enables automatic signing with `Apple Development` and allows Xcode to update development
+signing assets using the account already signed into Xcode. It takes precedence over
+`OPENCLIP_DEV_SIGN_IDENTITY`. Without either variable, the launcher keeps ad-hoc signing.
+After switching signing identities, grant Accessibility once for that build. Normal permission
+requests do not reset TCC. Keep using the same team and bundle identifier for subsequent builds.
+
+Development signing and Developer ID distribution signing have different designated requirements,
+so switching between development and released builds may require a new Accessibility grant.
+
+References: [Apple's automatic signing workflow](https://help.apple.com/xcode/mac/current/en.lproj/dev60b6fbbc7.html)
+and [code signing requirements](https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements).
+
+### Use an existing certificate without signing in
+
+If this Mac already has a valid development signing identity and its private key, no Apple sign-in
+or team ID is needed. List identities with `security find-identity -v -p codesigning`, then use
+the identity's SHA-1 fingerprint:
+
+```bash
+OPENCLIP_DEV_SIGN_IDENTITY="CERTIFICATE_SHA1" ./scripts/dev_run.sh
+```
+
+To remember the choice, save just that fingerprint on one line in `keys/dev-signing-identity`.
+This file is gitignored. Explicit environment variables take precedence; set
+`OPENCLIP_DEV_SIGN_IDENTITY=-` to run ad-hoc even when the file exists. Clones without local
+configuration continue to build ad-hoc.
+
+The dev launcher opens the `.app` through LaunchServices (`open`), as Finder does, rather than
+spawning `Contents/MacOS/OpenClip` directly. This gives permission requests the normal application
+launch context. After rebuilding, check both the app's permission status and its entry in
+**System Settings → Privacy & Security → Accessibility**.
+
+### Alternative: offline self-signed development certificate
+
+To keep Accessibility permission attached to repeated local builds, create a self-signed code
+signing certificate in **Keychain Access → Certificate Assistant → Create a Certificate**. Use a
+recognizable name (for example, `OpenClip Local Development`), identity type **Self Signed Root**,
+and certificate type **Code Signing**. Keep it in your login keychain. This identity is only for
+this Mac: it is not a trusted publisher identity, does not make builds distributable, and cannot
+replace Developer ID for releases or notarization.
+
+Find the exact identity name with:
+
+```bash
+security find-identity -v -p codesigning
+```
+
+Then run the development launcher with that name:
+
+```bash
+OPENCLIP_DEV_SIGN_IDENTITY="OpenClip Local Development" ./scripts/dev_run.sh
+```
+
+The override affects only `dev_run.sh`; project and release defaults remain ad-hoc. After the first
+signed launch, grant Accessibility to OpenClip once in System Settings. Normal permission prompts
+and the **Open Settings** button do not reset TCC. Use the explicit recovery action only if a grant
+is genuinely stale.
 
 ## Configuration
 
@@ -167,10 +239,9 @@ Two rules when editing that file:
 
 - **Gatekeeper stops refusing the app.** This is the whole point.
 - **The Accessibility grant survives updates.** An ad-hoc signature's designated requirement is a
-  bare `cdhash`, which changes with every build, so TCC treated each update as a different
-  application and quietly dropped the Accessibility permission. That is the bug
-  `PermissionManager.resetTCCAndRelaunch()` and the proactive `tccutil reset` work around. A
-  Developer ID signature's requirement pins the bundle identifier and the Team ID instead:
+  bare `cdhash`, which changes with every build, so TCC can treat each update as a different
+  application. A stable signing identity gives TCC a stable designated requirement. A Developer ID
+  signature's requirement pins the bundle identifier and the Team ID instead:
 
   ```
   identifier "com.openclip.OpenClip" and anchor apple generic

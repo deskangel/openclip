@@ -174,8 +174,7 @@ struct GeneralTab: View {
                                                     : String(localized: "Access Required"))
 
                             Button(String(localized: "Open Settings")) {
-                                let shouldReset = !permissionManager.isAccessibilityGranted
-                                permissionManager.requestAccessibilityPermission(proactivelyResetStaleTCC: shouldReset)
+                                permissionManager.requestAccessibilityPermission()
                             }
                             .buttonStyle(.plain)
                             .font(.system(size: 11.5, weight: .medium))

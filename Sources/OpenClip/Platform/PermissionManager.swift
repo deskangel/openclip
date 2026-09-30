@@ -50,28 +50,10 @@ public final class PermissionManager: ObservableObject {
     }
 
     /// Open System Settings → Accessibility and prompt macOS TCC to evaluate the running binary.
-    /// - Parameter proactivelyResetStaleTCC: When true (default), silently clears any stale or disabled
-    ///   TCC cache entry for OpenClip via `tccutil reset` before opening settings, preventing the macOS
-    ///   "stuck disabled / toggle not working" bug on updates and reinstalls.
-    public func requestAccessibilityPermission(proactivelyResetStaleTCC: Bool = true) {
-        // Start monitoring immediately so UI reflects the current grant without waiting for tccutil (up to 30s).
+    /// TCC entries are reset only through the explicit recovery action below.
+    public func requestAccessibilityPermission() {
         startMonitoring()
-        if proactivelyResetStaleTCC {
-            Task { @MainActor in
-                do {
-                    _ = try await ShellProcessRunner.run(ShellProcessRunner.Invocation(
-                        executableURL: URL(fileURLWithPath: "/usr/bin/tccutil"),
-                        arguments: ["reset", "Accessibility", "com.openclip.OpenClip"],
-                        environment: [:]
-                    ))
-                } catch {
-                    Log.permissions.error("Failed to run proactive tccutil reset: \(error.localizedDescription)")
-                }
-                promptAndOpenAccessibilitySettings()
-            }
-        } else {
-            promptAndOpenAccessibilitySettings()
-        }
+        promptAndOpenAccessibilitySettings()
     }
 
     private func promptAndOpenAccessibilitySettings() {
