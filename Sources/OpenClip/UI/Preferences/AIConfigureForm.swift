@@ -19,6 +19,7 @@ public struct AIConfigureForm: View {
     @State private var isFetchingCloudModels: Bool = false
     @State private var cloudFetchError: String? = nil
     @State private var cloudFetchGeneration: Int = 0
+    @State private var cloudKeyDebounceTask: Task<Void, Never>?
 
     @State private var fetchedLocalModels: [String] = []
     @State private var isFetchingLocalModels: Bool = false
@@ -253,6 +254,20 @@ public struct AIConfigureForm: View {
 
                     SecureField("API Key", text: $aiManager.cloudAPIKey)
                         .textFieldStyle(.roundedBorder)
+                        .onChange(of: aiManager.cloudAPIKey) { newKey in
+                            cloudKeyDebounceTask?.cancel()
+                            let trimmed = newKey.trimmingCharacters(in: .whitespacesAndNewlines)
+                            guard !trimmed.isEmpty else {
+                                fetchedCloudModels = []
+                                cloudFetchError = nil
+                                return
+                            }
+                            cloudKeyDebounceTask = Task {
+                                try? await Task.sleep(nanoseconds: 500_000_000)
+                                guard !Task.isCancelled else { return }
+                                fetchCloudModels()
+                            }
+                        }
 
                     HStack(spacing: 8) {
                         Picker("Model", selection: $aiManager.cloudModel) {

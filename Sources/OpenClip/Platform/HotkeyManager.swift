@@ -24,6 +24,8 @@ public final class HotkeyManager {
     public weak var selectionMonitor: (any SelectionMonitoring)?
     private var cancellables = Set<AnyCancellable>()
     private var registeredHotkeyIDs: Set<String> = []
+    private var popupTriggerTask: Task<Void, Never>?
+    private var popupTriggerRequestID: UUID?
     
     /// Gating for the ⌥⌘C trigger. Deliberately does **not** consult `SettingKey.isAppEnabled`:
     /// that setting is "Appear Automatically" (both in Preferences and the menu bar), so it owns
@@ -74,6 +76,14 @@ public final class HotkeyManager {
     }
 
     public func handleTogglePopup(frontmostApp: NSRunningApplication? = NSWorkspace.shared.frontmostApplication) {
+        // A second press cancels a selection read that has not presented yet.
+        if popupTriggerRequestID != nil {
+            popupTriggerTask?.cancel()
+            popupTriggerTask = nil
+            popupTriggerRequestID = nil
+            return
+        }
+        guard KeyboardShortcuts.isEnabled else { return }
         // Popup already visible: if in search mode, the hotkey dismisses the popup (toggle off);
         // if in actions bar mode, the hotkey transitions directly into search mode.
         if let popupController = self.popupController, popupController.isVisible {
@@ -85,8 +95,43 @@ public final class HotkeyManager {
             return
         }
 
-        guard let trigger = self.resolveSynchronousTrigger(frontmostApp: frontmostApp) else { return }
+        let requestID = UUID()
+        let requestedPID = frontmostApp?.processIdentifier
+        popupTriggerRequestID = requestID
+        popupTriggerTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer {
+                if self.popupTriggerRequestID == requestID {
+                    self.popupTriggerRequestID = nil
+                    self.popupTriggerTask = nil
+                }
+            }
 
+            let trigger: (context: SelectionContext, canPaste: Bool?)?
+            if let frontmostApp {
+                trigger = await self.collectTrigger(
+                    frontmostApp: frontmostApp,
+                    allowsEmptyText: true,
+                    requestID: requestID,
+                    requestedPID: requestedPID
+                )
+            } else {
+                trigger = self.resolveSynchronousTrigger(frontmostApp: nil)
+            }
+            guard !Task.isCancelled,
+                  KeyboardShortcuts.isEnabled,
+                  self.popupTriggerRequestID == requestID,
+                  DefaultSettingsStore.shared.get(.pauseUntilTimestamp) <= Date().timeIntervalSince1970,
+                  let trigger else { return }
+            if let requestedPID, let currentPID = NSWorkspace.shared.frontmostApplication?.processIdentifier, currentPID != requestedPID {
+                return
+            }
+            if let frontmostApp, !Self.triggerAllowed(frontmost: frontmostApp) { return }
+            self.showSearch(for: trigger)
+        }
+    }
+
+    private func showSearch(for trigger: (context: SelectionContext, canPaste: Bool?)) {
         // When both the monitored selection and clipboard are empty, check whether there are any
         // standalone actions (e.g. extensions declaring `requiresSelection: false`) available to run.
         // If not, avoid showing an empty search palette ("No matching actions" dead end); instead,
@@ -243,15 +288,30 @@ public final class HotkeyManager {
     }
 
     /// Shared retrieve path for ⌥⌘C and per-action hotkeys: gate, probe paste, read selection
-    /// (clipboard fallback), reject empty/oversized input.
+    /// (clipboard fallback), reject oversized input and empty input unless explicitly allowed.
     internal func collectTrigger(
-        frontmostApp: NSRunningApplication? = NSWorkspace.shared.frontmostApplication
+        frontmostApp: NSRunningApplication? = NSWorkspace.shared.frontmostApplication,
+        allowsEmptyText: Bool = false,
+        requestID: UUID? = nil,
+        requestedPID: pid_t? = nil
     ) async -> (context: SelectionContext, canPaste: Bool?)? {
-        guard Self.triggerAllowed(frontmost: frontmostApp),
+        guard !Task.isCancelled,
+              Self.triggerAllowed(frontmost: frontmostApp),
               let frontApp = frontmostApp else { return nil }
+
+        let isTriggerAuthorized: PasteboardCopyEngine.CopyAuthorization = { [weak self] in
+            guard !Task.isCancelled,
+                  Self.triggerAllowed(frontmost: frontApp) else { return false }
+            if let requestID, self?.popupTriggerRequestID != requestID { return false }
+            if let requestedPID, let currentPID = NSWorkspace.shared.frontmostApplication?.processIdentifier, currentPID != requestedPID {
+                return false
+            }
+            return true
+        }
 
         // Fast path: reuse active monitored selection without blocking on AX tree walk
         if let monitored = await selectionMonitor?.currentSelection(for: frontApp.bundleIdentifier) {
+            guard isTriggerAuthorized() else { return nil }
             let text = monitored.context.text
             if TextSanitizer.isSubstantial(text),
                text.utf8.count <= Constants.maxTextLength {
@@ -271,6 +331,7 @@ public final class HotkeyManager {
             }
         }
 
+        guard isTriggerAuthorized() else { return nil }
         let policy = RuleEngine.shared.resolvePolicies(for: frontApp.bundleIdentifier ?? "")
         let appIdentity = AppIdentity(frontApp)
         let probeTask = popupController?.preparePasteProbe(for: frontApp, policy: policy)
@@ -278,7 +339,14 @@ public final class HotkeyManager {
         var retrievedText = ""
         var selectionBounds: CGRect? = nil
 
-        if let result = await SelectionRetrievalCoordinator().retrieve(
+        let copyCapture: SelectionRetrievalCoordinator.CopyCapture = { request in
+            await PasteboardCopyEngine(isCopyAuthorized: {
+                isTriggerAuthorized()
+                    && !CopyTriggerGate.isForeignOverlayPresent(at: NSEvent.mouseLocation)
+            }).capture(trigger: request.trigger)
+        }
+
+        if let result = await SelectionRetrievalCoordinator(copyCapture: copyCapture).retrieve(
             for: appIdentity,
             policy: policy,
             cursor: CursorClassifier.current.asCore,
@@ -288,6 +356,8 @@ public final class HotkeyManager {
             retrievedText = result.text
             selectionBounds = result.bounds
         }
+
+        guard isTriggerAuthorized() else { return nil }
 
         var isClipboardFallback = false
         if retrievedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -301,8 +371,13 @@ public final class HotkeyManager {
             }
         }
 
-        guard TextSanitizer.isSubstantial(retrievedText),
+        guard !Task.isCancelled,
               retrievedText.utf8.count <= Constants.maxTextLength else { return nil }
+        if !TextSanitizer.isSubstantial(retrievedText) {
+            guard allowsEmptyText else { return nil }
+            retrievedText = ""
+            isClipboardFallback = false
+        }
 
         let context = SelectionContext(
             text: retrievedText,
@@ -314,6 +389,7 @@ public final class HotkeyManager {
             isClipboardFallback: isClipboardFallback
         )
         let canPaste = await probeTask?.value
+        guard isTriggerAuthorized() else { return nil }
         return (context, canPaste)
     }
 }

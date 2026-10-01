@@ -257,7 +257,7 @@ struct PopupThemeSelector: View {
         }
         .labelsHidden()
         .pickerStyle(.segmented)
-        .frame(width: width, height: 24)
+        .frame(width: width, height: 24, alignment: .trailing)
         .accessibilityLabel(label)
     }
 
@@ -279,7 +279,7 @@ struct PopupThemeSelector: View {
         }
         .labelsHidden()
         .pickerStyle(.segmented)
-        .frame(width: width, height: 24)
+        .frame(width: width, height: 24, alignment: .trailing)
         .accessibilityLabel(label)
     }
 
@@ -300,6 +300,7 @@ struct PopupThemeSelector: View {
         .padding(.horizontal, SettingsDesignTokens.sectionCardPaddingH)
         .padding(.vertical, SettingsDesignTokens.sectionCardPaddingV)
         .frame(minHeight: 34)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func stepSlider(

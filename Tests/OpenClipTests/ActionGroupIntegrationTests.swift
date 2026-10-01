@@ -4,6 +4,7 @@
 // Integration tests covering custom action group lifecycle, extension uninstallation within groups,
 // and table reordering/nesting behaviors in Preferences.
 import XCTest
+import SwiftUI
 @testable import Core
 @testable import OpenClip
 
@@ -673,6 +674,120 @@ final class ActionsOutlineDropTests: XCTestCase {
 
         XCTAssertEqual(coordinator.actionGroupDefs[0].memberActionIDs, ["action.3", "action.1", "action.2"])
         XCTAssertEqual(coordinator.actions.map(\.id), [groupID, "action.3", "action.1", "action.2", "action.4"])
+    }
+
+    func testOutlineNodeSignatureDistinguishesDisabledState() {
+        let dummy = DummyAction(id: "com.pkg.leafy.1", title: "Leafy 1")
+        let customization = ActionCustomizationManager(settingsStore: settingsStore)
+
+        let nodeEnabled = OutlineNode(
+            id: dummy.id,
+            kind: .standaloneAction(dummy),
+            customization: customization,
+            disabledActionIDs: [],
+            disabledPackages: []
+        )
+        let nodeDisabled = OutlineNode(
+            id: dummy.id,
+            kind: .standaloneAction(dummy),
+            customization: customization,
+            disabledActionIDs: [dummy.id],
+            disabledPackages: []
+        )
+        let nodePkgDisabled = OutlineNode(
+            id: dummy.id,
+            kind: .standaloneAction(dummy),
+            customization: customization,
+            disabledActionIDs: [],
+            disabledPackages: ["com.pkg.leafy"]
+        )
+
+        XCTAssertNotEqual(nodeEnabled.signature, nodeDisabled.signature)
+        XCTAssertNotEqual(nodeEnabled.signature, nodePkgDisabled.signature)
+        XCTAssertFalse(OutlineNode.treesEqual([nodeEnabled], [nodeDisabled]))
+        XCTAssertFalse(OutlineNode.treesEqual([nodeEnabled], [nodePkgDisabled]))
+    }
+
+    func testActionEnablementToggleIndividualActionInsideDisabledPackage() {
+        var disabledPackages: Set<String> = ["com.pkg.leafy"]
+        var disabledActionIDs: Set<String> = []
+
+        let action1 = DummyAction(id: "action.1", title: "Action 1")
+        let binding1 = ActionEnablement.binding(
+            for: action1,
+            disabledActionIDs: Binding(get: { disabledActionIDs }, set: { disabledActionIDs = $0 }),
+            disabledPackages: Binding(get: { disabledPackages }, set: { disabledPackages = $0 }),
+            coordinator: coordinator
+        )
+
+        XCTAssertFalse(binding1.wrappedValue)
+
+        // Turn action 1 on: package should be removed from disabledPackages, and siblings should be disabled
+        binding1.wrappedValue = true
+
+        XCTAssertFalse(disabledPackages.contains("com.pkg.leafy"))
+        XCTAssertFalse(disabledActionIDs.contains("action.1"))
+        // Siblings (action.2, action.3, action.4 from setUp) should now be in disabledActionIDs
+        XCTAssertTrue(disabledActionIDs.contains("action.2"))
+        XCTAssertTrue(disabledActionIDs.contains("action.3"))
+        XCTAssertTrue(disabledActionIDs.contains("action.4"))
+
+        // Action 1 is now enabled
+        XCTAssertTrue(binding1.wrappedValue)
+
+        // Now turn action 1 off
+        binding1.wrappedValue = false
+        XCTAssertTrue(disabledActionIDs.contains("action.1"))
+        XCTAssertFalse(binding1.wrappedValue)
+    }
+
+    func testPackageBindingEnableAndDisable() {
+        var disabledPackages: Set<String> = []
+        var disabledActionIDs: Set<String> = ["action.1", "action.2", "action.3", "action.4"]
+
+        let pkgBinding = ActionEnablement.packageBinding(
+            packageID: "com.pkg.leafy",
+            gatedReason: nil,
+            disabledPackages: Binding(get: { disabledPackages }, set: { disabledPackages = $0 }),
+            disabledActionIDs: Binding(get: { disabledActionIDs }, set: { disabledActionIDs = $0 }),
+            coordinator: coordinator
+        )
+
+        // When all actions are disabled, package reads as false
+        XCTAssertFalse(pkgBinding.wrappedValue)
+
+        // Turn package on: clears all action disables and clears disabledPackages
+        pkgBinding.wrappedValue = true
+        XCTAssertFalse(disabledPackages.contains("com.pkg.leafy"))
+        XCTAssertTrue(disabledActionIDs.isEmpty)
+        XCTAssertTrue(pkgBinding.wrappedValue)
+
+        // Turn package off: adds to disabledPackages
+        pkgBinding.wrappedValue = false
+        XCTAssertTrue(disabledPackages.contains("com.pkg.leafy"))
+        XCTAssertFalse(pkgBinding.wrappedValue)
+    }
+
+    func testAcceptDropBeforePackageHeaderPlacesActionBeforePackageActions() {
+        _ = outlineCoordinator.rebuildTree()
+        let standaloneAction = DummyAction(
+            id: "standalone.other",
+            title: "Other",
+            chrome: ActionChrome(badge: .none, rowStyle: .standard, popupBehavior: .perform, source: .builtin)
+        )
+        coordinator.register(action: standaloneAction)
+        _ = outlineCoordinator.rebuildTree()
+
+        guard let headerIndex = outlineCoordinator.rootNodes.firstIndex(where: { $0.id == "pkg.com.pkg.leafy" }) else {
+            return XCTFail("Package header node not found")
+        }
+
+        let outlineView = NSOutlineView()
+        let info = MockDraggingInfo(actionID: "standalone.other")
+        let success = outlineCoordinator.outlineView(outlineView, acceptDrop: info, item: nil, childIndex: headerIndex)
+        XCTAssertTrue(success)
+
+        XCTAssertEqual(coordinator.actions.first?.id, "standalone.other")
     }
 }
 

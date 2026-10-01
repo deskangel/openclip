@@ -202,12 +202,14 @@ struct PackageHeaderRowView: View {
     let packageID: String
     let gatedReason: ExtensionGateReason?
     @Binding var disabledPackages: Set<String>
+    @Binding var disabledActionIDs: Set<String>
 
     var body: some View {
         let isEnabled = ActionEnablement.packageBinding(
             packageID: packageID,
             gatedReason: gatedReason,
-            disabledPackages: $disabledPackages
+            disabledPackages: $disabledPackages,
+            disabledActionIDs: $disabledActionIDs
         )
 
         HStack(alignment: .center, spacing: 10) {

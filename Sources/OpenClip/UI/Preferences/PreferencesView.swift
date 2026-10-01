@@ -264,7 +264,8 @@ public struct PreferencesView: View {
             ActionEnablement.packageBinding(
                 packageID: id,
                 gatedReason: info.gatedReason,
-                disabledPackages: $disabledPackages
+                disabledPackages: $disabledPackages,
+                disabledActionIDs: $disabledActionIDs
             ).wrappedValue = isOn
         default:
             guard let action = subjectAction(of: router.currentPage) else { return }

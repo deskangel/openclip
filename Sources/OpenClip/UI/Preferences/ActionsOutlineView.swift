@@ -40,12 +40,21 @@ final class OutlineNode: NSObject {
         id: String,
         kind: Kind,
         children: [OutlineNode] = [],
-        customization: ActionCustomizationManager
+        customization: ActionCustomizationManager,
+        disabledActionIDs: Set<String> = [],
+        disabledPackages: Set<String> = []
     ) {
         self.id = id
         self.kind = kind
         self.children = children
-        self.signature = Self.computeSignature(id: id, kind: kind, children: children, using: customization)
+        self.signature = Self.computeSignature(
+            id: id,
+            kind: kind,
+            children: children,
+            using: customization,
+            disabledActionIDs: disabledActionIDs,
+            disabledPackages: disabledPackages
+        )
         super.init()
     }
 
@@ -100,32 +109,40 @@ final class OutlineNode: NSObject {
         id: String,
         kind: Kind,
         children: [OutlineNode],
-        using customization: ActionCustomizationManager
+        using customization: ActionCustomizationManager,
+        disabledActionIDs: Set<String> = [],
+        disabledPackages: Set<String> = []
     ) -> String {
         var sig = id + ":"
         switch kind {
         case .customGroup(let def, let action):
             let p = customization.presented(action, surface: .table)
-            sig += "cg:\(def.title):\(def.iconName):\(def.memberActionIDs.joined(separator: ",")):\(p.title):\(String(describing: p.icon))"
+            let dis = disabledActionIDs.contains(def.id)
+            sig += "cg:\(def.title):\(def.iconName):\(def.memberActionIDs.joined(separator: ",")):\(p.title):\(String(describing: p.icon)):dis=\(dis)"
         case .extensionGroup(let action):
             let p = customization.presented(action, surface: .table)
-            sig += "eg:\(p.title):\(String(describing: p.icon))"
+            let dis = disabledActionIDs.contains(action.id) || (ActionIdentity.extensionPackageID(of: action).map { disabledPackages.contains($0) } ?? false)
+            sig += "eg:\(p.title):\(String(describing: p.icon)):dis=\(dis)"
         case .standaloneAction(let action):
             let p = customization.presented(action, surface: .table)
-            sig += "sa:\(p.title):\(String(describing: p.icon))"
+            let dis = disabledActionIDs.contains(action.id) || (ActionIdentity.extensionPackageID(of: action).map { disabledPackages.contains($0) } ?? false)
+            sig += "sa:\(p.title):\(String(describing: p.icon)):dis=\(dis)"
         case .packageHeader(let pkgID, let title, let gatedReason):
-            sig += "ph:\(pkgID):\(title):\(String(describing: gatedReason))"
+            let dis = disabledPackages.contains(pkgID)
+            sig += "ph:\(pkgID):\(title):\(String(describing: gatedReason)):dis=\(dis)"
         case .groupMember(let action, let parentGroupID):
             let p = customization.presented(action, surface: .table)
-            sig += "gm:\(parentGroupID):\(p.title):\(String(describing: p.icon))"
+            let dis = disabledActionIDs.contains(action.id)
+            sig += "gm:\(parentGroupID):\(p.title):\(String(describing: p.icon)):dis=\(dis)"
         case .extensionSubAction(let action, let parentGroupID):
             let p = customization.presented(action, surface: .table)
+            let dis = disabledActionIDs.contains(action.id) || (ActionIdentity.extensionPackageID(of: action).map { disabledPackages.contains($0) } ?? false)
             // Option schema is part of the identity so a hot-reloaded manifest that adds, drops,
             // or modifies options re-renders the row's settings cog even when title and icon are unchanged.
             let optionsSig = action.actionOptions.map { opt in
                 "\(opt.identifier):\(opt.type.rawValue):\(opt.label):\(opt.defaultValue ?? ""):\(opt.options?.joined(separator: "|") ?? "")"
             }.joined(separator: ",")
-            sig += "es:\(parentGroupID):\(p.title):\(String(describing: p.icon)):\(optionsSig)"
+            sig += "es:\(parentGroupID):\(p.title):\(String(describing: p.icon)):\(optionsSig):dis=\(dis)"
         }
         if !children.isEmpty {
             sig += "[" + children.map(\.signature).joined(separator: ";") + "]"
@@ -494,6 +511,13 @@ final class ActionsOutlineCoordinator: NSObject, NSOutlineViewDataSource, NSOutl
                 self?.syncWithParent()
             }
             .store(in: &cancellables)
+
+        NotificationCenter.default.publisher(for: .openClipExtensionsDidChange)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.syncWithParent()
+            }
+            .store(in: &cancellables)
     }
 
     @discardableResult
@@ -542,7 +566,9 @@ final class ActionsOutlineCoordinator: NSObject, NSOutlineViewDataSource, NSOutl
                     return OutlineNode(
                         id: memberID,
                         kind: .groupMember(action: memberAction, parentGroupID: def.id),
-                        customization: parent.customizationManager
+                        customization: parent.customizationManager,
+                        disabledActionIDs: parent.disabledActionIDs,
+                        disabledPackages: parent.disabledPackages
                     )
                 }
                 if needle.isEmpty || groupMatches || !memberNodes.isEmpty {
@@ -550,7 +576,9 @@ final class ActionsOutlineCoordinator: NSObject, NSOutlineViewDataSource, NSOutl
                         id: def.id,
                         kind: .customGroup(def, action),
                         children: memberNodes,
-                        customization: parent.customizationManager
+                        customization: parent.customizationManager,
+                        disabledActionIDs: parent.disabledActionIDs,
+                        disabledPackages: parent.disabledPackages
                     ))
                 }
                 continue
@@ -570,7 +598,9 @@ final class ActionsOutlineCoordinator: NSObject, NSOutlineViewDataSource, NSOutl
                     return OutlineNode(
                         id: sub.id,
                         kind: .extensionSubAction(action: sub, parentGroupID: action.id),
-                        customization: parent.customizationManager
+                        customization: parent.customizationManager,
+                        disabledActionIDs: parent.disabledActionIDs,
+                        disabledPackages: parent.disabledPackages
                     )
                 }
                 if needle.isEmpty || groupMatches || !subActionNodes.isEmpty {
@@ -578,7 +608,9 @@ final class ActionsOutlineCoordinator: NSObject, NSOutlineViewDataSource, NSOutl
                         id: action.id,
                         kind: .extensionGroup(action),
                         children: subActionNodes,
-                        customization: parent.customizationManager
+                        customization: parent.customizationManager,
+                        disabledActionIDs: parent.disabledActionIDs,
+                        disabledPackages: parent.disabledPackages
                     ))
                 }
                 continue
@@ -606,7 +638,9 @@ final class ActionsOutlineCoordinator: NSObject, NSOutlineViewDataSource, NSOutl
                         newRoots.append(OutlineNode(
                             id: "pkg.\(pkgID)",
                             kind: .packageHeader(packageID: pkgID, title: title, gatedReason: gatedReason),
-                            customization: parent.customizationManager
+                            customization: parent.customizationManager,
+                            disabledActionIDs: parent.disabledActionIDs,
+                            disabledPackages: parent.disabledPackages
                         ))
                     }
                 }
@@ -626,7 +660,9 @@ final class ActionsOutlineCoordinator: NSObject, NSOutlineViewDataSource, NSOutl
                     return OutlineNode(
                         id: preset.id,
                         kind: .groupMember(action: preset, parentGroupID: action.id),
-                        customization: parent.customizationManager
+                        customization: parent.customizationManager,
+                        disabledActionIDs: parent.disabledActionIDs,
+                        disabledPackages: parent.disabledPackages
                     )
                 }
                 if needle.isEmpty || groupMatches || !subActionNodes.isEmpty {
@@ -634,7 +670,9 @@ final class ActionsOutlineCoordinator: NSObject, NSOutlineViewDataSource, NSOutl
                         id: action.id,
                         kind: .extensionGroup(action),
                         children: subActionNodes,
-                        customization: parent.customizationManager
+                        customization: parent.customizationManager,
+                        disabledActionIDs: parent.disabledActionIDs,
+                        disabledPackages: parent.disabledPackages
                     ))
                 }
                 continue
@@ -645,7 +683,9 @@ final class ActionsOutlineCoordinator: NSObject, NSOutlineViewDataSource, NSOutl
                 newRoots.append(OutlineNode(
                     id: action.id,
                     kind: .standaloneAction(action),
-                    customization: parent.customizationManager
+                    customization: parent.customizationManager,
+                    disabledActionIDs: parent.disabledActionIDs,
+                    disabledPackages: parent.disabledPackages
                 ))
             }
         }
@@ -659,7 +699,9 @@ final class ActionsOutlineCoordinator: NSObject, NSOutlineViewDataSource, NSOutl
                 return OutlineNode(
                     id: memberID,
                     kind: .groupMember(action: memberAction, parentGroupID: def.id),
-                    customization: parent.customizationManager
+                    customization: parent.customizationManager,
+                    disabledActionIDs: parent.disabledActionIDs,
+                    disabledPackages: parent.disabledPackages
                 )
             }
             if let dummyAction = actions.first(where: { $0.id == def.id }) {
@@ -668,7 +710,9 @@ final class ActionsOutlineCoordinator: NSObject, NSOutlineViewDataSource, NSOutl
                         id: def.id,
                         kind: .customGroup(def, dummyAction),
                         children: memberNodes,
-                        customization: parent.customizationManager
+                        customization: parent.customizationManager,
+                        disabledActionIDs: parent.disabledActionIDs,
+                        disabledPackages: parent.disabledPackages
                     ))
                 }
             }
@@ -762,7 +806,8 @@ final class ActionsOutlineCoordinator: NSObject, NSOutlineViewDataSource, NSOutl
                     title: title,
                     packageID: packageID,
                     gatedReason: gatedReason,
-                    disabledPackages: parent.$disabledPackages
+                    disabledPackages: parent.$disabledPackages,
+                    disabledActionIDs: parent.$disabledActionIDs
                 )
             )
 
@@ -1031,7 +1076,13 @@ final class ActionsOutlineCoordinator: NSObject, NSOutlineViewDataSource, NSOutl
             let destinationActionIndex: Int
             if index < roots.count {
                 let targetNode = roots[index]
-                destinationActionIndex = parent.coordinator.actions.firstIndex(where: { $0.id == targetNode.id }) ?? parent.coordinator.actions.count
+                if let targetAction = targetNode.action {
+                    destinationActionIndex = parent.coordinator.actions.firstIndex(where: { $0.id == targetAction.id }) ?? parent.coordinator.actions.count
+                } else if case .packageHeader(let pkgID, _, _) = targetNode.kind {
+                    destinationActionIndex = parent.coordinator.actions.firstIndex(where: { ActionIdentity.extensionPackageID(of: $0) == pkgID }) ?? parent.coordinator.actions.count
+                } else {
+                    destinationActionIndex = parent.coordinator.actions.firstIndex(where: { $0.id == targetNode.id }) ?? parent.coordinator.actions.count
+                }
             } else {
                 destinationActionIndex = parent.coordinator.actions.count
             }

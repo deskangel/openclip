@@ -88,6 +88,12 @@ public final class ActionRegistry: ObservableObject, Sendable {
         func placement(of action: any Action) -> (tier: Int, rank: Int) {
             if let index = orderIndexMap[action.id] {
                 return (0, index)
+            } else if let packageID = ActionIdentity.extensionPackageID(of: action),
+                      let index = orderIndexMap[packageID] {
+                return (0, index)
+            } else if let gated = action as? GatedExtensionAction,
+                      let match = orderIndexMap.first(where: { $0.key == gated.packageID || $0.key.hasPrefix(gated.packageID + ".") }) {
+                return (0, match.value)
             } else if ActionIdentity.isBuiltin(action) {
                 return (1, 0)
             } else {
@@ -237,7 +243,21 @@ public final class ActionRegistry: ObservableObject, Sendable {
         let currentOrder = settingsStore.get(.actionOrder)
         guard !currentOrder.isEmpty else { return }
         let activeIDs = Set(registeredActions.map { $0.id }).union(groupDefs.map { $0.id })
-        let prunedOrder = currentOrder.filter { activeIDs.contains($0) }
+        let prunedOrder = currentOrder.filter { id in
+            if activeIDs.contains(id) { return true }
+            if registeredActions.contains(where: {
+                if let gated = $0 as? GatedExtensionAction {
+                    return gated.packageID == id || id.hasPrefix(gated.packageID + ".")
+                }
+                if let pkgID = ActionIdentity.extensionPackageID(of: $0) {
+                    return pkgID == id || id.hasPrefix(pkgID + ".")
+                }
+                return false
+            }) {
+                return true
+            }
+            return false
+        }
         if prunedOrder != currentOrder {
             settingsStore.set(.actionOrder, value: prunedOrder)
         }

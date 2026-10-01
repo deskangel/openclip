@@ -176,8 +176,8 @@ private struct PopupPreviewPresenter: ActionPresenting {
     func tableIcon(for action: any Action) -> ActionIcon { action.icon }
 }
 
-/// Keep the contextual island at the start of the stage as the main bar grows beside it.
-/// Placement never changes the size proposed by the preview stage.
+/// Center the popup in the stage when it fits, keeping a leading inset when the popup is wider
+/// than the available space. Placement never changes the size proposed by the preview stage.
 private struct PopupPreviewLayout: Layout {
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         proposal.replacingUnspecifiedDimensions()
@@ -188,7 +188,7 @@ private struct PopupPreviewLayout: Layout {
         let size = popup.sizeThatFits(.unspecified)
         popup.place(
             at: CGPoint(
-                x: bounds.minX + 16,
+                x: bounds.minX + max(16, (bounds.width - size.width) / 2),
                 y: bounds.midY - size.height / 2
             ),
             anchor: .topLeading,

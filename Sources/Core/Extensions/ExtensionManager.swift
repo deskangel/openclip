@@ -83,18 +83,16 @@ public final class ExtensionManager: Sendable {
             finalActions = scanned
         }
         
+        // Register refreshed actions first so any transitioning actions (e.g. active <-> gated)
+        // are already present in registeredActions before obsolete temporary IDs are unregistered.
+        for action in finalActions {
+            onRegister?(action)
+        }
         let newIDs = Set(finalActions.map { $0.id })
-        // Diff the previous vs refreshed action IDs. Only unregister IDs that are permanently gone;
-        // retained IDs are replaced in place via onRegister (register(action:)), so their
-        // .actionOrder entries survive the reload instead of being pruned by a full
-        // unregister-then-register cycle.
         for oldAction in self.loadedActions where !newIDs.contains(oldAction.id) {
             onUnregister?(oldAction.id)
         }
         self.loadedActions = finalActions
-        for action in finalActions {
-            onRegister?(action)
-        }
     }
     
     /// Installs a new extension package (.openclipext folder, .zip archive, or script file) into ~/.openclip/extensions

@@ -255,6 +255,47 @@ final class HotkeyManagerTests: XCTestCase {
         XCTAssertNil(trigger)
     }
 
+    func testCollectTriggerRejectsMismatchedRequestedPID() async throws {
+        let manager = HotkeyManager.shared
+        let monitor = MockSelectionMonitor()
+        let app = AppIdentity(bundleIdentifier: "com.apple.TextEdit", localizedName: "TextEdit")
+        let selection = SelectionContext(
+            text: "monitored text",
+            sourceApp: app,
+            cursorPosition: CGPoint(x: 50, y: 50),
+            selectionBounds: CGRect(x: 10, y: 10, width: 100, height: 20),
+            timestamp: Date(),
+            appPolicy: .default
+        )
+        monitor.latestSelection = (context: selection, canPaste: true)
+        manager.selectionMonitor = monitor
+
+        let frontmost = MockFrontmostApp(bundleID: "com.apple.TextEdit", pid: 99999)
+        // With a requestedPID that does not match the actual frontmost app, trigger is refused
+        let trigger = await manager.collectTrigger(frontmostApp: frontmost, requestID: UUID(), requestedPID: 99999)
+        XCTAssertNil(trigger)
+    }
+
+    func testCollectTriggerRejectsMismatchedRequestID() async throws {
+        let manager = HotkeyManager.shared
+        let monitor = MockSelectionMonitor()
+        let app = AppIdentity(bundleIdentifier: "com.apple.TextEdit", localizedName: "TextEdit")
+        let selection = SelectionContext(
+            text: "monitored text",
+            sourceApp: app,
+            cursorPosition: CGPoint(x: 50, y: 50),
+            selectionBounds: CGRect(x: 10, y: 10, width: 100, height: 20),
+            timestamp: Date(),
+            appPolicy: .default
+        )
+        monitor.latestSelection = (context: selection, canPaste: true)
+        manager.selectionMonitor = monitor
+
+        let frontmost = MockFrontmostApp(bundleID: "com.apple.TextEdit")
+        // Pass a random request ID that does not match manager.popupTriggerRequestID
+        let trigger = await manager.collectTrigger(frontmostApp: frontmost, requestID: UUID())
+        XCTAssertNil(trigger)
+    }
 }
 
 @MainActor
@@ -303,11 +344,14 @@ private struct BoundTestAction: Action {
 /// an `NSRunningApplication?`, so the mock subclasses it.
 private final class MockFrontmostApp: NSRunningApplication {
     private let bundleID: String?
+    private let pid: pid_t
 
-    init(bundleID: String?) {
+    init(bundleID: String?, pid: pid_t = 1001) {
         self.bundleID = bundleID
+        self.pid = pid
         super.init()
     }
 
     override var bundleIdentifier: String? { bundleID }
+    override var processIdentifier: pid_t { pid }
 }
