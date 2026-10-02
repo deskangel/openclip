@@ -10,9 +10,15 @@
     <a href="https://discord.gg/sy4MeFxf8"><img src="https://img.shields.io/badge/discord-join-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord" /></a>
   </p>
 
+  <p>
+    <a href="https://github.com/sponsors/ganeshmshetty"><img src="https://img.shields.io/badge/Sponsor-EA4AAA?style=flat-square&logo=githubsponsors&logoColor=white" alt="GitHub Sponsors" /></a>
+    <a href="https://buymeacoffee.com/ganeshmshetty"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=flat-square&logo=buymeacoffee&logoColor=black" alt="Buy Me a Coffee" /></a>
+    <a href="https://ko-fi.com/ganeshmshetty"><img src="https://img.shields.io/badge/Ko--fi-FF5E5B?style=flat-square&logo=kofi&logoColor=white" alt="Ko-fi" /></a>
+  </p>
+
   <br />
 
-  <img src="./assets/all.gif" alt="OpenClip in action" width="760" style="border-radius: 12px;" />
+  <img src="./assets/all.gif" alt="OpenClip in action" width="480" />
 </div>
 
 <br />

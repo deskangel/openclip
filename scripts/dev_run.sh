@@ -11,8 +11,6 @@ set -eo pipefail
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_DIR"
 
-"$PROJECT_DIR/scripts/prepare_openselection.sh"
-
 NO_INSTALL=false
 FORCE_GENERATE=false
 VERBOSE=false

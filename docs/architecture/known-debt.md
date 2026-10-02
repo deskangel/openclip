@@ -403,11 +403,11 @@ areas; stale debt notes are worse than none.
   switches; programmatic focus changes without an observed gesture are not detected.
   It is not an AX focused-element identity guarantee, and arbitrary extension keystrokes
   remain outside this paste-result check.
-- **Temporary local dependency integration is reproducible.** `scripts/prepare_openselection.sh`
-  bootstraps the separate checkout from a published full commit plus the tracked integration
-  patch. Existing local checkouts remain developer overrides. CI prepares it before XcodeGen;
-  test, package, and development scripts prepare it before building. Publish the package changes
-  and switch back to a remote revision when the integration is ready for distribution.
+- **OpenSelection integration is published and pinned.** `project.yml` uses the remote
+  OpenSelection repository at revision `918a1cae87b3a80bf7abf76e76373eb56c6c3610`.
+  The clipboard coordination, structured outcomes and correlated diagnostics live on that
+  repository's main branch. Fresh builds resolve the same source through SwiftPM; the local
+  checkout is no longer required, and the temporary bootstrap script/patch are retired.
 - **Automatic reads are tied to the selection source process.** The monitor uses the activated app
   from the workspace notification and cancels pending reads and clears the cached selection on a
   switch away from the source. Queued notifications for apps no longer frontmost, activation of
