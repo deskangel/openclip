@@ -4,6 +4,30 @@ All notable user-facing changes to OpenClip.
 
 ---
 
+## v1.7.3 - 2026-10-02
+
+### Features & Improvements
+- **Popup controls**: Refined search and result-card buttons with compact spacing, consistent corners, and native Liquid Glass controls on macOS 26 when using the glass theme. Removed the search footer's action count.
+- **Draggable search**: Move the search palette by dragging its search icon or header edges; the action bar retains the new position when leaving search.
+- **Action editor**: Colored outline icons for appearance, triggers, and output settings, with descriptions available through hover-revealed info popovers.
+- **Collapsible preferences sidebar**: Actions and Installed sections remember their expanded state. Searching reveals matching entries automatically.
+- **Update release notes**: The About tab shows notes in a dedicated popover with support for Markdown, HTML, and plain text.
+
+### Fixes & Stability
+- Fixed action and extension ordering across reloads and availability changes, and improved toggle updates and group enablement in Preferences.
+- Fixed removing a duplicated extension accidentally removing its original package.
+- Improved global action hotkey selection capture, copy fallback, and trigger checks.
+- Improved cloud AI model fetching when editing credentials or leaving its settings page.
+- Corrected Sparkle's install-on-quit delegate callback and replaced deprecated browser-opening APIs.
+- Updated OpenSelection to v2.15.1, with cursor-buffer safety and stricter AX inspection concurrency limits.
+
+### Developer Tooling
+- Debug builds now use a separate OpenClip Dev identity, with Accessibility recovery targeting the running app.
+- Development runs show structured build, install, and launch progress, with grouped warnings and `--verbose` for complete output.
+- Tests show progress grouped by test class, concise results, and relevant failures; `--verbose` provides the full log.
+
+---
+
 ## v1.7.2 - 2026-09-30
 
 ### Features & Improvements
