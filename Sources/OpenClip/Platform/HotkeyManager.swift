@@ -269,11 +269,38 @@ public final class HotkeyManager {
         }
     }
 
-    private func handleActionHotkey(_ actionID: String) {
+    internal func handleActionHotkey(_ actionID: String, settingsStore: SettingsStore = DefaultSettingsStore.shared) {
         guard let popupController else { return }
         guard let action = ActionCoordinator.shared.actions.first(where: { $0.id == actionID }),
               ActionIdentity.isBindable(action),
               !(action is GatedExtensionAction) else { return }
+
+        // Refuse to run actions or packages that have been disabled in preferences
+        let disabledIDs = settingsStore.get(.disabledActionIDs)
+        let disabledPackages = settingsStore.get(.disabledPackages)
+        guard !disabledIDs.contains(action.id) else { return }
+        if let pkgID = ActionIdentity.extensionPackageID(of: action), disabledPackages.contains(pkgID) {
+            return
+        }
+        if action.chrome.launchesAI, !AIServiceManager.shared.isAIEnabled {
+            return
+        }
+        if ActionIdentity.isAIPreset(action) {
+            guard AIServiceManager.shared.isAIEnabled,
+                  AIServiceManager.shared.preset(forActionID: action.id)?.isEnabled == true else {
+                return
+            }
+        }
+        let groupDefs = ActionCoordinator.shared.actionGroupDefs
+        if let parentGroup = groupDefs.first(where: { $0.memberActionIDs.contains(action.id) }),
+           disabledIDs.contains(parentGroup.id) {
+            return
+        }
+        if let parentExtensionGroup = ActionCoordinator.shared.actions.first(where: {
+            $0.chrome.popupBehavior == .showSubActions && action.id != $0.id && action.id.hasPrefix($0.id + ".")
+        }), disabledIDs.contains(parentExtensionGroup.id) {
+            return
+        }
 
         if popupController.isVisible, let context = popupController.currentActionContext {
             popupController.runBoundAction(action, with: context)

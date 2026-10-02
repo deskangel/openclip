@@ -272,7 +272,7 @@ final class HotkeyManagerTests: XCTestCase {
 
         let frontmost = MockFrontmostApp(bundleID: "com.apple.TextEdit", pid: 99999)
         // With a requestedPID that does not match the actual frontmost app, trigger is refused
-        let trigger = await manager.collectTrigger(frontmostApp: frontmost, requestID: UUID(), requestedPID: 99999)
+        let trigger = await manager.collectTrigger(frontmostApp: frontmost, requestID: nil, requestedPID: 99999)
         XCTAssertNil(trigger)
     }
 
@@ -295,6 +295,134 @@ final class HotkeyManagerTests: XCTestCase {
         // Pass a random request ID that does not match manager.popupTriggerRequestID
         let trigger = await manager.collectTrigger(frontmostApp: frontmost, requestID: UUID())
         XCTAssertNil(trigger)
+    }
+
+    func testHandleActionHotkeyExecutesWhenEnabled() async throws {
+        let manager = HotkeyManager.shared
+        let controller = PopupWindowController()
+        manager.setup(popupController: controller)
+
+        let performedExpectation = expectation(description: "Action executed")
+        let action = BoundTestAction(id: "test.enabled.hotkey") {
+            performedExpectation.fulfill()
+        }
+        ActionCoordinator.shared.register(action: action)
+
+        let app = AppIdentity(NSRunningApplication.current)
+        let selection = SelectionContext(
+            text: "sample text",
+            sourceApp: app,
+            cursorPosition: .zero,
+            selectionBounds: nil,
+            timestamp: Date(),
+            appPolicy: .default
+        )
+        controller.startTestSession(for: selection)
+
+        let store = MemorySettingsStore()
+        manager.handleActionHotkey("test.enabled.hotkey", settingsStore: store)
+        await fulfillment(of: [performedExpectation], timeout: 2.0)
+    }
+
+    func testHandleActionHotkeyRejectsDisabledAction() async throws {
+        let manager = HotkeyManager.shared
+        let controller = PopupWindowController()
+        manager.setup(popupController: controller)
+
+        var performed = false
+        let action = BoundTestAction(id: "test.disabled.hotkey") {
+            performed = true
+        }
+        ActionCoordinator.shared.register(action: action)
+
+        let app = AppIdentity(NSRunningApplication.current)
+        let selection = SelectionContext(
+            text: "sample text",
+            sourceApp: app,
+            cursorPosition: .zero,
+            selectionBounds: nil,
+            timestamp: Date(),
+            appPolicy: .default
+        )
+        controller.startTestSession(for: selection)
+
+        let store = MemorySettingsStore()
+        store.set(.disabledActionIDs, value: ["test.disabled.hotkey"])
+
+        manager.handleActionHotkey("test.disabled.hotkey", settingsStore: store)
+        try await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertFalse(performed)
+    }
+
+    func testHandleActionHotkeyRejectsDisabledPackage() async throws {
+        let manager = HotkeyManager.shared
+        let controller = PopupWindowController()
+        manager.setup(popupController: controller)
+
+        var performed = false
+        let action = BoundTestAction(
+            id: "pkg123.action",
+            chrome: ActionChrome(source: .extensionPkg(packageID: "pkg123"))
+        ) {
+            performed = true
+        }
+        ActionCoordinator.shared.register(action: action)
+
+        let app = AppIdentity(NSRunningApplication.current)
+        let selection = SelectionContext(
+            text: "sample text",
+            sourceApp: app,
+            cursorPosition: .zero,
+            selectionBounds: nil,
+            timestamp: Date(),
+            appPolicy: .default
+        )
+        controller.startTestSession(for: selection)
+
+        let store = MemorySettingsStore()
+        store.set(.disabledPackages, value: ["pkg123"])
+
+        manager.handleActionHotkey("pkg123.action", settingsStore: store)
+        try await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertFalse(performed)
+    }
+
+    func testHandleActionHotkeyRejectsDisabledExtensionGroupParent() async throws {
+        let manager = HotkeyManager.shared
+        let controller = PopupWindowController()
+        manager.setup(popupController: controller)
+
+        var performed = false
+        let parentGroup = BoundTestAction(
+            id: "pkg123.group",
+            chrome: ActionChrome(popupBehavior: .showSubActions)
+        ) {}
+        let childAction = BoundTestAction(
+            id: "pkg123.group.child",
+            chrome: ActionChrome()
+        ) {
+            performed = true
+        }
+        ActionCoordinator.shared.register(action: parentGroup)
+        ActionCoordinator.shared.register(action: childAction)
+
+        let app = AppIdentity(NSRunningApplication.current)
+        let selection = SelectionContext(
+            text: "sample text",
+            sourceApp: app,
+            cursorPosition: .zero,
+            selectionBounds: nil,
+            timestamp: Date(),
+            appPolicy: .default
+        )
+        controller.startTestSession(for: selection)
+
+        let store = MemorySettingsStore()
+        store.set(.disabledActionIDs, value: ["pkg123.group"])
+
+        manager.handleActionHotkey("pkg123.group.child", settingsStore: store)
+        try await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertFalse(performed)
     }
 }
 
@@ -326,9 +454,9 @@ private final class MockSelectionMonitor: SelectionMonitoring {
 
 private struct BoundTestAction: Action {
     let id: String
-    let title: String = "Test Bound"
-    let icon = ActionIcon.symbol("star")
-    let chrome = ActionChrome()
+    var title: String = "Test Bound"
+    var icon = ActionIcon.symbol("star")
+    var chrome: ActionChrome = ActionChrome()
     let onPerform: @MainActor () -> Void
 
     @MainActor func isEnabled(for context: ActionContext) -> Bool { true }

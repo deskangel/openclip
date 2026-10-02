@@ -56,11 +56,23 @@ enum ActionEnablement {
                 set: { enabled in
                     if enabled {
                         disabledActionIDs.wrappedValue.remove(action.id)
+                        // If this action is a sub-action of an extension group, ensure the group container is not disabled
+                        if let container = coordinator.actions.first(where: {
+                            ActionIdentity.extensionPackageID(of: $0) == packageID
+                            && $0.chrome.popupBehavior == .showSubActions
+                        }) {
+                            disabledActionIDs.wrappedValue.remove(container.id)
+                        }
                         if disabledPackages.wrappedValue.contains(packageID) {
                             disabledPackages.wrappedValue.remove(packageID)
-                            // Keep other actions in this package disabled so only this action is enabled
+                            // Keep other executable actions in this package disabled so only this action is enabled,
+                            // but never disable the group container row itself.
                             let siblingIDs = coordinator.actions
-                                .filter { ActionIdentity.extensionPackageID(of: $0) == packageID && $0.id != action.id }
+                                .filter {
+                                    ActionIdentity.extensionPackageID(of: $0) == packageID
+                                    && $0.id != action.id
+                                    && $0.chrome.popupBehavior != .showSubActions
+                                }
                                 .map(\.id)
                             for sibID in siblingIDs {
                                 disabledActionIDs.wrappedValue.insert(sibID)

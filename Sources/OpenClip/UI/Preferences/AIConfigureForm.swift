@@ -258,6 +258,8 @@ public struct AIConfigureForm: View {
                             cloudKeyDebounceTask?.cancel()
                             let trimmed = newKey.trimmingCharacters(in: .whitespacesAndNewlines)
                             guard !trimmed.isEmpty else {
+                                cloudFetchGeneration += 1
+                                isFetchingCloudModels = false
                                 fetchedCloudModels = []
                                 cloudFetchError = nil
                                 return

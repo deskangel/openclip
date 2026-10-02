@@ -92,8 +92,8 @@ public final class ActionRegistry: ObservableObject, Sendable {
                       let index = orderIndexMap[packageID] {
                 return (0, index)
             } else if let gated = action as? GatedExtensionAction,
-                      let match = orderIndexMap.first(where: { $0.key == gated.packageID || $0.key.hasPrefix(gated.packageID + ".") }) {
-                return (0, match.value)
+                      let match = order.enumerated().first(where: { $0.element == gated.packageID || $0.element.hasPrefix(gated.packageID + ".") }) {
+                return (0, match.offset)
             } else if ActionIdentity.isBuiltin(action) {
                 return (1, 0)
             } else {
@@ -250,7 +250,7 @@ public final class ActionRegistry: ObservableObject, Sendable {
                     return gated.packageID == id || id.hasPrefix(gated.packageID + ".")
                 }
                 if let pkgID = ActionIdentity.extensionPackageID(of: $0) {
-                    return pkgID == id || id.hasPrefix(pkgID + ".")
+                    return pkgID == id
                 }
                 return false
             }) {
