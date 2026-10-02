@@ -4,9 +4,25 @@ import XCTest
 
 @MainActor
 final class ActionResultHandlerTests: XCTestCase {
+    @MainActor
+    private final class RecordingPoster: KeyboardEventPosting {
+        var keys: [CGKeyCode] = []
+        func postKey(keyCode: CGKeyCode, flags: CGEventFlags) { keys.append(keyCode) }
+    }
+
+    private func makeHandler(settingsStore: SettingsStore = MemorySettingsStore(),
+                             pasteboard: NSPasteboard = .general,
+                             dictionaryLookup: @escaping DefaultActionResultHandler.DictionaryLookup = { _ in nil },
+                             pasteboardRestoreDelay: TimeInterval = 0.01) -> DefaultActionResultHandler {
+        DefaultActionResultHandler(settingsStore: settingsStore, keyboardPoster: RecordingPoster(),
+                                   pasteboard: pasteboard, dictionaryLookup: dictionaryLookup,
+                                   pasteboardRestoreDelay: pasteboardRestoreDelay,
+                                   appActivator: { _ in }, targetActiveChecker: { _ in true })
+    }
+
     func testCopyResultHandler() async throws {
         let isolatedPasteboard = NSPasteboard(name: NSPasteboard.Name("OpenClipTest-\(UUID().uuidString)"))
-        let handler = DefaultActionResultHandler(pasteboard: isolatedPasteboard)
+        let handler = makeHandler(pasteboard: isolatedPasteboard)
         let result = ActionResult.copy("Test Copy")
         try await handler.handle(result, in: nil)
         
@@ -16,7 +32,7 @@ final class ActionResultHandlerTests: XCTestCase {
 
     func testCopyDefinitionHandlerWritesLookupToPasteboard() async throws {
         let isolatedPasteboard = NSPasteboard(name: NSPasteboard.Name("OpenClipTest-\(UUID().uuidString)"))
-        let handler = DefaultActionResultHandler(
+        let handler = makeHandler(
             pasteboard: isolatedPasteboard,
             dictionaryLookup: { word in "The definition of \(word)." }
         )
@@ -27,7 +43,7 @@ final class ActionResultHandlerTests: XCTestCase {
 
     func testCopyDefinitionHandlerThrowsWhenLookupEmpty() async throws {
         let isolatedPasteboard = NSPasteboard(name: NSPasteboard.Name("OpenClipTest-\(UUID().uuidString)"))
-        let handler = DefaultActionResultHandler(
+        let handler = makeHandler(
             pasteboard: isolatedPasteboard,
             dictionaryLookup: { _ in nil }
         )
@@ -46,7 +62,7 @@ final class ActionResultHandlerTests: XCTestCase {
     /// assertion is that a non-existent name surfaces as a thrown error (→ status) and that the
     /// missing-binary guard throws cleanly too.
     func testRunShortcutDoesNotCrash() async throws {
-        let handler = DefaultActionResultHandler()
+        let handler = makeHandler()
         let binary = URL(fileURLWithPath: Constants.shortcutsBinaryPath)
         guard FileManager.default.isExecutableFile(atPath: binary.path) else {
             throw XCTSkip("shortcuts CLI unavailable; skipping run-shortcut handler test")
@@ -65,7 +81,7 @@ final class ActionResultHandlerTests: XCTestCase {
         let store = MemorySettingsStore()
         store.set(.completionCopyToClipboard, value: false)
         let testDelay: TimeInterval = 0.05
-        let handler = DefaultActionResultHandler(settingsStore: store, pasteboard: isolatedPasteboard, pasteboardRestoreDelay: testDelay)
+        let handler = makeHandler(settingsStore: store, pasteboard: isolatedPasteboard, pasteboardRestoreDelay: testDelay)
         
         isolatedPasteboard.clearContents()
         isolatedPasteboard.setString("OriginalItem", forType: .string)
@@ -86,7 +102,7 @@ final class ActionResultHandlerTests: XCTestCase {
 
     func testCopyContentHandlerWritesMultiTypePasteboard() async throws {
         let isolatedPasteboard = NSPasteboard(name: NSPasteboard.Name("OpenClipTest-\(UUID().uuidString)"))
-        let handler = DefaultActionResultHandler(pasteboard: isolatedPasteboard)
+        let handler = makeHandler(pasteboard: isolatedPasteboard)
         let payload = RichPasteboardPayload(plainText: "Plain copy", rtf: "{\\rtf1 RTF copy}", html: "<b>HTML copy</b>")
         try await handler.handle(.copyContent(payload), in: nil)
 
@@ -97,7 +113,7 @@ final class ActionResultHandlerTests: XCTestCase {
 
     func testCopyContentHandlerWritesRawFlavorsVerbatim() async throws {
         let isolatedPasteboard = NSPasteboard(name: NSPasteboard.Name("OpenClipTest-\(UUID().uuidString)"))
-        let handler = DefaultActionResultHandler(pasteboard: isolatedPasteboard)
+        let handler = makeHandler(pasteboard: isolatedPasteboard)
         let proprietaryType = "com.apple.notes.richtext"
         let proprietaryData = Data([0x00, 0x01, 0xFE, 0xFF])
         let payload = RichPasteboardPayload(
@@ -117,7 +133,7 @@ final class ActionResultHandlerTests: XCTestCase {
         let isolatedPasteboard = NSPasteboard(name: NSPasteboard.Name("OpenClipTest-\(UUID().uuidString)"))
         let store = MemorySettingsStore()
         store.set(.completionCopyToClipboard, value: true)
-        let handler = DefaultActionResultHandler(settingsStore: store, pasteboard: isolatedPasteboard)
+        let handler = makeHandler(settingsStore: store, pasteboard: isolatedPasteboard)
         let payload = RichPasteboardPayload(plainText: "Plain paste", rtf: "{\\rtf1 RTF paste}", html: "<i>HTML paste</i>")
         try await handler.handle(.pasteContent(payload), in: nil)
 
@@ -132,12 +148,103 @@ final class ActionResultHandlerTests: XCTestCase {
         let isolatedPasteboard = NSPasteboard(name: NSPasteboard.Name("OpenClipTest-\(UUID().uuidString)"))
         let store = MemorySettingsStore()
         store.set(.completionCopyToClipboard, value: true)
-        let handler = DefaultActionResultHandler(settingsStore: store, pasteboard: isolatedPasteboard)
+        let handler = makeHandler(settingsStore: store, pasteboard: isolatedPasteboard)
         try await handler.handle(.paste("TransientPaste"), in: nil)
 
         XCTAssertEqual(isolatedPasteboard.string(forType: .string), "TransientPaste")
         XCTAssertNotNil(isolatedPasteboard.data(forType: PasteboardSnapshot.transientType))
         XCTAssertNotNil(isolatedPasteboard.data(forType: PasteboardSnapshot.autoGeneratedType))
+    }
+
+    func testPasteResultHandlerPassesTargetAppToOpenSelection() async throws {
+        let board = NSPasteboard(name: .init("OpenClipTest-\(UUID().uuidString)"))
+        defer { board.releaseGlobally() }
+        let poster = RecordingPoster()
+        let app = NSRunningApplication.current
+        var activatedPID: pid_t?
+        var checkedPID: pid_t?
+        let handler = DefaultActionResultHandler(keyboardPoster: poster, pasteboard: board,
+            pasteboardRestoreDelay: 0,
+            appActivator: { activatedPID = $0.processIdentifier },
+            targetActiveChecker: { checkedPID = $0.processIdentifier; return true })
+        try await handler.handle(.paste("TargetAppText"), in: nil, targetApp: app)
+        XCTAssertEqual(activatedPID, app.processIdentifier)
+        XCTAssertEqual(checkedPID, app.processIdentifier)
+        XCTAssertEqual(poster.keys, [Constants.vVirtualKey])
+    }
+
+    func testFailedActivationDoesNotWriteClipboardOrPostPaste() async {
+        let board = NSPasteboard(name: .init("OpenClipTest-\(UUID().uuidString)"))
+        defer { board.releaseGlobally() }
+        board.setString("original", forType: .string)
+        let poster = RecordingPoster()
+        let handler = DefaultActionResultHandler(keyboardPoster: poster, pasteboard: board,
+            pasteboardRestoreDelay: 0, appActivator: { _ in }, targetActiveChecker: { _ in false })
+        do {
+            try await handler.handle(.paste("payload"), in: nil, targetApp: .current)
+            XCTFail("Expected activation failure")
+        } catch { }
+        XCTAssertTrue(poster.keys.isEmpty)
+        XCTAssertEqual(board.string(forType: .string), "original")
+    }
+
+    func testExplicitCopyCancelsPendingRestoreAndClearsCoordinatorSession() async throws {
+        let isolatedPasteboard = NSPasteboard(name: NSPasteboard.Name("OpenClipTest-\(UUID().uuidString)"))
+        let store = MemorySettingsStore()
+        store.set(.completionCopyToClipboard, value: false)
+        let testDelay: TimeInterval = 0.2
+        let handler = makeHandler(settingsStore: store, pasteboard: isolatedPasteboard, pasteboardRestoreDelay: testDelay)
+
+        isolatedPasteboard.clearContents()
+        isolatedPasteboard.setString("BaselineClipboard", forType: .string)
+
+        // Spawn a paste in background task that will restore after delay:
+        let pasteTask = Task { @MainActor in
+            try await handler.handle(.paste("PastedText"), in: nil)
+        }
+
+        // Wait briefly for paste to acquire coordinator session and write temporary text:
+        try await Task.sleep(nanoseconds: 20_000_000)
+
+        // User explicitly copies before the restore delay expires:
+        try await handler.handle(.copy("ExplicitUserCopy"), in: nil)
+
+        _ = await pasteTask.result
+
+        // The user's explicit copy must remain and not be overwritten by the paste restore:
+        XCTAssertEqual(isolatedPasteboard.string(forType: .string), "ExplicitUserCopy")
+    }
+
+    func testRapidSuccessivePastesInheritBaselineAndRestoreOriginal() async throws {
+        let isolatedPasteboard = NSPasteboard(name: NSPasteboard.Name("OpenClipTest-\(UUID().uuidString)"))
+        let store = MemorySettingsStore()
+        store.set(.completionCopyToClipboard, value: false)
+        let testDelay: TimeInterval = 0.1
+        let handler = makeHandler(settingsStore: store, pasteboard: isolatedPasteboard, pasteboardRestoreDelay: testDelay)
+
+        isolatedPasteboard.clearContents()
+        isolatedPasteboard.setString("OriginalBaseline", forType: .string)
+
+        let payload1 = RichPasteboardPayload(plainText: "Temp 1")
+        let payload2 = RichPasteboardPayload(plainText: "Temp 2")
+
+        let task1 = Task { @MainActor in
+            try await handler.handle(.pasteContent(payload1), in: nil)
+        }
+
+        // Yield slightly so task1 begins and sets dirty state:
+        try await Task.sleep(nanoseconds: 20_000_000)
+
+        // task2 preempts task1:
+        let task2 = Task { @MainActor in
+            try await handler.handle(.pasteContent(payload2), in: nil)
+        }
+
+        _ = await task1.result
+        _ = await task2.result
+
+        // The final restored text must be OriginalBaseline, NOT Temp 1 or Temp 2!
+        XCTAssertEqual(isolatedPasteboard.string(forType: .string), "OriginalBaseline")
     }
 }
 

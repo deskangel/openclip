@@ -24,3 +24,6 @@ plans/
 keys/
 openselection/
 .agents/skills/
+
+# Reproducible integration overlay for the separate OpenSelection package.
+!scripts/dependencies/OpenSelection.patch

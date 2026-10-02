@@ -701,5 +701,9 @@
   "Moderate": "標準",
   "Default": "デフォルト",
   "Wide": "ワイド",
-  "Maximum": "最大"
+  "Maximum": "最大",
+  "Selection": "選択範囲",
+  "Clipboard": "クリップボード",
+  "Tab to switch text source": "Tab キーでテキストソースを切り替え",
+  "Press Tab to switch between selection and clipboard": "Tab キーで選択範囲とクリップボードを切り替え"
 }

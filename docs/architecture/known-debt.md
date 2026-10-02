@@ -153,8 +153,9 @@ areas; stale debt notes are worse than none.
   The only reliable hook is `PopupPanel.setFrame` (`PopupPanel.swift:42`): when
   `pinBottomEdgeOnResize` is set it keeps the bottom edge fixed so results-above-the-field growth
   never shoves the popup. For the search palette the pin is one-shot
-  (`releasesBottomPinAfterGrowth`): it covers the entry growth only, so the palette's height can
-  follow the result count without sliding the field; `exitSearch()` re-arms it for the search→bar
+  (`releasesBottomPinAfterGrowth`): it covers the entry growth only. The palette captures its
+  height from the initial result count, so filtering does not resize the card or move the field;
+  longer result sets scroll within that height. `exitSearch()` re-arms the pin for the search→bar
   collapse after restoring the bar's bottom edge (Esc no longer jumps the popup). Both flags are
   cleared by `show(for:)` and `hide()` before intentional placement.
 - **Search and content modes are the two key exceptions to the never-key rule.** `PopupPanel.allowsKey`
@@ -185,7 +186,9 @@ areas; stale debt notes are worse than none.
 - **The search header can move the popup.** Dragging its magnifying glass or the clear strips above
   and below the text field uses the result card's panel-drag path; editing and selecting search text
   remains on the text field. The pre-search bar frame moves by the same delta so leaving search
-  returns the bar to the dragged position.
+  returns the bar to the dragged position. The trailing source chip shows whether the active action
+  context is the selection or clipboard; Tab switches between them when a distinct clipboard text
+  snapshot is available, and the visible chip can also be clicked.
 - **Define has a single display picker; popover mode is a system Look Up popover, not inline
   content.** `DefineAction` exposes one `definitionDisplay` picker (`card` default / `popover` /
   `dictionary`), replacing the old `openInDictionaryApp` boolean; a legacy `true` migrates to
@@ -342,44 +345,12 @@ areas; stale debt notes are worse than none.
 
 ## Concurrency
 
-- **Residual non-interruptible paths (documented).** Two spots remain that a hostile
-  or hung target can make block a background thread:
-  (1) `SelectionRetrievalCoordinator.pressEditCopyMenu` starts an AXPress on the dedicated
-  `com.openclip.ax-inspect` queue. The `pasteboardCopyTimeout` poll does not stop that press.
-  A blocked target can occupy one queue worker until AX returns or
-  `AXUIElementSetMessagingTimeout` (`Constants.axReadTimeout`) ends the call.
-  The `inspectGate` permit is not held for that duration.
-  `pressCopyMenuWithWatchdog` releases the permit at the first of {press returned, `axReadTimeout`},
-  same OnceResume race as inspect. The queue is concurrent, so a blocked press does not delay
-  later retrieval requests (see below);
-  (2) `PasteAvailabilityProbe.editPasteEnabled` walks the menu bar up to an aggregate deadline
-  passed through `AXMenuNavigator.findMenuItem`. Each AX message also has a per-call limit of
-  `axReadTimeout`. An abandoned walk stops at `pasteProbeTimeout` (or upon completing an in-flight message),
-  so workers do not linger for minutes on the queue. The counting gate releases its permit at the deadline
-  (issue #37) so subsequent probes are never delayed.
-  These paths do not block the main actor.
-- **AX inspect is deadline-capped.** `SelectionRetrievalCoordinator.inspectWithWatchdog` races
-  `AXElementInspector.inspect` against
-  `Constants.axReadTimeout` (0.5 s) via the `OnceResume` once-gate, running the blocking snapshot on
-  the dedicated `com.openclip.ax-inspect` queue; an unresponsive app returns
-  `nil` to the retrieval chain instead of hanging the popup.
-- **Inspect concurrency is bounded, not serialized.** The old single fail-fast `axSlot` made every
-  overlapping gesture (rapid re-selection, double-click, hotkey+monitor races) miss entirely and
-  stayed occupied until the underlying AX call returned — one heavy page suppressed popups
-  process-wide for seconds. Reads now go through a counting gate (`Constants.axMaxConcurrentInspects`,
-  currently 4): concurrent reads proceed in parallel, the permit frees when the caller's watchdog
-  settles (deadline or completion), and only genuinely saturated bursts skip. Menu-copy presses
-  share the same gate. The permit is released at `axReadTimeout`, same as inspect.
-- **The `ax-inspect` queue is concurrent, not head-of-line blocking.** All blocking AX work in the
-  coordinator (the inspect snapshot and the Edit ▸ Copy AXPress) shares one concurrent
-  `com.openclip.ax-inspect` queue: a hung AX call occupies one worker thread but later inspect
-  snapshots and presses start on other threads, so a slow or stuck target no longer delays the next
-  request's start. Each request still gets its own `axReadTimeout` deadline race.
-  `PasteAvailabilityProbe` uses the same design (issue #37): a concurrent
-  `com.openclip.ax-probe` queue and a counting gate (`Constants.pasteProbeMaxConcurrent`, 4).
-  The side that ends the wait releases the permit at `pasteProbeTimeout`.
-  The old `probeSlot` stayed occupied until the blocked AX walk returned.
-  That stopped every later probe and changed all paste operations to copy.
+- **AX caller deadlines and worker lifetimes are separate.** Inspect, menu press,
+  paste probes, and copy-menu probes run on concurrent background queues with independent
+  watchdogs. A deadline resumes the caller promptly, but the worker retains its concurrency
+  permit until the synchronous AX work returns. At saturation, new work fails fast rather
+  than adding abandoned threads. OS messaging timeouts and aggregate menu-walk deadlines
+  still cannot forcibly terminate a synchronous call already executing.
 - **Subprocess pipe reads are non-blocking (hang fix).** `ShellProcessRunner` previously read stdout/
   stderr with blocking `readToEnd()` tasks and a `Task.sleep` watchdog — both can be starved, so a
   child (or grandchild) holding a pipe open could wedge the cooperative pool and hang the test
@@ -399,15 +370,44 @@ areas; stale debt notes are worse than none.
 
 ## Selection Retrieval
 
-- **Automatic copy is authorized separately from AX text evidence.** OpenClip's monitor injects
-  OpenSelection's `AutomaticCopyCapture` through the coordinator's copy-capture seam. Before a passive copy it
-  requires an enabled menu item with the Command-C key equivalent (Command alone, independent
-  of the translated title). The menu probe runs off the main actor with a 150 ms aggregate
-  deadline and a per-message timeout; only one probe runs at a time. Unavailable or unreadable
-  commands fail closed. Native AX reads and the explicit hotkey retain their existing paths.
-  New presses and application activation cancel pending monitoring tasks; the capture rechecks
-  cancellation, target PID and the existing overlay guard before posting. Each authorized copy
-  trigger is logged without selected text or clipboard data.
+- **Clipboard operations share ownership.** OpenSelection's pasteboard coordinator reserves
+  the clipboard through preparation, activation, and the bounded delivery window. Posted
+  captures drain independently of caller cancellation; permanent OpenClip copies queue behind
+  committed operations. Snapshot inheritance and restoration check clipboard generations so
+  intervening external writes survive. External apps cannot be locked: a write arriving beyond
+  the configured capture/delivery window, or between an OS clipboard check and write, remains
+  a platform limitation.
+- **Automatic copy is authorized separately from AX evidence.** Weak evidence consults the
+  Command-C menu state; only a confirmed disabled command refuses capture. Strong evidence
+  bypasses the menu walk. Probes run off the main actor with independent caller deadlines and
+  a cap held until workers exit. Capture checks cancellation, source PID, and overlays before
+  posting. All hotkey retrieval paths bind authorization to their captured source PID.
+- **Selection reads return explainable outcomes.** OpenSelection's `retrieveResponse`,
+  `AutomaticCopyCapture.captureResponse`, and `PasteboardCopyEngine.captureResponse`
+  distinguish empty selection, changed target, timeout, blocked copy, cancellation, policy
+  refusal, worker saturation, and failure. Optional APIs remain compatibility projections.
+  Core's `TextReadResponse` and `SelectionTriggerResponse` carry these through the bridge
+  and hotkey/monitor paths. Clipboard fallback retains the original retrieval reason.
+  Reports add an optional `readStatus` so older report JSON remains readable; outcome logs
+  contain codes, never selected text or clipboard payloads.
+- **Selection logging is summarized and correlated.** Each retrieval emits one completion
+  event with configured/winning strategies, reason, timings, retry counts and observed
+  clipboard restoration. Poll-level details are trace-only. Task-local correlation follows
+  capture and detached menu work; response IDs correlate monitor/hotkey delivery decisions.
+  Reports retain structured metrics without duplicating the app's completion line. Phase
+  measurements overlap; they are diagnostic boundaries, not additive latency components.
+- **Delayed paste checks observed selection freshness.** Monitor invalidation advances a
+  generation carried by selection contexts. Hotkey reads reject results after a generation
+  changes, and popup delivery checks freshness before and after paste probing, downgrading
+  stale paste results to copy. This covers observed mouse/keyboard field changes and app
+  switches; programmatic focus changes without an observed gesture are not detected.
+  It is not an AX focused-element identity guarantee, and arbitrary extension keystrokes
+  remain outside this paste-result check.
+- **Temporary local dependency integration is reproducible.** `scripts/prepare_openselection.sh`
+  bootstraps the separate checkout from a published full commit plus the tracked integration
+  patch. Existing local checkouts remain developer overrides. CI prepares it before XcodeGen;
+  test, package, and development scripts prepare it before building. Publish the package changes
+  and switch back to a remote revision when the integration is ready for distribution.
 - **Automatic reads are tied to the selection source process.** The monitor uses the activated app
   from the workspace notification and cancels pending reads and clears the cached selection on a
   switch away from the source. Queued notifications for apps no longer frontmost, activation of

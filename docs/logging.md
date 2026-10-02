@@ -129,3 +129,32 @@ OpenClip provides a fast, built-in CLI log reader powered directly by `DebugLogS
 - **Zero Polling Overhead**: Normal app operation has zero polling timers or `OSLogService.xpc` CPU usage.
 - **Flags**: `--category=`, `--level=`, `--count=`, `--collect=` (seconds, default 4), `--help`.
 - It cold-launches the app, runs extension loading (so load/reject lines are produced), waits for collection, prints matching lines to stdout, and exits 0 (`2` on usage errors). This is the quickest agent check for "did my extension load or reject?".
+
+
+### Selection log noise and correlation
+
+Selection retrieval emits one `selection completed` event for each read, including fast
+native successes. The summary carries the request trace ID, trigger, bundle ID,
+configured and winning strategies, outcome, attempt count, fallback reason when applicable,
+and timings/retry counts for phases that ran. Timings are in microseconds. AX inspection
+time is also included within web/evidence settling durations; these overlapping measurements
+must not be summed to estimate total latency.
+
+Successful reads log at info. Empty/blocked reads log at debug, cancellations at trace,
+and changed targets, timeouts and failures at warning. Repeated AX inspections, strategy
+transitions, menu evaluation, copy polling detail and successful strategy messages log at
+trace, excluded by the app's default debug sink. Cascade reports still reach diagnostics
+consumers, but the app sink does not print a second report summary.
+
+Copy capture inherits a task-local request trace (including detached menu dispatch).
+Monitor/hotkey delivery logs keep the read's trace ID for fallback or invalidated delivery,
+and omit redundant successful-delivery messages. `clipboardRestored` is included only
+when synthetic copy was posted; false means no baseline restoration occurred, including
+intentional preservation of a user copy. No selected text or clipboard contents enter the
+summary.
+
+Example (fields are sorted in actual output):
+
+```text
+[Trace#10] [cascade] selection completed [outcome=selection trigger=dragEnd configuredStrategy=ax-text-control winningStrategy=keyboard-copy elapsedMicros=453000µs webAreaRetries=5 evidenceRetries=2 clipboardRestored=true]
+```

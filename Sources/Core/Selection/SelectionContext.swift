@@ -6,6 +6,8 @@ import Foundation
 import CoreGraphics
 
 public struct SelectionContext: Sendable {
+    /// Generation of observed selection/focus gestures; nil for untracked contexts.
+    public let selectionGeneration: UInt64?
     public let text: String
     public let sourceApp: AppIdentity
     public let cursorPosition: CGPoint
@@ -31,8 +33,10 @@ public struct SelectionContext: Sendable {
         isClipboardFallback: Bool = false,
         html: String? = nil,
         rtf: String? = nil,
-        flavors: [RichPasteboardFlavor] = []
+        flavors: [RichPasteboardFlavor] = [],
+        selectionGeneration: UInt64? = nil
     ) {
+        self.selectionGeneration = selectionGeneration
         self.text = text
         self.sourceApp = sourceApp
         self.cursorPosition = cursorPosition
@@ -44,5 +48,22 @@ public struct SelectionContext: Sendable {
         self.html = html
         self.rtf = rtf
         self.flavors = flavors
+    }
+
+    public func with(cursorPosition: CGPoint) -> SelectionContext {
+        SelectionContext(
+            text: text,
+            sourceApp: sourceApp,
+            cursorPosition: cursorPosition,
+            mouseDownLocation: mouseDownLocation,
+            selectionBounds: selectionBounds,
+            timestamp: timestamp,
+            appPolicy: appPolicy,
+            isClipboardFallback: isClipboardFallback,
+            html: html,
+            rtf: rtf,
+            flavors: flavors,
+            selectionGeneration: selectionGeneration
+        )
     }
 }

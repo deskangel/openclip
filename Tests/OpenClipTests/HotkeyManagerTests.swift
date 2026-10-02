@@ -16,7 +16,109 @@ final class HotkeyManagerTests: XCTestCase {
         await MainActor.run {
             TestIsolation.reset()
             HotkeyManager.shared.selectionMonitor = nil
+            HotkeyManager.shared.retriever = nil
+            HotkeyManager.shared.frontmostPIDProvider = { 1001 }
         }
+    }
+
+    override func tearDown() async throws {
+        HotkeyManager.shared.frontmostPIDProvider = { NSWorkspace.shared.frontmostApplication?.processIdentifier }
+        HotkeyManager.shared.retriever = nil
+        try await super.tearDown()
+    }
+
+    func testPerActionRetrievalRejectsChangedTargetWithoutRequestedPID() async {
+        let manager = HotkeyManager.shared
+        manager.frontmostPIDProvider = { 2002 }
+        let result = await manager.collectTrigger(frontmostApp: MockFrontmostApp(bundleID: "com.apple.TextEdit"))
+        XCTAssertNil(result)
+    }
+
+    func testPerActionRetrievalRejectsSwitchDuringFreshRetrieval() async {
+        let manager = HotkeyManager.shared
+        manager.selectionMonitor = nil
+        manager.retriever = SelectionRetrievalCoordinator(
+            inspect: { _ in AXElementInspector.Target() },
+            copyCapture: { _ in
+                await MainActor.run { manager.frontmostPIDProvider = { 2002 } }
+                return Core.TextResult(text: "stale text")
+            }
+        )
+        let result = await manager.collectTrigger(frontmostApp: MockFrontmostApp(bundleID: "com.sublimetext.4"))
+        XCTAssertNil(result)
+    }
+
+    func testStructuredOutcomeExplainsTargetSwitchDuringRetrieval() async {
+        let manager = HotkeyManager.shared
+        manager.retriever = SelectionRetrievalCoordinator(
+            inspect: { _ in AXElementInspector.Target() },
+            copyCapture: { _ in
+                await MainActor.run { manager.frontmostPIDProvider = { 2002 } }
+                return Core.TextResult(text: "old selection")
+            })
+        let response = await manager.collectTriggerResponse(frontmostApp: MockFrontmostApp(bundleID: "com.sublimetext.4"))
+        XCTAssertEqual(response.status, .targetChanged)
+        XCTAssertNil(response.context)
+    }
+
+    func testFieldChangeDuringReadRejectsLateResult() async {
+        let manager = HotkeyManager.shared
+        let monitor = MockSelectionMonitor()
+        manager.selectionMonitor = monitor
+        manager.retriever = SelectionRetrievalCoordinator(
+            inspect: { _ in AXElementInspector.Target() },
+            copyCapture: { _ in
+                await MainActor.run { monitor.clearSelection() }
+                return Core.TextResult(text: "old field")
+            })
+        let response = await manager.collectTriggerResponse(frontmostApp: MockFrontmostApp(bundleID: "com.sublimetext.4"))
+        XCTAssertEqual(response.status, .targetChanged)
+        XCTAssertNil(response.context)
+    }
+
+    func testClipboardFallbackRetainsReadFailure() async {
+        let manager = HotkeyManager.shared
+        let board = NSPasteboard.general
+        let snapshot = PasteboardSnapshot.capture(board)
+        defer { snapshot.restore(to: board) }
+        board.clearContents()
+        board.setString("fallback text", forType: .string)
+        manager.retriever = SelectionRetrievalCoordinator(
+            inspect: { _ in AXElementInspector.Target() },
+            detailedCopyCapture: { _ in SelectionReadResponse(status: .copyBlocked) })
+        let response = await manager.collectTriggerResponse(frontmostApp: MockFrontmostApp(bundleID: "com.sublimetext.4"))
+        XCTAssertEqual(response.status, .clipboardFallback)
+        XCTAssertEqual(response.retrievalStatus, .copyBlocked)
+        XCTAssertEqual(response.context?.text, "fallback text")
+    }
+
+    func testHotkeyWaitsForPendingDragReadAndReusesIt() async {
+        let manager = HotkeyManager.shared
+        let app = MockFrontmostApp(bundleID: "com.apple.TextEdit")
+        let store = MemorySettingsStore()
+        store.set(.isMouseHoldEnabled, value: false)
+        store.set(.isAppEnabled, value: false)
+        let monitor = MacSelectionMonitor(settingsStore: store)
+        monitor.frontmostAppProvider = { app }
+        monitor.isExcludedBundle = { _ in false }
+        monitor.isSystemChromeAt = { _ in false }
+        monitor.windowAtPoint = { _ in nil }
+        monitor.currentCursorProvider = { .unknown }
+        monitor.policyResolver = { _ in .default }
+        monitor.retriever = SelectionRetrievalCoordinator(inspect: { _ in
+            Thread.sleep(forTimeInterval: 0.01)
+            return AXElementInspector.Target(role: "AXTextField", selectedText: "drag selection")
+        }, copyCapture: { _ in XCTFail("AX drag must not post copy"); return nil })
+        manager.selectionMonitor = monitor
+        manager.retriever = SelectionRetrievalCoordinator(inspect: { _ in
+            XCTFail("Pending drag result must be reused"); return AXElementInspector.Target()
+        })
+        monitor.handleMouseDown(at: CGPoint(x: 100, y: 100))
+        monitor.handleMouseUp(app: app, cursor: CGPoint(x: 200, y: 150), clickCount: 1)
+        let response = await manager.collectTriggerResponse(frontmostApp: app)
+        XCTAssertEqual(response.status, .selection)
+        XCTAssertEqual(response.context?.text, "drag selection")
+        XCTAssertEqual(response.context?.selectionGeneration, monitor.selectionGeneration)
     }
 
     /// "Appear Automatically" off means the popup stops following selections — the shortcut is an
@@ -424,12 +526,109 @@ final class HotkeyManagerTests: XCTestCase {
         try await Task.sleep(nanoseconds: 50_000_000)
         XCTAssertFalse(performed)
     }
+
+    func testCollectTriggerPreservesCompletePayloadInCachedPath() async throws {
+        let manager = HotkeyManager.shared
+        let mockMonitor = MockSelectionMonitor()
+        manager.selectionMonitor = mockMonitor
+
+        let app = MockFrontmostApp(bundleID: "com.apple.TextEdit")
+        let sourceApp = AppIdentity(app)
+        let sampleFlavors = [RichPasteboardFlavor(type: "public.utf8-plain-text", data: Data("Cached sample text".utf8))]
+        let context = SelectionContext(
+            text: "Cached sample text",
+            sourceApp: sourceApp,
+            cursorPosition: CGPoint(x: 100, y: 100),
+            mouseDownLocation: CGPoint(x: 90, y: 90),
+            selectionBounds: CGRect(x: 10, y: 20, width: 100, height: 30),
+            timestamp: Date(),
+            appPolicy: .default,
+            isClipboardFallback: false,
+            html: "<p>Cached sample text</p>",
+            rtf: "{\\rtf1 Cached sample text}",
+            flavors: sampleFlavors
+        )
+        mockMonitor.latestSelection = (context: context, canPaste: true)
+
+        let trigger = await manager.collectTrigger(frontmostApp: app)
+        let resolved = try XCTUnwrap(trigger)
+        XCTAssertEqual(resolved.context.text, "Cached sample text")
+        XCTAssertEqual(resolved.context.html, "<p>Cached sample text</p>")
+        XCTAssertEqual(resolved.context.rtf, "{\\rtf1 Cached sample text}")
+        XCTAssertEqual(resolved.context.flavors, sampleFlavors)
+    }
+
+    func testResolveSynchronousTriggerPreservesCompletePayloadInCachedPath() throws {
+        let manager = HotkeyManager.shared
+        let mockMonitor = MockSelectionMonitor()
+        manager.selectionMonitor = mockMonitor
+
+        let app = MockFrontmostApp(bundleID: "com.apple.TextEdit")
+        let sourceApp = AppIdentity(app)
+        let sampleFlavors = [RichPasteboardFlavor(type: "public.utf8-plain-text", data: Data("Sync sample text".utf8))]
+        let context = SelectionContext(
+            text: "Sync sample text",
+            sourceApp: sourceApp,
+            cursorPosition: CGPoint(x: 100, y: 100),
+            mouseDownLocation: CGPoint(x: 90, y: 90),
+            selectionBounds: CGRect(x: 10, y: 20, width: 100, height: 30),
+            timestamp: Date(),
+            appPolicy: .default,
+            isClipboardFallback: false,
+            html: "<p>Sync sample text</p>",
+            rtf: "{\\rtf1 Sync sample text}",
+            flavors: sampleFlavors
+        )
+        mockMonitor.latestSelection = (context: context, canPaste: true)
+
+        let trigger = manager.resolveSynchronousTrigger(frontmostApp: app)
+        let resolved = try XCTUnwrap(trigger)
+        XCTAssertEqual(resolved.context.text, "Sync sample text")
+        XCTAssertEqual(resolved.context.html, "<p>Sync sample text</p>")
+        XCTAssertEqual(resolved.context.rtf, "{\\rtf1 Sync sample text}")
+        XCTAssertEqual(resolved.context.flavors, sampleFlavors)
+    }
+
+    func testCollectTriggerPreservesCompletePayloadInFreshPath() async throws {
+        let manager = HotkeyManager.shared
+        manager.selectionMonitor = nil
+
+        let app = MockFrontmostApp(bundleID: "com.sublimetext.4")
+        let sampleFlavors = [
+            RichPasteboardFlavor(type: "public.html", data: Data("<p>Fresh text</p>".utf8)),
+            RichPasteboardFlavor(type: "com.apple.custom", data: Data([10, 20, 30]))
+        ]
+
+        manager.retriever = SelectionRetrievalCoordinator(
+            inspect: { _ in
+                AXElementInspector.Target()
+            },
+            copyCapture: { _ in
+                Core.TextResult(
+                    text: "Fresh text",
+                    bounds: CGRect(x: 10, y: 20, width: 30, height: 40),
+                    html: "<p>Fresh text</p>",
+                    rtf: "{\\rtf1 Fresh text}",
+                    flavors: sampleFlavors
+                )
+            }
+        )
+
+        let trigger = await manager.collectTrigger(frontmostApp: app)
+        let resolved = try XCTUnwrap(trigger)
+        XCTAssertEqual(resolved.context.text, "Fresh text")
+        XCTAssertEqual(resolved.context.html, "<p>Fresh text</p>")
+        XCTAssertEqual(resolved.context.rtf, "{\\rtf1 Fresh text}")
+        XCTAssertEqual(resolved.context.flavors, sampleFlavors)
+    }
 }
+
 
 @MainActor
 private final class MockSelectionMonitor: SelectionMonitoring {
     var onSelection: ((SelectionContext, Bool?) -> Void)?
     var latestSelection: (context: SelectionContext, canPaste: Bool?)?
+    var selectionGeneration: UInt64? = 0
     var clearSelectionCalled = false
 
     init() {}
@@ -444,6 +643,7 @@ private final class MockSelectionMonitor: SelectionMonitoring {
     }
 
     func clearSelection() {
+        selectionGeneration = (selectionGeneration ?? 0) &+ 1
         clearSelectionCalled = true
         latestSelection = nil
     }

@@ -13,13 +13,25 @@ import SDWebImageSVGCoder
 public protocol ActionResultHandler: Sendable {
     @MainActor
     func handle(_ result: ActionResult, in view: NSView?) async throws
-    /// Executes a leaf effect with its side-effect body but never asks the presenter to dismiss
-    /// the popup. Keep-open presentation effects (e.g. the AI result card's Paste/Copy) use this
-    /// door: dismissal lives in the controller's top-level decision, never inside the effect
-    /// handler, so this is the "effect door that never hides". Non-throwing — a thrown error is
-    /// swallowed and logged.
     @MainActor
     func handleWithoutDismissal(_ result: ActionResult, in view: NSView?) async
+
+    @MainActor
+    func handle(_ result: ActionResult, in view: NSView?, targetApp: NSRunningApplication?) async throws
+    @MainActor
+    func handleWithoutDismissal(_ result: ActionResult, in view: NSView?, targetApp: NSRunningApplication?) async
+}
+
+extension ActionResultHandler {
+    @MainActor
+    public func handle(_ result: ActionResult, in view: NSView?, targetApp: NSRunningApplication?) async throws {
+        try await handle(result, in: view)
+    }
+
+    @MainActor
+    public func handleWithoutDismissal(_ result: ActionResult, in view: NSView?, targetApp: NSRunningApplication?) async {
+        await handleWithoutDismissal(result, in: view)
+    }
 }
 
 /// Physical-key posting seam (Task 15): `DefaultActionResultHandler` posts keystrokes through an
@@ -44,6 +56,8 @@ public struct SessionEventTapPoster: KeyboardEventPosting {
         let resolvedFlags = CGEventFlags(rawValue: flags.rawValue | 0x000008)
         if let keydown = CGEvent(keyboardEventSource: src, virtualKey: keyCode, keyDown: true),
            let keyup = CGEvent(keyboardEventSource: src, virtualKey: keyCode, keyDown: false) {
+            keydown.setIntegerValueField(.eventSourceUserData, value: KeyboardEventPoster.syntheticEventTag)
+            keyup.setIntegerValueField(.eventSourceUserData, value: KeyboardEventPoster.syntheticEventTag)
             keydown.flags = resolvedFlags
             keyup.flags = resolvedFlags
             keydown.post(tap: .cgSessionEventTap)
@@ -58,6 +72,9 @@ public final class DefaultActionResultHandler: ActionResultHandler, Sendable {
     /// so tests can stub the lookup instead of hitting the real system dictionaries.
     public typealias DictionaryLookup = @Sendable (String) -> String?
 
+    public typealias AppActivator = @MainActor @Sendable (NSRunningApplication) -> Void
+    public typealias TargetActiveChecker = @MainActor @Sendable (NSRunningApplication) async -> Bool
+
     private let settingsStore: SettingsStore
     private let keyboardPoster: KeyboardEventPosting
     private let pasteboard: NSPasteboard
@@ -66,12 +83,15 @@ public final class DefaultActionResultHandler: ActionResultHandler, Sendable {
     private let icsCleanupDelay: TimeInterval
     private let openURL: @MainActor @Sendable (URL) -> Void
     private let openURLInApp: @MainActor @Sendable (URL, String) async -> Void
-    private var pendingRestoreTask: Task<Void, Never>?
+    private let appActivator: AppActivator
+    private let targetActiveChecker: TargetActiveChecker
 
     public init(settingsStore: SettingsStore = DefaultSettingsStore.shared,
                 keyboardPoster: KeyboardEventPosting = SessionEventTapPoster(),
                 pasteboard: NSPasteboard = .general,
-                dictionaryLookup: @escaping DictionaryLookup = DictionaryLookupFactory.systemLookup) {
+                dictionaryLookup: @escaping DictionaryLookup = DictionaryLookupFactory.systemLookup,
+                appActivator: @escaping AppActivator = { $0.activate() },
+                targetActiveChecker: @escaping TargetActiveChecker = SelectionReplacer.defaultTargetActiveChecker) {
         self.settingsStore = settingsStore
         self.keyboardPoster = keyboardPoster
         self.pasteboard = pasteboard
@@ -82,6 +102,8 @@ public final class DefaultActionResultHandler: ActionResultHandler, Sendable {
         self.openURLInApp = { url, bundleID in
             await BrowserTabOpener().open(url, inApp: bundleID)
         }
+        self.appActivator = appActivator
+        self.targetActiveChecker = targetActiveChecker
     }
 
     public init(settingsStore: SettingsStore = DefaultSettingsStore.shared,
@@ -93,7 +115,9 @@ public final class DefaultActionResultHandler: ActionResultHandler, Sendable {
                 openURL: @escaping @MainActor @Sendable (URL) -> Void = { NSWorkspace.shared.open($0) },
                 openURLInApp: @escaping @MainActor @Sendable (URL, String) async -> Void = { url, bundleID in
                     await BrowserTabOpener().open(url, inApp: bundleID)
-                }) {
+                },
+                appActivator: @escaping AppActivator = { $0.activate() },
+                targetActiveChecker: @escaping TargetActiveChecker = SelectionReplacer.defaultTargetActiveChecker) {
         self.settingsStore = settingsStore
         self.keyboardPoster = keyboardPoster
         self.pasteboard = pasteboard
@@ -102,44 +126,54 @@ public final class DefaultActionResultHandler: ActionResultHandler, Sendable {
         self.icsCleanupDelay = icsCleanupDelay
         self.openURL = openURL
         self.openURLInApp = openURLInApp
+        self.appActivator = appActivator
+        self.targetActiveChecker = targetActiveChecker
     }
 
 
-    public func handle(_ result: ActionResult, in view: NSView? = nil) async throws {
-        try await execute(result, in: view)
+    public func handle(_ result: ActionResult, in view: NSView?) async throws {
+        try await execute(result, in: view, targetApp: nil)
     }
 
-    public func handleWithoutDismissal(_ result: ActionResult, in view: NSView? = nil) async {
+    public func handleWithoutDismissal(_ result: ActionResult, in view: NSView?) async {
         do {
-            try await execute(result, in: view)
+            try await execute(result, in: view, targetApp: nil)
         } catch {
-            // Never rethrow into the keep-open door: the presenter already suppresses dismissal and a
-            // throw would fall back to the legacy error-status path. Log instead.
+            Log.resultHandler.error("effect failed: \(error.localizedDescription)")
+        }
+    }
+
+    public func handle(_ result: ActionResult, in view: NSView?, targetApp: NSRunningApplication?) async throws {
+        try await execute(result, in: view, targetApp: targetApp)
+    }
+
+    public func handleWithoutDismissal(_ result: ActionResult, in view: NSView?, targetApp: NSRunningApplication?) async {
+        do {
+            try await execute(result, in: view, targetApp: targetApp)
+        } catch {
             Log.resultHandler.error("effect failed: \(error.localizedDescription)")
         }
     }
 
     /// The single side-effect body shared by `handle` (throws) and `handleWithoutDismissal`
     /// (swallows). Deliberately no dismissal step — hiding is decided by the presenter, never here.
-    private func execute(_ result: ActionResult, in view: NSView?) async throws {
+    private func execute(_ result: ActionResult, in view: NSView?, targetApp: NSRunningApplication? = nil) async throws {
         switch result {
         case .copy(let text):
-            pendingRestoreTask?.cancel()
-            pendingRestoreTask = nil
+            let clipboardSession = try await OpenSelection.ClipboardCoordinator.shared.acquireSession(priority: .userAction, pasteboard: self.pasteboard)
+            defer { clipboardSession.commitPermanent() }
             let pasteboard = self.pasteboard
             pasteboard.clearContents()
             pasteboard.setString(text, forType: .string)
 
         case .copyContent(let payload):
-            pendingRestoreTask?.cancel()
-            pendingRestoreTask = nil
+            let clipboardSession = try await OpenSelection.ClipboardCoordinator.shared.acquireSession(priority: .userAction, pasteboard: self.pasteboard)
+            defer { clipboardSession.commitPermanent() }
             let pasteboard = self.pasteboard
             pasteboard.clearContents()
             writePayload(payload, to: pasteboard)
 
         case .copyDefinition(let word):
-            pendingRestoreTask?.cancel()
-            pendingRestoreTask = nil
             guard let definition = dictionaryLookup(word), !definition.isEmpty else {
                 throw NSError(
                     domain: Constants.actionErrorDomain,
@@ -147,40 +181,65 @@ public final class DefaultActionResultHandler: ActionResultHandler, Sendable {
                     userInfo: [NSLocalizedDescriptionKey: "No dictionary definition found for “\(word)”."]
                 )
             }
+            let clipboardSession = try await OpenSelection.ClipboardCoordinator.shared.acquireSession(priority: .userAction, pasteboard: self.pasteboard)
+            defer { clipboardSession.commitPermanent() }
             let pasteboard = self.pasteboard
             pasteboard.clearContents()
             pasteboard.setString(definition, forType: .string)
 
         case .cut(let text):
-            pendingRestoreTask?.cancel()
-            pendingRestoreTask = nil
+            let clipboardSession = try await OpenSelection.ClipboardCoordinator.shared.acquireSession(priority: .userAction, pasteboard: self.pasteboard)
+            defer { clipboardSession.commitPermanent() }
+            if let targetApp {
+                appActivator(targetApp)
+                let isActive = await targetActiveChecker(targetApp)
+                guard isActive else {
+                    throw NSError(
+                        domain: Constants.actionErrorDomain,
+                        code: Int(Constants.actionErrorCode),
+                        userInfo: [NSLocalizedDescriptionKey: "Target application unavailable for cut."]
+                    )
+                }
+            }
             let pasteboard = self.pasteboard
             pasteboard.clearContents()
             pasteboard.setString(text, forType: .string)
             postKey(keyCode: Constants.deleteVirtualKey, flags: [])
 
         case .paste(let text):
-            pendingRestoreTask?.cancel()
-            pendingRestoreTask = nil
             let copyToClipboard = settingsStore.get(.completionCopyToClipboard)
+            let destinationApp = targetApp ?? NSWorkspace.shared.frontmostApplication
             try await OpenSelection.replace(
                 with: text,
-                in: NSWorkspace.shared.frontmostApplication,
+                in: destinationApp,
                 pasteboard: self.pasteboard,
                 restoreDelay: self.pasteboardRestoreDelay,
                 restorePasteboard: !copyToClipboard,
+                appActivator: self.appActivator,
+                targetActiveChecker: self.targetActiveChecker,
                 keyPoster: { [weak self] keyCode, flags in
                     self?.postKey(keyCode: keyCode, flags: flags)
                 }
             )
 
         case .pasteContent(let payload):
-            pendingRestoreTask?.cancel()
-            pendingRestoreTask = nil
-            let pasteboard = self.pasteboard
-            deliverPaste(to: pasteboard) {
-                writePayload(payload, to: pasteboard, transient: true)
-            }
+            let copyToClipboard = settingsStore.get(.completionCopyToClipboard)
+            let destinationApp = targetApp ?? NSWorkspace.shared.frontmostApplication
+            try await OpenSelection.replace(
+                with: payload.plainText ?? "",
+                html: payload.html,
+                rtf: payload.rtf,
+                flavors: payload.flavors.map { PasteboardFlavor(type: $0.type, data: $0.data) },
+                in: destinationApp,
+                pasteboard: self.pasteboard,
+                restoreDelay: self.pasteboardRestoreDelay,
+                restorePasteboard: !copyToClipboard,
+                appActivator: self.appActivator,
+                targetActiveChecker: self.targetActiveChecker,
+                keyPoster: { [weak self] keyCode, flags in
+                    self?.postKey(keyCode: keyCode, flags: flags)
+                }
+            )
 
         case .openURL(let url):
             openURL(url)
@@ -226,8 +285,8 @@ public final class DefaultActionResultHandler: ActionResultHandler, Sendable {
                               code: Constants.actionErrorCode,
                               userInfo: [NSLocalizedDescriptionKey: "File does not exist: \(url.lastPathComponent)"])
             }
-            pendingRestoreTask?.cancel()
-            pendingRestoreTask = nil
+            let clipboardSession = try await OpenSelection.ClipboardCoordinator.shared.acquireSession(priority: .userAction, pasteboard: self.pasteboard)
+            defer { clipboardSession.commitPermanent() }
             let pasteboard = self.pasteboard
             pasteboard.clearContents()
             var objects: [NSPasteboardWriting] = [url as NSURL]
@@ -268,7 +327,12 @@ public final class DefaultActionResultHandler: ActionResultHandler, Sendable {
             Log.resultHandler.info("Saved file \(url.lastPathComponent, privacy: .public) to \(finalURL.path, privacy: .public)")
 
         case .simulatePaste:
+            let clipboardSession = try await OpenSelection.ClipboardCoordinator.shared.acquireSession(priority: .userAction, pasteboard: self.pasteboard)
+            defer { clipboardSession.commitPermanent() }
+            try await activateTarget(targetApp)
             postKey(keyCode: Constants.vVirtualKey, flags: .maskCommand)
+            let deliveryWindow = Task { try? await Task.sleep(nanoseconds: UInt64(self.pasteboardRestoreDelay * 1_000_000_000)) }
+            _ = await deliveryWindow.value
 
         // Presentation/flow results are presenter-owned (PopupWindowController). The handler treats
         // them as no-ops so the switch stays exhaustive without crashing when one is routed here.
@@ -278,6 +342,7 @@ public final class DefaultActionResultHandler: ActionResultHandler, Sendable {
         // Keyboard execution: keyPress posts a synthetic keystroke; runShortcut launches the
         // shortcuts CLI under the shared subprocess watchdog (thrown errors surface as a status).
         case .keyPress(let spec):
+            try await activateTarget(targetApp)
             postKeyPress(spec)
         case .runShortcut(let name, let input):
             try await runShortcut(name: name, input: input)
@@ -382,7 +447,15 @@ public final class DefaultActionResultHandler: ActionResultHandler, Sendable {
         try await center.add(request)
     }
 
-    private func writePayload(_ payload: RichPasteboardPayload, to pasteboard: NSPasteboard, transient: Bool = false) {
+    private func activateTarget(_ targetApp: NSRunningApplication?) async throws {
+        guard let targetApp else { try Task.checkCancellation(); return }
+        appActivator(targetApp)
+        guard await targetActiveChecker(targetApp), !Task.isCancelled else {
+            throw OpenSelectionError.targetApplicationUnavailable
+        }
+    }
+
+    private func writePayload(_ payload: RichPasteboardPayload, to pasteboard: NSPasteboard) {
         if !payload.flavors.isEmpty {
             // Write captured representations verbatim (matches clipboard managers like Maccy):
             // app-private types must survive unchanged, and `setData` avoids `writeObjects`
@@ -402,35 +475,6 @@ public final class DefaultActionResultHandler: ActionResultHandler, Sendable {
                 item.setString(text, forType: .string)
             }
             pasteboard.writeObjects([item])
-        }
-        if transient {
-            pasteboard.setData(Data(), forType: PasteboardSnapshot.transientType)
-            pasteboard.setData(Data(), forType: PasteboardSnapshot.autoGeneratedType)
-        }
-    }
-
-    /// Writes `write` onto the pasteboard then synthesizes ⌘V, honoring the per-click copy
-    /// preference and restoring the previous pasteboard contents when the frontmost app ignores
-    /// the paste (changeCount unchanged).
-    private func deliverPaste(to pasteboard: NSPasteboard, write: () -> Void) {
-        if settingsStore.get(.completionCopyToClipboard) {
-            pasteboard.clearContents()
-            write()
-            postKey(keyCode: Constants.vVirtualKey, flags: .maskCommand)
-        } else {
-            let snapshot = PasteboardSnapshot.capture(pasteboard)
-            pasteboard.clearContents()
-            write()
-            let changeCountAfterSet = pasteboard.changeCount
-            postKey(keyCode: Constants.vVirtualKey, flags: .maskCommand)
-
-            pendingRestoreTask = Task { @MainActor in
-                try? await Task.sleep(nanoseconds: UInt64(self.pasteboardRestoreDelay * 1_000_000_000))
-                guard !Task.isCancelled else { return }
-                if pasteboard.changeCount == changeCountAfterSet {
-                    snapshot.restore(to: pasteboard, transientMarkers: true)
-                }
-            }
         }
     }
 

@@ -397,8 +397,8 @@ public struct ResultCardView: View {
             .gesture(headerDragGesture)
             .help("Drag to move")
 
-            HStack(spacing: 4) {
-                HStack(spacing: 4) {
+            HStack(spacing: 8) {
+                HStack(spacing: 8) {
                     if hasDiff && payload.file == nil {
                         diffToggle
                     }

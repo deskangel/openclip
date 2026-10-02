@@ -701,5 +701,9 @@
   "Moderate": "適中",
   "Default": "預設",
   "Wide": "寬",
-  "Maximum": "最大"
+  "Maximum": "最大",
+  "Selection": "選取文字",
+  "Clipboard": "剪貼簿",
+  "Tab to switch text source": "按 Tab 鍵切換文字來源",
+  "Press Tab to switch between selection and clipboard": "按 Tab 鍵在選取文字和剪貼簿之間切換"
 }

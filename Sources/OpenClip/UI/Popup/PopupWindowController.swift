@@ -308,6 +308,10 @@ public class PopupWindowController {
             actions: activeActions,
             allActions: activeActions,
             context: actionContext,
+            alternateSearchContext: alternateClipboardSearchContext(for: context),
+            onSearchContextChanged: { [weak self] selection in
+                self?.updateSearchContext(selection)
+            },
             screenWidth: screenBounds.width,
             initialAICardAboveBar: cardAbove,
             modeStore: modeStore,
@@ -562,6 +566,39 @@ public class PopupWindowController {
         PopupMetrics.searchPanelWidth
     }
 
+    private func alternateClipboardSearchContext(for selection: SelectionContext) -> SelectionContext? {
+        guard !selection.isClipboardFallback,
+              !selection.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        let pasteboard = NSPasteboard.general
+        guard let text = pasteboard.string(forType: .string),
+              TextSanitizer.isSubstantial(text),
+              text.utf8.count <= Constants.maxTextLength,
+              text != selection.text else { return nil }
+        return SelectionContext(
+            text: text,
+            sourceApp: selection.sourceApp,
+            cursorPosition: selection.cursorPosition,
+            mouseDownLocation: selection.mouseDownLocation,
+            selectionBounds: nil,
+            timestamp: selection.timestamp,
+            appPolicy: selection.appPolicy,
+            isClipboardFallback: true,
+            html: pasteboard.string(forType: .html),
+            rtf: pasteboard.string(forType: .rtf)
+        )
+    }
+
+    private func updateSearchContext(_ selection: SelectionContext) {
+        guard modeStore.mode == .search else { return }
+        currentActionContext = ActionContext(
+            selection: selection,
+            modifiers: currentActionContext?.modifiers ?? []
+        )
+        // Inline values were evaluated for the original selection. Clear them so the palette
+        // cannot show a stale preview; running the action evaluates it against the active context.
+        modeStore.inlineResults.removeAll()
+    }
+
     /// The hosting view grows the panel to the palette on its own, after the current run-loop turn
     /// (and sometimes a display pass later); a remembered palette can be tall enough for that
     /// growth to run off a screen edge, so nudge it back once the growth has landed. Same two
@@ -608,6 +645,12 @@ public class PopupWindowController {
         if openedDirectlyInSearch {
             hide()
             return
+        }
+        if let currentContext {
+            currentActionContext = ActionContext(
+                selection: currentContext,
+                modifiers: currentActionContext?.modifiers ?? []
+            )
         }
         modeStore.scope = nil
         modeStore.mode = .actions
@@ -705,8 +748,19 @@ public class PopupWindowController {
             // A remembered (or later resized) card may be far taller than the bar/palette cap:
             // let the panel grow as tall as the screen; the card's own clamps keep it on-screen.
             if let panel { panel.heightCap = screenBounds(for: panel).height }
-            modeStore.resultCardSize = rememberedSize(for: .card)
-            modeStore.isSurfaceUserSized = false
+            if isStreaming {
+                // A first response streams into an otherwise content-fitted card. Lock its
+                // dimensions from the first render so each incoming chunk doesn't resize the
+                // panel; use the user's saved size or the standard card size as the stable frame.
+                modeStore.resultCardSize = rememberedSize(for: .card) ?? CGSize(
+                    width: PopupMetrics.aiCardIdealWidth,
+                    height: PopupMetrics.aiCardMinHeight
+                )
+                modeStore.isSurfaceUserSized = true
+            } else {
+                modeStore.resultCardSize = rememberedSize(for: .card)
+                modeStore.isSurfaceUserSized = false
+            }
             modeStore.mode = .content
             enterKeyMode()
         }
@@ -2250,7 +2304,7 @@ public class PopupWindowController {
                 // A detached-surface result (e.g. the Look Up popover) suspends scroll dismissal
                 // for the rest of the session; anything else leaves it off.
                 isScrollDismissalSuspended = resolved.result.suspendsScrollDismissal
-                try await resultHandler.handle(resolved.result, in: panel?.contentView)
+                try await resultHandler.handle(resolved.result, in: panel?.contentView, targetApp: delivery?.application)
                 let toastToShow: StatusFeedback? = {
                     if let toast = resolved.toast {
                         if case .saveFile = resolved.result {
@@ -2291,6 +2345,9 @@ public class PopupWindowController {
     /// probe runs only when a paste outcome is actually on the table (the raw result is a paste, or
     /// a declared secondary is a paste); the declared secondary and per-click toasts still apply to
     /// any result.
+    internal var selectionIsCurrent: @MainActor (SelectionContext) -> Bool = { _ in true }
+    internal private(set) var lastDeliveryStatus: SelectionReadStatus?
+
     private func resolveDelivery(_ result: ActionResult, delivery: DeliveryContext?, suppressDeliveryToast: Bool = false) async -> (result: ActionResult, toast: StatusFeedback?) {
         guard let delivery else { return (result, nil) }
         let selected = ActionResultDelivery.select(
@@ -2303,13 +2360,26 @@ public class PopupWindowController {
         )
         let couldPaste = isPaste(selected)
         let isTargetActive = isTargetApplicationActive(delivery.application)
-        let canPaste: Bool
+            && (delivery.selection.map(selectionIsCurrent) ?? true)
+        var canPaste: Bool
         if !couldPaste || !isTargetActive {
             canPaste = false
         } else if !PasteAvailability.needsProbe(policy: delivery.policy) {
             canPaste = PasteAvailability.effective(policy: delivery.policy, probe: nil) ?? false
         } else {
             canPaste = await pasteProbe.canPaste(in: delivery.application, policy: delivery.policy) ?? false
+        }
+        // A target may change while the AX paste probe is suspended.
+        if couldPaste, !isTargetApplicationActive(delivery.application)
+            || !(delivery.selection.map(selectionIsCurrent) ?? true) {
+            canPaste = false
+        }
+        if couldPaste, !isTargetActive || !(delivery.selection.map(selectionIsCurrent) ?? true)
+            || !isTargetApplicationActive(delivery.application) {
+            lastDeliveryStatus = .targetChanged
+            Log.selection.debug("delivery outcome: targetChanged")
+        } else {
+            lastDeliveryStatus = nil
         }
         let resolved = ActionResultDelivery.resolve(
             raw: result,

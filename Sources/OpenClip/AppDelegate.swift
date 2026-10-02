@@ -95,6 +95,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         
         // Setup selection monitor
         let macMonitor = MacSelectionMonitor()
+        controller.selectionIsCurrent = { [weak macMonitor] context in
+            guard let generation = context.selectionGeneration else { return true }
+            return macMonitor?.selectionGeneration == generation
+        }
         // Presentation gate only: "Appear Automatically" is evaluated by the monitor on its
         // passive (mouse-release/keyboard) path, not here — the explicit hold gesture and the
         // ⌥⌘C hotkey must still summon the popup with it off. Global Pause is rechecked at

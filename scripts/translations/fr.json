@@ -701,5 +701,9 @@
   "Moderate": "Modéré",
   "Default": "Par défaut",
   "Wide": "Large",
-  "Maximum": "Maximum"
+  "Maximum": "Maximum",
+  "Selection": "Sélection",
+  "Clipboard": "Presse-papiers",
+  "Tab to switch text source": "Tab pour changer la source du texte",
+  "Press Tab to switch between selection and clipboard": "Appuyez sur Tab pour basculer entre la sélection et le presse-papiers"
 }

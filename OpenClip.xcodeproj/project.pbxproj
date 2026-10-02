@@ -343,6 +343,7 @@
 		D4A6AFDA144AEA1F534D5516 /* AICustomActionBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48665E7BF31385C3CEC3857D /* AICustomActionBuilder.swift */; };
 		D6108981B89D6782D1F1583A /* AppUpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB483298675E80C088DA1A8B /* AppUpdateManager.swift */; };
 		D6AF7C565A52C2B7EF2C8078 /* AppleIntelligenceAvailability.swift in Sources */ = {isa = PBXBuildFile; fileRef = 799B9DB85114C7531350007E /* AppleIntelligenceAvailability.swift */; };
+		D6BD95FA80C902E69D37F217 /* SelectionReadResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4D04A61268E8A1A8B1F557D /* SelectionReadResponse.swift */; };
 		D6F88E415ABB12BB4050C88E /* OnboardingWindowControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E467628FCBF3B46387A7A43 /* OnboardingWindowControllerTests.swift */; };
 		D72FCA9FD303A157A2043950 /* ActionIdentityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98F4DC2E8594188FBB4BF626 /* ActionIdentityTests.swift */; };
 		D7E40768967837E0BB3D1F89 /* CustomActionManifestWriterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9206ED1D9BA1DDBC6B15C384 /* CustomActionManifestWriterTests.swift */; };
@@ -590,6 +591,7 @@
 		4EBF2237CD3B7F39A13015BE /* PDFPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFPreviewView.swift; sourceTree = "<group>"; };
 		4FD963C9E0D372414ECC705E /* ShortcutRecorderPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutRecorderPopover.swift; sourceTree = "<group>"; };
 		503C3147E869802CD5FF0867 /* AIPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIPage.swift; sourceTree = "<group>"; };
+		50497A4F3040C1F1460E1B5D /* openselection */ = {isa = PBXFileReference; lastKnownFileType = folder; name = openselection; path = openselection; sourceTree = SOURCE_ROOT; };
 		5056C8C6C08BF8DC3FFAAC3C /* SubBarState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubBarState.swift; sourceTree = "<group>"; };
 		535B6891DB044AC163B4E2CF /* RotatingFileLogSink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RotatingFileLogSink.swift; sourceTree = "<group>"; };
 		5403DA3AA5ED80810759AB76 /* ActionIconView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionIconView.swift; sourceTree = "<group>"; };
@@ -765,6 +767,7 @@
 		C29A7771E75FA4091D2066E2 /* ConfigurationRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigurationRequest.swift; sourceTree = "<group>"; };
 		C37B15A81CCA6D36DF0183BA /* MathEvaluator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MathEvaluator.swift; sourceTree = "<group>"; };
 		C48F2C371E4126CE67142FC0 /* NewGroupPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewGroupPage.swift; sourceTree = "<group>"; };
+		C4D04A61268E8A1A8B1F557D /* SelectionReadResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionReadResponse.swift; sourceTree = "<group>"; };
 		C5D1E29A447351B335A4C2A4 /* OpenURLAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenURLAction.swift; sourceTree = "<group>"; };
 		C5D5D2263A84CD1657679210 /* ShellProcessRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellProcessRunner.swift; sourceTree = "<group>"; };
 		C5F2AB8A6E0D1E5BC1ECFA6A /* IntegrationSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationSettings.swift; sourceTree = "<group>"; };
@@ -883,6 +886,14 @@
 				2D0B6A4A79189F0D076BE588 /* LocalLLMProvider.swift */,
 			);
 			path = Providers;
+			sourceTree = "<group>";
+		};
+		047E55EBDA4F3AE88B1291A0 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				50497A4F3040C1F1460E1B5D /* openselection */,
+			);
+			name = Packages;
 			sourceTree = "<group>";
 		};
 		0A2AE4010C5A2D86AD53D563 /* Extensions */ = {
@@ -1208,6 +1219,7 @@
 				D1C60AD211354ED2FF2C562D /* Core */,
 				3BFB332B47278C5BC2AE4229 /* OpenClip */,
 				E5550E18E26D2F31A7B43491 /* OpenClipTests */,
+				047E55EBDA4F3AE88B1291A0 /* Packages */,
 				C7914DC6A469A7C9C9E3D4F9 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -1431,6 +1443,7 @@
 				17E803385A2D8E9D1D257F00 /* Constants.swift */,
 				8F741E6F7B6D8F5B61A13F0F /* SelectionContext.swift */,
 				DECAB4B5213F632283318CD6 /* SelectionMonitoring.swift */,
+				C4D04A61268E8A1A8B1F557D /* SelectionReadResponse.swift */,
 				A4569F410A617490B0538051 /* TextRetrieving.swift */,
 			);
 			path = Selection;
@@ -1686,10 +1699,10 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				08D4D3F56FD0A85127E5EBAF /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */,
-				52FC89888BBA9C48D51282B2 /* XCRemoteSwiftPackageReference "OpenSelection" */,
 				6F6B418BC685195C47AA367E /* XCRemoteSwiftPackageReference "SDWebImageSVGCoder" */,
 				0BBBF5D087479FC9C36D0D54 /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */,
 				2F5F308890722E78493B7EEE /* XCRemoteSwiftPackageReference "Sparkle" */,
+				F53D4DCB52499A0000EEC5B0 /* XCLocalSwiftPackageReference "openselection" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = C7914DC6A469A7C9C9E3D4F9 /* Products */;
@@ -1940,6 +1953,7 @@
 				EBE9FB46AD56F10020544D24 /* SelectionContext.swift in Sources */,
 				A255B2AD8EDA8F740EABEE0F /* SelectionGatePolicy.swift in Sources */,
 				C02DCB05C24F9A9EFA004B12 /* SelectionMonitoring.swift in Sources */,
+				D6BD95FA80C902E69D37F217 /* SelectionReadResponse.swift in Sources */,
 				AA905209842701F51E2A5712 /* SelectionRetrievalMode.swift in Sources */,
 				E6EB3B0A91D5B10B60A5734C /* SemanticVersion.swift in Sources */,
 				AE8C8312A2C5B67FCF938E4E /* SettingKey.swift in Sources */,
@@ -2465,6 +2479,13 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		F53D4DCB52499A0000EEC5B0 /* XCLocalSwiftPackageReference "openselection" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = openselection;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		08D4D3F56FD0A85127E5EBAF /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -2488,14 +2509,6 @@
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 2.6.4;
-			};
-		};
-		52FC89888BBA9C48D51282B2 /* XCRemoteSwiftPackageReference "OpenSelection" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/ganeshmshetty/OpenSelection.git";
-			requirement = {
-				kind = exactVersion;
-				version = 2.15.1;
 			};
 		};
 		6F6B418BC685195C47AA367E /* XCRemoteSwiftPackageReference "SDWebImageSVGCoder" */ = {
@@ -2531,12 +2544,10 @@
 		};
 		BB2C97C1C543D89191FBB976 /* OpenSelection */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 52FC89888BBA9C48D51282B2 /* XCRemoteSwiftPackageReference "OpenSelection" */;
 			productName = OpenSelection;
 		};
 		CCBD9EA1BA1F06020AF01851 /* OpenSelection */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 52FC89888BBA9C48D51282B2 /* XCRemoteSwiftPackageReference "OpenSelection" */;
 			productName = OpenSelection;
 		};
 /* End XCSwiftPackageProductDependency section */

@@ -22,6 +22,8 @@ set -e
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_DIR"
 
+"$PROJECT_DIR/scripts/prepare_openselection.sh"
+
 OC_PROJECT_DIR="$PROJECT_DIR"
 # shellcheck source=scripts/signing_config.sh
 . "$PROJECT_DIR/scripts/signing_config.sh"

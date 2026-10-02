@@ -933,6 +933,33 @@ final class MacSelectionMonitorTests: XCTestCase {
         XCTAssertNil(asyncExpired, "currentSelection must also return nil for expired selection")
     }
 
+    func testSynchronousSelectionRejectsMismatchedPID() async throws {
+        let monitor = makeMonitor()
+        let sourceApp = AppIdentity(bundleIdentifier: "com.apple.TextEdit", localizedName: "TextEdit", processIdentifier: 1234)
+        let context = SelectionContext(
+            text: "Hello",
+            sourceApp: sourceApp,
+            cursorPosition: .zero,
+            timestamp: Date(),
+            appPolicy: .default
+        )
+        monitor.latestSelection = (context: context, canPaste: true)
+
+        let samePIDApp = AppIdentity(bundleIdentifier: "com.apple.TextEdit", localizedName: "TextEdit", processIdentifier: 1234)
+        let matched = monitor.synchronousSelection(for: samePIDApp)
+        XCTAssertNotNil(matched)
+        XCTAssertEqual(matched?.context.text, "Hello")
+
+        let diffPIDApp = AppIdentity(bundleIdentifier: "com.apple.TextEdit", localizedName: "TextEdit", processIdentifier: 5678)
+        let mismatched = monitor.synchronousSelection(for: diffPIDApp)
+        XCTAssertNil(mismatched)
+
+        let asyncMatched = await monitor.currentSelection(for: samePIDApp)
+        XCTAssertNotNil(asyncMatched)
+        let asyncMismatched = await monitor.currentSelection(for: diffPIDApp)
+        XCTAssertNil(asyncMismatched)
+    }
+
     func testPlainClickClearsLatestSelection() async throws {
         let monitor = makeMonitor()
         monitor.isExcludedBundle = { _ in false }

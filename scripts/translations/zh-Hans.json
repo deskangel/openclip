@@ -701,5 +701,9 @@
   "Moderate": "适中",
   "Default": "默认",
   "Wide": "宽",
-  "Maximum": "最大"
+  "Maximum": "最大",
+  "Selection": "选中文本",
+  "Clipboard": "剪贴板",
+  "Tab to switch text source": "按 Tab 键切换文本来源",
+  "Press Tab to switch between selection and clipboard": "按 Tab 键在选中文本和剪贴板之间切换"
 }

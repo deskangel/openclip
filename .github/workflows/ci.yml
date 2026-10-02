@@ -21,8 +21,11 @@ jobs:
         with:
           xcode-version: '26.6'
 
-      - name: Install Tools (XcodeGen & xcbeautify)
-        run: brew install xcodegen xcbeautify
+      - name: Install Tools (XcodeGen, xcbeautify & ripgrep)
+        run: brew install xcodegen xcbeautify ripgrep
+
+      - name: Prepare pinned OpenSelection integration
+        run: ./scripts/prepare_openselection.sh
 
       - name: Generate Xcode Project
         run: xcodegen generate

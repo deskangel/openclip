@@ -1538,6 +1538,49 @@ final class ActionResultDeliveryTests: XCTestCase {
     }
 
     @MainActor
+    func testFieldChangeBeforeAsyncActionFinishesCopiesInsteadOfPasting() async throws {
+        let handler = RecordingHandler()
+        let controller = shownController(resultHandler: handler, pasteProbe: FixedProbe(result: true), appPolicy: .default)
+        let target = DeliveryTestApp(pid: 90001)
+        controller.previousFrontmostApp = target
+        controller.frontmostApplicationProvider = { target }
+        var fieldIsCurrent = true
+        controller.selectionIsCurrent = { _ in fieldIsCurrent }
+        controller.runAction(SlowPasteStubAction(text: "late result"),
+                             with: controllerCurrentContext(controller), isSecondaryClick: false)
+        fieldIsCurrent = false
+        assertCase(try await awaitDelivery(from: handler), .copy("late result"))
+        XCTAssertEqual(controller.lastDeliveryStatus, .targetChanged)
+    }
+
+    @MainActor
+    func testFieldChangeWhilePasteProbeSuspendsCopiesInsteadOfPasting() async throws {
+        let handler = RecordingHandler()
+        let probe = SwitchingTargetProbe()
+        let controller = shownController(resultHandler: handler, pasteProbe: probe, appPolicy: .default)
+        let target = DeliveryTestApp(pid: 90001)
+        controller.previousFrontmostApp = target
+        controller.frontmostApplicationProvider = { target }
+        controller.selectionIsCurrent = { _ in !probe.switched }
+        controller.deliverResult(.paste("late result"))
+        assertCase(try await awaitDelivery(from: handler), .copy("late result"))
+        XCTAssertEqual(controller.lastDeliveryStatus, .targetChanged)
+    }
+
+    @MainActor
+    func testAppSwitchWhilePasteProbeSuspendsDowngradesToCopy() async throws {
+        let handler = RecordingHandler()
+        let probe = SwitchingTargetProbe()
+        let controller = shownController(resultHandler: handler, pasteProbe: probe, appPolicy: .default)
+        let target = DeliveryTestApp(pid: 90001)
+        let other = DeliveryTestApp(pid: 90002)
+        controller.previousFrontmostApp = target
+        controller.frontmostApplicationProvider = { probe.switched ? other : target }
+        controller.deliverResult(.paste("safe text"))
+        assertCase(try await awaitDelivery(from: handler), .copy("safe text"))
+    }
+
+    @MainActor
     func testDeliverResultAfterHidePreservesPrecapturedInFlightDeliveryContext() async throws {
         let handler = RecordingHandler()
         let controller = shownController(resultHandler: handler,
@@ -1780,4 +1823,21 @@ private final class LockedContextBox: @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         return storage
     }
+}
+
+@MainActor
+private final class SwitchingTargetProbe: PasteAvailabilityProbing {
+    var switched = false
+    func canPaste(in app: NSRunningApplication?, policy: AppPolicyContext) async -> Bool? {
+        await Task.yield()
+        switched = true
+        return true
+    }
+}
+
+private final class DeliveryTestApp: NSRunningApplication {
+    private let pid: pid_t
+    init(pid: pid_t) { self.pid = pid; super.init() }
+    override var processIdentifier: pid_t { pid }
+    override var bundleIdentifier: String? { "com.test.delivery" }
 }

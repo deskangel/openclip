@@ -22,6 +22,8 @@ public final class HotkeyManager {
     private var lastFallbackClipboard: (changeCount: Int, text: String)?
     private weak var popupController: PopupWindowController?
     public weak var selectionMonitor: (any SelectionMonitoring)?
+    internal var retriever: SelectionRetrievalCoordinator?
+    internal var frontmostPIDProvider: @MainActor @Sendable () -> pid_t? = { NSWorkspace.shared.frontmostApplication?.processIdentifier }
     private var cancellables = Set<AnyCancellable>()
     private var registeredHotkeyIDs: Set<String> = []
     private var popupTriggerTask: Task<Void, Never>?
@@ -198,22 +200,11 @@ public final class HotkeyManager {
 
         // 1. Fast path: reuse active monitored selection if fresh (requires a known app)
         if canUseMonitoredSelection,
-           let monitored = selectionMonitor?.synchronousSelection(for: frontmostApp?.bundleIdentifier) {
+           let monitored = selectionMonitor?.synchronousSelection(for: appIdentity) {
             let text = monitored.context.text
             if TextSanitizer.isSubstantial(text),
                text.utf8.count <= Constants.maxTextLength {
-                let context = SelectionContext(
-                    text: text,
-                    sourceApp: monitored.context.sourceApp,
-                    cursorPosition: NSEvent.mouseLocation,
-                    mouseDownLocation: monitored.context.mouseDownLocation,
-                    selectionBounds: monitored.context.selectionBounds,
-                    timestamp: monitored.context.timestamp,
-                    appPolicy: monitored.context.appPolicy,
-                    isClipboardFallback: monitored.context.isClipboardFallback,
-                    html: monitored.context.html,
-                    rtf: monitored.context.rtf
-                )
+                let context = monitored.context.with(cursorPosition: NSEvent.mouseLocation)
                 return (context, monitored.canPaste)
             }
         }
@@ -239,7 +230,9 @@ public final class HotkeyManager {
                 selectionBounds: nil,
                 timestamp: Date(),
                 appPolicy: policy,
-                isClipboardFallback: isClipboardFallback
+                isClipboardFallback: isClipboardFallback,
+                html: pasteboard.string(forType: .html),
+                rtf: pasteboard.string(forType: .rtf)
             )
             return (context, nil)
         }
@@ -316,73 +309,108 @@ public final class HotkeyManager {
 
     /// Shared retrieve path for ⌥⌘C and per-action hotkeys: gate, probe paste, read selection
     /// (clipboard fallback), reject oversized input and empty input unless explicitly allowed.
+    internal private(set) var lastTriggerResponse: SelectionTriggerResponse?
+    internal var onTriggerOutcome: ((SelectionTriggerResponse) -> Void)?
+
     internal func collectTrigger(
+        frontmostApp: NSRunningApplication? = NSWorkspace.shared.frontmostApplication,
+        allowsEmptyText: Bool = false, requestID: UUID? = nil, requestedPID: pid_t? = nil
+    ) async -> (context: SelectionContext, canPaste: Bool?)? {
+        let response = await collectTriggerResponse(frontmostApp: frontmostApp,
+            allowsEmptyText: allowsEmptyText, requestID: requestID, requestedPID: requestedPID)
+        guard let context = response.context else { return nil }
+        return (context, response.canPaste)
+    }
+
+    internal func collectTriggerResponse(
         frontmostApp: NSRunningApplication? = NSWorkspace.shared.frontmostApplication,
         allowsEmptyText: Bool = false,
         requestID: UUID? = nil,
         requestedPID: pid_t? = nil
-    ) async -> (context: SelectionContext, canPaste: Bool?)? {
+    ) async -> SelectionTriggerResponse {
+        func finish(_ response: SelectionTriggerResponse) -> SelectionTriggerResponse {
+            lastTriggerResponse = response
+            onTriggerOutcome?(response)
+            if let traceID = response.traceID, [.clipboardFallback, .targetChanged, .cancelled, .tooLarge].contains(response.status) {
+                Log.selection.debug("[Trace#\(traceID, privacy: .public)] hotkey delivery outcome: \(response.status.rawValue, privacy: .public); readOutcome=\(response.retrievalStatus?.rawValue ?? "unknown", privacy: .public)")
+            }
+            return response
+        }
+        let generation = selectionMonitor?.selectionGeneration
         guard !Task.isCancelled,
               Self.triggerAllowed(frontmost: frontmostApp),
-              let frontApp = frontmostApp else { return nil }
+              let frontApp = frontmostApp else { return finish(.init(status: Task.isCancelled ? .cancelled : .policyBlocked)) }
 
+        let requiredPID = requestedPID ?? frontApp.processIdentifier
         let isTriggerAuthorized: PasteboardCopyEngine.CopyAuthorization = { [weak self] in
             guard !Task.isCancelled,
                   Self.triggerAllowed(frontmost: frontApp) else { return false }
             if let requestID, self?.popupTriggerRequestID != requestID { return false }
-            if let requestedPID, let currentPID = NSWorkspace.shared.frontmostApplication?.processIdentifier, currentPID != requestedPID {
-                return false
-            }
+            guard self?.frontmostPIDProvider() == requiredPID else { return false }
+            guard self?.selectionMonitor?.selectionGeneration == generation else { return false }
             return true
         }
 
+        var retrievalTraceID: UInt64?
+        func denied() -> SelectionTriggerResponse {
+            let status: SelectionReadStatus = Task.isCancelled || (requestID != nil && popupTriggerRequestID != requestID)
+                ? .cancelled : (!Self.triggerAllowed(frontmost: frontApp) ? .policyBlocked : .targetChanged)
+            return finish(.init(status: status, traceID: retrievalTraceID))
+        }
+
+        let appIdentity = AppIdentity(frontApp)
         // Fast path: reuse active monitored selection without blocking on AX tree walk
-        if let monitored = await selectionMonitor?.currentSelection(for: frontApp.bundleIdentifier) {
-            guard isTriggerAuthorized() else { return nil }
+        if let monitored = await selectionMonitor?.currentSelection(for: appIdentity) {
+            guard isTriggerAuthorized() else { return denied() }
             let text = monitored.context.text
             if TextSanitizer.isSubstantial(text),
                text.utf8.count <= Constants.maxTextLength {
-                let context = SelectionContext(
-                    text: text,
-                    sourceApp: monitored.context.sourceApp,
-                    cursorPosition: NSEvent.mouseLocation,
-                    mouseDownLocation: monitored.context.mouseDownLocation,
-                    selectionBounds: monitored.context.selectionBounds,
-                    timestamp: monitored.context.timestamp,
-                    appPolicy: monitored.context.appPolicy,
-                    isClipboardFallback: monitored.context.isClipboardFallback,
-                    html: monitored.context.html,
-                    rtf: monitored.context.rtf
-                )
-                return (context, monitored.canPaste)
+                let context = monitored.context.with(cursorPosition: NSEvent.mouseLocation)
+                return finish(.init(context: context, canPaste: monitored.canPaste,
+                    status: context.isClipboardFallback ? .clipboardFallback : .selection))
             }
         }
 
-        guard isTriggerAuthorized() else { return nil }
+        guard isTriggerAuthorized() else { return denied() }
         let policy = RuleEngine.shared.resolvePolicies(for: frontApp.bundleIdentifier ?? "")
-        let appIdentity = AppIdentity(frontApp)
         let probeTask = popupController?.preparePasteProbe(for: frontApp, policy: policy)
 
         var retrievedText = ""
         var selectionBounds: CGRect? = nil
+        var selectionHTML: String?
+        var selectionRTF: String?
+        var selectionFlavors: [RichPasteboardFlavor] = []
 
-        let copyCapture: SelectionRetrievalCoordinator.CopyCapture = { request in
-            await PasteboardCopyEngine(isCopyAuthorized: isTriggerAuthorized).capture(trigger: request.trigger)
+        let copyCapture: SelectionRetrievalCoordinator.DetailedCopyCapture = { request in
+            await PasteboardCopyEngine(authorizationFailure: {
+                if Task.isCancelled { return .cancelled }
+                return isTriggerAuthorized() ? nil : .targetChanged
+            }, isCopyAuthorized: isTriggerAuthorized).captureResponse(trigger: request.trigger)
         }
 
-        if let result = await SelectionRetrievalCoordinator(copyCapture: copyCapture).retrieve(
+        let coordinator = retriever ?? SelectionRetrievalCoordinator(detailedCopyCapture: copyCapture)
+        let read = await coordinator.retrieveResponse(
             for: appIdentity,
             policy: policy,
             cursor: CursorClassifier.current.asCore,
             allowCopyFallback: true,
-            requireCopyEvidence: false
-        ) {
+            requireCopyEvidence: false,
+            trigger: .keyboardShortcut
+        )
+        retrievalTraceID = read.traceID
+        if let result = read.result {
             retrievedText = result.text
             selectionBounds = result.bounds
+            selectionHTML = result.html
+            selectionRTF = result.rtf
+            selectionFlavors = result.flavors
         }
 
-        guard isTriggerAuthorized() else { return nil }
+        guard isTriggerAuthorized() else { return denied() }
 
+        if read.status == .cancelled || read.status == .targetChanged || read.status == .policyBlocked || read.status == .busy {
+            return finish(.init(status: read.status))
+        }
         var isClipboardFallback = false
         if retrievedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             let pasteboard = NSPasteboard.general
@@ -392,15 +420,23 @@ public final class HotkeyManager {
                 retrievedText = clipboard
                 isClipboardFallback = true
                 lastFallbackClipboard = (currentChangeCount, clipboard)
+                selectionHTML = pasteboard.string(forType: .html)
+                selectionRTF = pasteboard.string(forType: .rtf)
+                selectionFlavors = []
             }
         }
 
-        guard !Task.isCancelled,
-              retrievedText.utf8.count <= Constants.maxTextLength else { return nil }
+        if Task.isCancelled { return denied() }
+        guard retrievedText.utf8.count <= Constants.maxTextLength else {
+            return finish(.init(status: .tooLarge, retrievalStatus: read.status, traceID: read.traceID))
+        }
         if !TextSanitizer.isSubstantial(retrievedText) {
-            guard allowsEmptyText else { return nil }
+            guard allowsEmptyText else { return finish(.init(status: read.status, retrievalStatus: read.status, traceID: read.traceID)) }
             retrievedText = ""
             isClipboardFallback = false
+            selectionHTML = nil
+            selectionRTF = nil
+            selectionFlavors = []
         }
 
         let context = SelectionContext(
@@ -410,10 +446,16 @@ public final class HotkeyManager {
             selectionBounds: selectionBounds,
             timestamp: Date(),
             appPolicy: policy,
-            isClipboardFallback: isClipboardFallback
+            isClipboardFallback: isClipboardFallback,
+            html: selectionHTML,
+            rtf: selectionRTF,
+            flavors: selectionFlavors,
+            selectionGeneration: generation
         )
         let canPaste = await probeTask?.value
-        guard isTriggerAuthorized() else { return nil }
-        return (context, canPaste)
+        guard isTriggerAuthorized() else { return denied() }
+        return finish(.init(context: context, canPaste: canPaste,
+            status: isClipboardFallback ? .clipboardFallback : (retrievedText.isEmpty ? .noSelection : .selection),
+            retrievalStatus: read.status, traceID: read.traceID))
     }
 }

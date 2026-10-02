@@ -1,0 +1,2263 @@
+diff --git a/Sources/OpenSelection/AXElementInspector.swift b/Sources/OpenSelection/AXElementInspector.swift
+index f2d6c00..61d4209 100644
+--- a/Sources/OpenSelection/AXElementInspector.swift
++++ b/Sources/OpenSelection/AXElementInspector.swift
+@@ -92,7 +92,7 @@ public struct AXElementInspector {
+     /// element. Reading `kAXFocusedUIElementAttribute` directly off the system-wide element
+     /// is the classic source of stale or missing selection reads.
+     public static func inspect(ancestorDepth: Int = ancestorWalkDepth, trace: SelectionTrace? = nil) -> Target {
+-        trace?.log(.debug, .ax, "ax inspect started")
++        trace?.log(.trace, .ax, "ax inspect started")
+         let systemWide = AXUIElementCreateSystemWide()
+ 
+         // 1. Focused application — from the system-wide element.
+diff --git a/Sources/OpenSelection/AutomaticCopyCapture.swift b/Sources/OpenSelection/AutomaticCopyCapture.swift
+index 03945a3..601c631 100644
+--- a/Sources/OpenSelection/AutomaticCopyCapture.swift
++++ b/Sources/OpenSelection/AutomaticCopyCapture.swift
+@@ -1,5 +1,6 @@
+ import AppKit
+ import ApplicationServices
++import os
+ 
+ public enum CopyMenuState: Sendable, Equatable {
+     case enabled, disabled
+@@ -9,16 +10,6 @@ public enum CopyMenuState: Sendable, Equatable {
+ 
+ private struct AXBox: @unchecked Sendable { let element: AXUIElement }
+ 
+-private final class OneShot<T: Sendable>: @unchecked Sendable {
+-    private let lock = NSLock()
+-    private var continuation: CheckedContinuation<T, Never>?
+-    init(_ c: CheckedContinuation<T, Never>) { continuation = c }
+-    func resume(_ value: T) {
+-        lock.lock(); let c = continuation; continuation = nil; lock.unlock()
+-        c?.resume(returning: value)
+-    }
+-}
+-
+ /// Per-PID probe: coalesces concurrent callers, caches the Copy element, and never conflates
+ /// "couldn't tell" with "disabled".
+ @MainActor
+@@ -27,7 +18,8 @@ final class CopyMenuProbe {
+     private var cached: [pid_t: AXBox] = [:]
+     private var inFlight: [pid_t: Task<CopyMenuState, Never>] = [:]
+     private let queue = DispatchQueue(label: "com.openselection.copy-menu-probe",
+-                                      qos: .userInitiated)
++                                      qos: .userInitiated,
++                                      attributes: .concurrent)
+     nonisolated(unsafe) private var terminationObserver: (any NSObjectProtocol)?
+ 
+     init() {
+@@ -107,30 +99,55 @@ final class CopyMenuProbe {
+         }
+     }
+ 
+-    private func run<T: Sendable>(hardLimit: TimeInterval, fallback: T,
+-                                  _ work: @escaping @Sendable () -> T) async -> T {
+-        await withCheckedContinuation { c in
+-            let gate = OneShot(c)
+-            queue.async { gate.resume(work()) }
+-            queue.asyncAfter(deadline: .now() + hardLimit) { gate.resume(fallback) }
++    private actor ConcurrencyGate {
++        private var inFlight = 0
++        func tryAcquire(limit: Int) -> Bool {
++            guard inFlight < limit else { return false }
++            inFlight += 1
++            return true
++        }
++        func release() { inFlight -= 1 }
++    }
++    private let gate = ConcurrencyGate()
++    var maxConcurrent: Int = 4
++
++    func run<T: Sendable>(hardLimit: TimeInterval, fallback: T,
++                          _ work: @escaping @Sendable () -> T) async -> T {
++        guard await gate.tryAcquire(limit: maxConcurrent) else {
++            return fallback
++        }
++        return await withCheckedContinuation { c in
++            let resume = OnceResume<T>()
++            let watchdog = TaskBox()
++            watchdog.set(Task {
++                try? await Task.sleep(nanoseconds: UInt64(hardLimit * 1_000_000_000))
++                resume.resume(c, with: fallback)
++            })
++            queue.async {
++                let result = work()
++                Task {
++                    await self.gate.release()
++                    if resume.resume(c, with: result) { watchdog.cancel() }
++                }
++            }
+         }
+     }
+ }
+ 
+ @MainActor
+ public enum AutomaticCopyCapture {
+-    public static func capture(
+-        configuration: SelectionConfiguration = .default,
+-        request: CopyRequest
+-    ) async -> SelectionResult? {
+-        await capture(
+-            configuration: configuration,
+-            request: request,
+-            pasteboard: .general,
++    public static func capture(configuration: SelectionConfiguration = .default,
++                               request: CopyRequest) async -> SelectionResult? {
++        await captureResponse(configuration: configuration, request: request).result
++    }
++
++    public static func captureResponse(configuration: SelectionConfiguration = .default,
++                                       request: CopyRequest) async -> SelectionReadResponse {
++        await captureResponse(
++            configuration: configuration, request: request, pasteboard: .general,
+             frontmostPID: { NSWorkspace.shared.frontmostApplication?.processIdentifier },
+             menuState: { await CopyMenuProbe.shared.settledState(for: $0, timeout: min(0.15, configuration.axReadTimeout)) },
+-            overlayPresent: { CopyTriggerGate.isForeignOverlayPresent(at: NSEvent.mouseLocation) }
+-        )
++            overlayPresent: { CopyTriggerGate.isForeignOverlayPresent(at: NSEvent.mouseLocation) })
+     }
+ 
+     /// Convenience overload if called with just a trigger (e.g. legacy/explicit callers)
+@@ -156,28 +173,41 @@ public enum AutomaticCopyCapture {
+     }
+ 
+     static func capture(
++        configuration: SelectionConfiguration = .default, request: CopyRequest,
++        pasteboard: NSPasteboard, frontmostPID: @escaping @MainActor () -> pid_t?,
++        menuState: @MainActor (pid_t) async -> CopyMenuState,
++        overlayPresent: @escaping @MainActor () -> Bool
++    ) async -> SelectionResult? {
++        await captureResponse(configuration: configuration, request: request, pasteboard: pasteboard,
++            frontmostPID: frontmostPID, menuState: menuState, overlayPresent: overlayPresent).result
++    }
++
++    static func captureResponse(
+         configuration: SelectionConfiguration = .default,
+         request: CopyRequest,
+         pasteboard: NSPasteboard,
+         frontmostPID: @escaping @MainActor () -> pid_t?,
+         menuState: @MainActor (pid_t) async -> CopyMenuState,
+         overlayPresent: @escaping @MainActor () -> Bool
+-    ) async -> SelectionResult? {
+-        guard !Task.isCancelled, let pid = frontmostPID() else { return nil }
++    ) async -> SelectionReadResponse {
++        if Task.isCancelled { return SelectionReadResponse(status: .cancelled) }
++        guard let pid = frontmostPID() else { return SelectionReadResponse(status: .targetChanged) }
+ 
+         if request.evidence.strength == .weak {
++            let phaseStart = SelectionTrace.current?.elapsedMicros ?? 0
+             let state = await menuState(pid)
+-            DiagnosticsHub.shared.log(.debug, .pasteboard, "automatic copy evaluating menu", fields: [
++            if let trace = SelectionTrace.current { trace.addMetric("copyMenuMicros", trace.elapsedMicros - phaseStart) }
++            DiagnosticsHub.shared.log(.trace, .pasteboard, "automatic copy evaluating menu", fields: [
+                 "pid": .int(Int64(pid)),
+                 "menuState": .token("\(state)"),
+                 "evidence": .token(request.evidence.reason)
+             ])
+             guard state != .disabled else {
+-                DiagnosticsHub.shared.log(.debug, .pasteboard, "automatic copy skipped, copy disabled under weak evidence", fields: [
++                DiagnosticsHub.shared.log(.trace, .pasteboard, "automatic copy skipped, copy disabled under weak evidence", fields: [
+                     "pid": .int(Int64(pid)),
+                     "menuState": .token("\(state)")
+                 ])
+-                return nil
++                return SelectionReadResponse(status: .copyBlocked)
+             }
+             if case .unknown(let reason) = state {
+                 // "Couldn't tell" is not "disabled" (the CopyMenuProbe contract itself never
+@@ -187,23 +217,28 @@ public enum AutomaticCopyCapture {
+                 // retrieval failure. The pasteboard engine snapshots and restores around the
+                 // trigger, so proceeding on an unknown verdict cannot clobber the clipboard —
+                 // only a positive `.disabled` refuses.
+-                DiagnosticsHub.shared.log(.debug, .pasteboard, "copy menu state unknown, proceeding under weak evidence", fields: [
++                DiagnosticsHub.shared.log(.trace, .pasteboard, "copy menu state unknown, proceeding under weak evidence", fields: [
+                     "pid": .int(Int64(pid)),
+                     "reason": .token(reason.rawValue)
+                 ])
+             }
+         } else {
+-            DiagnosticsHub.shared.log(.debug, .pasteboard, "automatic copy proceeding with strong evidence", fields: [
++            DiagnosticsHub.shared.log(.trace, .pasteboard, "automatic copy proceeding with strong evidence", fields: [
+                 "pid": .int(Int64(pid)),
+                 "evidence": .token(request.evidence.reason)
+             ])
+         }
+-        guard !Task.isCancelled, frontmostPID() == pid else { return nil }
+-
+-        let engine = PasteboardCopyEngine(configuration: configuration, isCopyAuthorized: {
++        if Task.isCancelled { return SelectionReadResponse(status: .cancelled) }
++        guard frontmostPID() == pid else { return SelectionReadResponse(status: .targetChanged) }
++
++        let engine = PasteboardCopyEngine(configuration: configuration, authorizationFailure: {
++            if Task.isCancelled { return .cancelled }
++            if frontmostPID() != pid { return .targetChanged }
++            return overlayPresent() ? .copyBlocked : nil
++        }, isCopyAuthorized: {
+             !Task.isCancelled && frontmostPID() == pid && !overlayPresent()
+         })
+-        return await engine.capture(pasteboard: pasteboard) {
++        return await engine.captureResponse(pasteboard: pasteboard) {
+             guard !Task.isCancelled, frontmostPID() == pid else { return }
+             request.trigger()
+         }
+diff --git a/Sources/OpenSelection/CursorClassifier.swift b/Sources/OpenSelection/CursorClassifier.swift
+index e0cb573..94b8a50 100644
+--- a/Sources/OpenSelection/CursorClassifier.swift
++++ b/Sources/OpenSelection/CursorClassifier.swift
+@@ -36,11 +36,14 @@ public struct CursorClassifier {
+               cgImage.bitsPerPixel == 32,
+               cgImage.bitsPerComponent == 8,
+               let data = cgImage.dataProvider?.data,
++              CFDataGetLength(data) >= cgImage.bytesPerRow * cgImage.height,
+               let pixels = CFDataGetBytePtr(data),
+               let alphaOffset = alphaByteOffset(cgImage) else {
+             return .unknown
+         }
+ 
++        // Retain the backing bytes through all pixel reads (also present in 2.15.1).
++        defer { withExtendedLifetime(data) {} }
+         let width = cgImage.width
+         let height = cgImage.height
+         let bytesPerRow = cgImage.bytesPerRow
+diff --git a/Sources/OpenSelection/Diagnostics/CascadeReport.swift b/Sources/OpenSelection/Diagnostics/CascadeReport.swift
+index fd25ab3..c30480d 100644
+--- a/Sources/OpenSelection/Diagnostics/CascadeReport.swift
++++ b/Sources/OpenSelection/Diagnostics/CascadeReport.swift
+@@ -148,6 +148,9 @@ public struct CascadeReport: Sendable, Codable, Equatable {
+     public let outcome: FinalOutcome
+     public let attempts: [StrategyAttempt]
+     public let dropped: Int
++    public let readStatus: SelectionReadStatus?
++    public let metrics: [String: UInt64]?
++    public let clipboardRestored: Bool?
+ 
+     public init(
+         schemaVersion: Int = CascadeReport.currentSchemaVersion,
+@@ -157,7 +160,10 @@ public struct CascadeReport: Sendable, Codable, Equatable {
+         totalMicros: UInt32,
+         outcome: FinalOutcome,
+         attempts: [StrategyAttempt] = [],
+-        dropped: Int = 0
++        dropped: Int = 0,
++        readStatus: SelectionReadStatus? = nil,
++        metrics: [String: UInt64]? = nil,
++        clipboardRestored: Bool? = nil
+     ) {
+         self.schemaVersion = schemaVersion
+         self.traceID = traceID
+@@ -167,5 +173,8 @@ public struct CascadeReport: Sendable, Codable, Equatable {
+         self.outcome = outcome
+         self.attempts = attempts
+         self.dropped = dropped
++        self.readStatus = readStatus
++        self.metrics = metrics
++        self.clipboardRestored = clipboardRestored
+     }
+ }
+diff --git a/Sources/OpenSelection/Diagnostics/DiagnosticsHub.swift b/Sources/OpenSelection/Diagnostics/DiagnosticsHub.swift
+index 958ef0b..749e627 100644
+--- a/Sources/OpenSelection/Diagnostics/DiagnosticsHub.swift
++++ b/Sources/OpenSelection/Diagnostics/DiagnosticsHub.swift
+@@ -137,6 +137,10 @@ public final class DiagnosticsHub: Sendable {
+         fields: [String: FieldValue] = [:]
+     ) {
+         guard isEnabled(level) else { return }
++        if let trace = SelectionTrace.current {
++            trace.log(level, category, message, fields: fields)
++            return
++        }
+         let event = DiagnosticEvent(
+             traceID: TraceID(rawValue: 0),
+             level: level,
+diff --git a/Sources/OpenSelection/Diagnostics/SelectionTrace.swift b/Sources/OpenSelection/Diagnostics/SelectionTrace.swift
+index e6be262..6f03876 100644
+--- a/Sources/OpenSelection/Diagnostics/SelectionTrace.swift
++++ b/Sources/OpenSelection/Diagnostics/SelectionTrace.swift
+@@ -41,6 +41,8 @@ public struct TriggerSource: Sendable, Codable, Equatable, ExpressibleByStringLi
+ 
+ /// A request-scoped trace tracking timing and emitting correlated events.
+ public final class SelectionTrace: Sendable {
++    @TaskLocal public static var current: SelectionTrace?
++
+     private static let idCounter = OSAllocatedUnfairLock<UInt64>(initialState: 1)
+ 
+     public let id: TraceID
+@@ -100,6 +102,55 @@ public final class SelectionTrace: Sendable {
+         recordedTarget.withLock { $0 = target }
+     }
+ 
++    private let readStatus = OSAllocatedUnfairLock<SelectionReadStatus>(initialState: .noSelection)
++
++    public var selectionReadStatus: SelectionReadStatus { readStatus.withLock { $0 } }
++    public func recordReadStatus(_ status: SelectionReadStatus) { readStatus.withLock { $0 = status } }
++
++    private let metrics = OSAllocatedUnfairLock<[String: UInt64]>(initialState: [:])
++    private let restored = OSAllocatedUnfairLock<Bool?>(initialState: nil)
++
++    public func addMetric(_ key: String, _ value: UInt64 = 1) {
++        metrics.withLock { $0[key, default: 0] += value }
++    }
++
++    public func recordClipboardRestored(_ value: Bool) { restored.withLock { $0 = value } }
++
++    public func complete(status: SelectionReadStatus, configured: SelectionStrategy, winner: SelectionStrategy?, bundleID: String? = nil) {
++        var fields: [String: FieldValue] = [
++            "bundleID": .token(bundleID ?? "unknown"),
++            "outcome": .token(status.rawValue), "trigger": .token(trigger.raw),
++            "configuredStrategy": .token(configured.rawValue),
++            "winningStrategy": .token(winner?.rawValue ?? "none"),
++            "elapsedMicros": .micros(UInt32(clamping: elapsedMicros))
++        ]
++        for (key, value) in metrics.withLock({ $0 }) {
++            fields[key] = .int(Int64(clamping: value))
++        }
++        if let value = restored.withLock({ $0 }) { fields["clipboardRestored"] = .bool(value) }
++        if let target = recordedTarget.withLock({ $0 }) {
++            fields["bundleID"] = .token(target.bundleID ?? "unknown")
++        }
++        let attempts = recordedAttempts.withLock { $0 }
++        fields["attempts"] = .int(Int64(attempts.count))
++        if let first = attempts.first, attempts.count > 1 {
++            let reason: String
++            switch first.outcome {
++            case .empty(let value): reason = String(describing: value)
++            case .timedOut: reason = "timedOut"
++            case .failed: reason = "failed"
++            case .skipped: reason = "skipped"
++            case .cancelled: reason = "cancelled"
++            case .succeeded: reason = "richEnrichment"
++            }
++            fields["fallbackReason"] = .token(reason)
++        }
++        let level: LogLevel = status == .selection ? .info
++            : (status == .timedOut || status == .failed || status == .targetChanged ? .warning
++                : (status == .cancelled ? .trace : .debug))
++        log(level, .cascade, "selection completed", fields: fields)
++    }
++
+     public func buildReport(outcome: FinalOutcome) -> CascadeReport {
+         let attempts = recordedAttempts.withLock { $0 }
+         let target = recordedTarget.withLock { $0 }
+@@ -111,7 +162,10 @@ public final class SelectionTrace: Sendable {
+             totalMicros: total,
+             outcome: outcome,
+             attempts: attempts,
+-            dropped: 0
++            dropped: 0,
++            readStatus: selectionReadStatus,
++            metrics: metrics.withLock { $0 },
++            clipboardRestored: restored.withLock { $0 }
+         )
+     }
+ }
+diff --git a/Sources/OpenSelection/OnceResume.swift b/Sources/OpenSelection/OnceResume.swift
+index 8bd0371..6bf36a7 100644
+--- a/Sources/OpenSelection/OnceResume.swift
++++ b/Sources/OpenSelection/OnceResume.swift
+@@ -11,13 +11,15 @@ final class OnceResume<T: Sendable>: @unchecked Sendable {
+     private let lock = OSAllocatedUnfairLock(initialState: false)
+ 
+     @discardableResult
+-    func resume(_ continuation: CheckedContinuation<T, Never>, with value: T) -> Bool {
++    func resume(_ continuation: CheckedContinuation<T, Never>, with value: T,
++                beforeResume: @Sendable () -> Void = {}) -> Bool {
+         let shouldResume = lock.withLock { resumed -> Bool in
+             guard !resumed else { return false }
+             resumed = true
+             return true
+         }
+         if shouldResume {
++            beforeResume()
+             continuation.resume(returning: value)
+         }
+         return shouldResume
+diff --git a/Sources/OpenSelection/OpenSelection.swift b/Sources/OpenSelection/OpenSelection.swift
+index 8ef9308..210db73 100644
+--- a/Sources/OpenSelection/OpenSelection.swift
++++ b/Sources/OpenSelection/OpenSelection.swift
+@@ -47,6 +47,9 @@ public enum OpenSelection: Sendable {
+     public typealias OpenSelectionMonitor = OpenSelectionMonitorType
+     public typealias PasteProbe = OpenSelectionPasteAvailabilityProbe
+     public typealias PasteAvailabilityProbe = OpenSelectionPasteAvailabilityProbe
++    public typealias ClipboardCoordinator = PasteboardCoordinator
++    public typealias ClipboardSession = PasteboardSession
++    public typealias ClipboardPriority = PasteboardOperationPriority
+     public typealias LogLevel = DiagnosticsLogLevel
+     public typealias LogCategory = DiagnosticsLogCategory
+     public typealias FieldValue = DiagnosticsFieldValue
+@@ -195,11 +198,17 @@ public enum OpenSelection: Sendable {
+         matchStyle: Bool = false,
+         restorePasteboard: Bool = true,
+         pasteboard: NSPasteboard = .general,
+-        configuration: SelectionConfiguration? = nil
++        configuration: SelectionConfiguration? = nil,
++        keyPoster: SelectionReplacer.KeyPoster? = nil,
++        appActivator: SelectionReplacer.AppActivator? = nil,
++        targetActiveChecker: SelectionReplacer.TargetActiveChecker? = nil
+     ) async throws {
+         let replacer = SelectionReplacer(
+             configuration: configuration ?? Self.configuration,
+-            pasteboard: pasteboard
++            pasteboard: pasteboard,
++            keyPoster: keyPoster ?? { KeyboardEventPoster.postKey(keyCode: $0, flags: $1) },
++            appActivator: appActivator ?? { $0.activate() },
++            targetActiveChecker: targetActiveChecker ?? SelectionReplacer.defaultTargetActiveChecker
+         )
+         try await replacer.replace(
+             with: text,
+diff --git a/Sources/OpenSelection/PasteAvailabilityProbe.swift b/Sources/OpenSelection/PasteAvailabilityProbe.swift
+index ed58cb5..4ed9aea 100644
+--- a/Sources/OpenSelection/PasteAvailabilityProbe.swift
++++ b/Sources/OpenSelection/PasteAvailabilityProbe.swift
+@@ -6,6 +6,7 @@
+ import AppKit
+ import ApplicationServices
+ import Foundation
++import os
+ 
+ public struct PasteAvailabilityProbe: Sendable {
+     public typealias Lookup = @Sendable (_ pid: pid_t, _ deadline: Date?) -> Bool?
+@@ -61,16 +62,12 @@ public struct PasteAvailabilityProbe: Sendable {
+ 
+     private actor ProbeConcurrencyGate {
+         private var inFlight = 0
+-
+         func tryAcquire(limit: Int) -> Bool {
+             guard inFlight < limit else { return false }
+             inFlight += 1
+             return true
+         }
+-
+-        func release() {
+-            inFlight -= 1
+-        }
++        func release() { inFlight -= 1 }
+     }
+     private static let probeGate = ProbeConcurrencyGate()
+ 
+@@ -89,7 +86,6 @@ public struct PasteAvailabilityProbe: Sendable {
+             watchdog.set(Task {
+                 try? await Task.sleep(nanoseconds: UInt64(timeoutSeconds * 1_000_000_000))
+                 if resume.resume(continuation, with: nil) {
+-                    Task.detached { await Self.probeGate.release() }
+                     DiagnosticsHub.shared.log(.warning, .pasteboard, "paste probe lookup deadline exceeded", fields: [
+                         "pid": .int(Int64(pid)),
+                         "timeoutMicros": .micros(UInt32(timeoutSeconds * 1_000_000))
+@@ -99,9 +95,9 @@ public struct PasteAvailabilityProbe: Sendable {
+ 
+             Self.axProbeQueue.async {
+                 let enabled = lookup(pid, deadline)
+-                if resume.resume(continuation, with: enabled) {
+-                    watchdog.cancel()
+-                    Task.detached { await Self.probeGate.release() }
++                Task {
++                    await Self.probeGate.release()
++                    if resume.resume(continuation, with: enabled) { watchdog.cancel() }
+                 }
+             }
+         }
+diff --git a/Sources/OpenSelection/PasteboardCopyEngine.swift b/Sources/OpenSelection/PasteboardCopyEngine.swift
+index d571970..c2f4fb1 100644
+--- a/Sources/OpenSelection/PasteboardCopyEngine.swift
++++ b/Sources/OpenSelection/PasteboardCopyEngine.swift
+@@ -15,34 +15,54 @@ public struct PasteboardCopyEngine {
+     /// window. Defaults to the system overlay gate (see `CopyTriggerGate`).
+     public typealias CopyAuthorization = @MainActor () -> Bool
+ 
++    /// Test seam for physical copy observation; production also watches untagged key events.
++    internal var userCopyObserved: @MainActor () -> Bool = { false }
++
+     private let configuration: SelectionConfiguration
+     private let isCopyAuthorized: CopyAuthorization
++    private let authorizationFailure: (@MainActor @Sendable () -> SelectionReadStatus?)?
+ 
+     public init(
+         configuration: SelectionConfiguration = .default,
++        authorizationFailure: (@MainActor @Sendable () -> SelectionReadStatus?)? = nil,
+         isCopyAuthorized: @escaping CopyAuthorization = {
+             !CopyTriggerGate.isForeignOverlayPresent(at: NSEvent.mouseLocation)
+         }
+     ) {
++        self.authorizationFailure = authorizationFailure
+         self.configuration = configuration
+         self.isCopyAuthorized = isCopyAuthorized
+     }
+ 
+     /// Runs `trigger` between archiving the pasteboard and polling for a change.
+-    public func capture(
++    @MainActor
++    /// Compatibility projection for callers that only need text.
++    public func capture(pasteboard: NSPasteboard = .general, timeout: TimeInterval? = nil,
++                        restoreDelay: TimeInterval? = nil, trigger: CopyTrigger) async -> SelectionResult? {
++        await captureResponse(pasteboard: pasteboard, timeout: timeout, restoreDelay: restoreDelay, trigger: trigger).result
++    }
++
++    public func captureResponse(
+         pasteboard: NSPasteboard = .general,
+         timeout: TimeInterval? = nil,
+         restoreDelay: TimeInterval? = nil,
+         trigger: CopyTrigger
+-    ) async -> SelectionResult? {
++    ) async -> SelectionReadResponse {
++        let trace = SelectionTrace.current
++        let phaseStart = trace?.elapsedMicros ?? 0
++        defer { if let trace { trace.addMetric("copyCaptureMicros", trace.elapsedMicros - phaseStart) } }
+         // Refuse before posting anything: a key window owned by another app means the synthetic ⌘C
+         // would fire that overlay's shortcut and tear it down instead of reaching the target app.
++        if Task.isCancelled { return SelectionReadResponse(status: .cancelled) }
+         guard isCopyAuthorized() else {
+-            DiagnosticsHub.shared.log(.debug, .pasteboard, "copy engine suppressed, foreign overlay owns key window")
+-            return nil
++            DiagnosticsHub.shared.log(.trace, .pasteboard, "copy engine suppressed, foreign overlay owns key window")
++            return SelectionReadResponse(status: authorizationFailure?() ?? .copyBlocked)
+         }
+ 
+-        let snapshot = PasteboardSnapshot.capture(pasteboard)
++        guard let session = PasteboardCoordinator.shared.beginSession(priority: .backgroundCapture, pasteboard: pasteboard) else {
++            DiagnosticsHub.shared.log(.trace, .pasteboard, "copy engine suppressed, active higher-priority pasteboard session")
++            return SelectionReadResponse(status: .busy)
++        }
+         let initialChangeCount = pasteboard.changeCount
+ 
+         // Watch for the user's own ⌘C/⌘X while the synthetic copy is in flight. Our posted events
+@@ -59,6 +79,13 @@ public struct PasteboardCopyEngine {
+         }
+         defer { if let keyMonitor { NSEvent.removeMonitor(keyMonitor) } }
+ 
++        guard !session.isCancelled else { return SelectionReadResponse(status: .cancelled) }
++
++        defer {
++            PasteboardCoordinator.shared.markCaptureFinished(for: session)
++        }
++        trace?.recordClipboardRestored(false)
++        PasteboardCoordinator.shared.markCopyPosted(for: session)
+         trigger()
+ 
+         let resolvedTimeout = timeout ?? Self.pollingTimeout(for: NSWorkspace.shared.frontmostApplication?.bundleIdentifier, configuration: configuration)
+@@ -71,25 +98,28 @@ public struct PasteboardCopyEngine {
+         // holds OUR synthetic copy, so the snapshot must be restored or their clipboard is lost).
+         var postCopyCount: Int?
+ 
+-        while Date() < deadline && !Task.isCancelled {
++        // Drain an already-posted copy even if its caller cancels; queued writes must
++        // not overtake the target app's bounded copy-response window.
++        while Date() < deadline && !session.isCancelled {
+             // The user pressed ⌘C/⌘X while our copy was in flight. Bail either way, but only restore
+             // when the pasteboard provably still holds our own copy: an untagged keydown does not
+             // guarantee a clipboard write (no selection, or an app that ignores the shortcut), and
+             // skipping the restore in that case would replace the user's clipboard with our
+             // synthetic selection.
+-            if userCopied.withLock({ $0 }) {
+-                Self.restoreAfterUserCopyIfNeeded(
+-                    changeCount: pasteboard.changeCount,
+-                    postCopyCount: postCopyCount,
+-                    snapshot: snapshot,
+-                    pasteboard: pasteboard
+-                )
+-                return nil
++            if (userCopied.withLock({ $0 }) || userCopyObserved()) {
++                if Self.shouldRestoreAfterUserCopy(changeCount: pasteboard.changeCount, postCopyCount: postCopyCount) {
++                    session.restoreImmediately()
++                    trace?.recordClipboardRestored(session.didRestore)
++                } else {
++                    session.commitPermanent()
++                }
++                return SelectionReadResponse(status: .copyBlocked)
+             }
+ 
+             if pasteboard.changeCount != initialChangeCount {
+                 if let candidate = pasteboard.string(forType: .string),
+                    Self.hasSelection(candidate) {
++                    PasteboardCoordinator.shared.markDirty(for: session)
+                     // Extract raw pasteboard data synchronously and restore the original items IMMEDIATELY.
+                     // This shrinks the clipboard exposure window down to sub-millisecond microseconds,
+                     // preventing third-party clipboard managers (Maccy, Paste, etc.) from intercepting
+@@ -114,11 +144,16 @@ public struct PasteboardCopyEngine {
+                     // and bailing out would leave it there in place of the user's clipboard. A user copy
+                     // that really landed advanced the changeCount and takes the bail-out instead.
+                     guard pasteboard.changeCount == observedCopyCount else {
+-                        DiagnosticsHub.shared.log(.debug, .pasteboard, "copy engine external copy detected, leaving clipboard untouched")
+-                        return nil
++                        DiagnosticsHub.shared.log(.trace, .pasteboard, "copy engine external copy detected, leaving clipboard untouched")
++                        session.commitPermanent()
++                        return SelectionReadResponse(status: .copyBlocked)
+                     }
+ 
+-                    snapshot.restore(to: pasteboard, transientMarkers: true)
++                    PasteboardCoordinator.shared.recordOwnedWrite(changeCount: observedCopyCount, for: session)
++                    session.restoreImmediately(expectedChangeCount: observedCopyCount)
++                    trace?.recordClipboardRestored(session.didRestore)
++                    if Task.isCancelled { return SelectionReadResponse(status: .cancelled) }
++                    guard isCopyAuthorized() else { return SelectionReadResponse(status: authorizationFailure?() ?? .copyBlocked) }
+ 
+                     // Post-process HTML/RTF in memory now that the pasteboard is safely restored
+                     let html = rawHTML ?? rawRTFData.flatMap(Self.htmlFromRTFData)
+@@ -138,21 +173,31 @@ public struct PasteboardCopyEngine {
+                     break
+                 }
+             }
+-            try? await Task.sleep(nanoseconds: UInt64(pollInterval * 1_000_000_000))
++            let poll = Task { try? await Task.sleep(nanoseconds: UInt64(pollInterval * 1_000_000_000)) }
++            _ = await poll.value
+         }
+ 
+         guard let result else {
+             let changeCount = pasteboard.changeCount
+-            let userCopyLanded = userCopied.withLock({ $0 })
++            let userCopyLanded = (userCopied.withLock({ $0 }) || userCopyObserved())
+                 && !Self.shouldRestoreAfterUserCopy(changeCount: changeCount, postCopyCount: postCopyCount)
+-            if changeCount != initialChangeCount, !userCopyLanded {
+-                DiagnosticsHub.shared.log(.debug, .pasteboard, "copy engine found no text within deadline, restoring snapshot")
+-                snapshot.restore(to: pasteboard, transientMarkers: true)
++            if !session.isCancelled {
++                if changeCount != initialChangeCount, !userCopyLanded {
++                    DiagnosticsHub.shared.log(.trace, .pasteboard, "copy engine found no text within deadline, restoring snapshot")
++                    PasteboardCoordinator.shared.recordOwnedWrite(changeCount: changeCount, for: session)
++                    session.restoreImmediately(expectedChangeCount: changeCount)
++                    trace?.recordClipboardRestored(session.didRestore)
++                } else {
++                    session.commitPermanent()
++                }
+             }
+-            return nil
++            let status: SelectionReadStatus = Task.isCancelled ? .cancelled
++                : session.isCancelled ? .copyBlocked
++                : authorizationFailure?() ?? (userCopyLanded ? .copyBlocked : (changeCount == initialChangeCount ? .timedOut : .noSelection))
++            return SelectionReadResponse(status: status)
+         }
+ 
+-        return result
++        return SelectionReadResponse(result: result, status: .selection)
+     }
+ 
+     /// Whether the snapshot must be restored after a user ⌘C/⌘X was observed mid-grab.
+@@ -179,11 +224,11 @@ public struct PasteboardCopyEngine {
+         pasteboard: NSPasteboard
+     ) -> Bool {
+         guard shouldRestoreAfterUserCopy(changeCount: changeCount, postCopyCount: postCopyCount) else {
+-            DiagnosticsHub.shared.log(.debug, .pasteboard, "copy engine user copied during grab, leaving clipboard untouched")
++            DiagnosticsHub.shared.log(.trace, .pasteboard, "copy engine user copied during grab, leaving clipboard untouched")
+             return false
+         }
+         snapshot.restore(to: pasteboard, transientMarkers: true)
+-        DiagnosticsHub.shared.log(.debug, .pasteboard, "copy engine user copy wrote nothing, restored snapshot over stale copy")
++        DiagnosticsHub.shared.log(.trace, .pasteboard, "copy engine user copy wrote nothing, restored snapshot over stale copy")
+         return true
+     }
+ 
+diff --git a/Sources/OpenSelection/SelectionReplacer.swift b/Sources/OpenSelection/SelectionReplacer.swift
+index 93c3283..cc3febb 100644
+--- a/Sources/OpenSelection/SelectionReplacer.swift
++++ b/Sources/OpenSelection/SelectionReplacer.swift
+@@ -27,6 +27,7 @@ public struct SelectionReplacer {
+     public typealias DirectAXReplacer = @MainActor @Sendable (AXUIElement, String) -> Bool
+     public typealias KeyPoster = @MainActor @Sendable (CGKeyCode, CGEventFlags) -> Void
+     public typealias AppActivator = @MainActor @Sendable (NSRunningApplication) -> Void
++    public typealias TargetActiveChecker = @MainActor @Sendable (NSRunningApplication) async -> Bool
+ 
+     public let configuration: SelectionConfiguration
+     public let pasteboard: NSPasteboard
+@@ -34,6 +35,7 @@ public struct SelectionReplacer {
+     public let directAXReplacer: DirectAXReplacer
+     public let keyPoster: KeyPoster
+     public let appActivator: AppActivator
++    public let targetActiveChecker: TargetActiveChecker
+ 
+     public init(
+         configuration: SelectionConfiguration = .default,
+@@ -41,7 +43,8 @@ public struct SelectionReplacer {
+         focusedElementProvider: @escaping FocusedElementProvider = SelectionReplacer.defaultFocusedElement,
+         directAXReplacer: @escaping DirectAXReplacer = SelectionReplacer.defaultDirectAXReplacer,
+         keyPoster: @escaping KeyPoster = { KeyboardEventPoster.postKey(keyCode: $0, flags: $1) },
+-        appActivator: @escaping AppActivator = { $0.activate() }
++        appActivator: @escaping AppActivator = { $0.activate() },
++        targetActiveChecker: @escaping TargetActiveChecker = SelectionReplacer.defaultTargetActiveChecker
+     ) {
+         self.configuration = configuration
+         self.pasteboard = pasteboard
+@@ -49,6 +52,7 @@ public struct SelectionReplacer {
+         self.directAXReplacer = directAXReplacer
+         self.keyPoster = keyPoster
+         self.appActivator = appActivator
++        self.targetActiveChecker = targetActiveChecker
+     }
+ 
+     public static let `default` = SelectionReplacer()
+@@ -72,6 +76,17 @@ public struct SelectionReplacer {
+         return false
+     }
+ 
++    public static let defaultTargetActiveChecker: TargetActiveChecker = { targetApp in
++        let deadline = Date().addingTimeInterval(0.3)
++        while Date() < deadline, !Task.isCancelled, !targetApp.isTerminated {
++            if NSWorkspace.shared.frontmostApplication?.processIdentifier == targetApp.processIdentifier {
++                return true
++            }
++            try? await Task.sleep(nanoseconds: 10_000_000)
++        }
++        return NSWorkspace.shared.frontmostApplication?.processIdentifier == targetApp.processIdentifier
++    }
++
+     /// Replaces the current selection in the target app with the given text.
+     @MainActor
+     public func replace(
+@@ -101,8 +116,21 @@ public struct SelectionReplacer {
+             }
+         }
+ 
+-        // 2. Fall back to non-destructive pasteboard delivery:
+-        let snapshot = restorePasteboard ? PasteboardSnapshot.capture(pasteboard) : nil
++        // Reserve the clipboard before activation can suspend. Another operation cannot
++        // replace the payload during preparation or the committed delivery window.
++        let session = try await PasteboardCoordinator.shared.acquireSession(priority: .userAction, pasteboard: pasteboard)
++        if let targetApp {
++            appActivator(targetApp)
++            let active = await targetActiveChecker(targetApp)
++            guard active, !Task.isCancelled else {
++                session.restoreImmediately()
++                throw OpenSelectionError.targetApplicationUnavailable
++            }
++        }
++        do { try Task.checkCancellation() } catch {
++            session.restoreImmediately()
++            throw error
++        }
+ 
+         pasteboard.clearContents()
+         if !flavors.isEmpty {
+@@ -128,30 +156,32 @@ public struct SelectionReplacer {
+             pasteboard.writeObjects([item])
+         }
+         let changeCountAfterWrite = pasteboard.changeCount
+-
+-        if let targetApp {
+-            appActivator(targetApp)
+-        }
++        PasteboardCoordinator.shared.recordOwnedWrite(changeCount: changeCountAfterWrite, for: session)
+ 
+         // Synthesize paste keystroke:
+         // When matchStyle is requested, use Option+Shift+Command+V (Paste and Match Style)
+         let keyFlags: CGEventFlags = matchStyle ? [.maskCommand, .maskAlternate, .maskShift] : .maskCommand
+         keyPoster(configuration.pasteVirtualKey, keyFlags)
+ 
+-        if restorePasteboard {
+-            // Document apps (like Apple Notes) sync asynchronously and benefit from a slightly longer delivery window
+-            let baseDelay = configuration.pasteboardDeliveryRestoreDelay
+-            let restoreDelay = isRichDocApp ? max(baseDelay, Self.richDocumentRestoreDelay) : baseDelay
+-            if restoreDelay > 0 {
+-                try? await Task.sleep(nanoseconds: UInt64(restoreDelay * 1_000_000_000))
+-                if pasteboard.changeCount == changeCountAfterWrite {
+-                    snapshot?.restore(to: pasteboard, transientMarkers: true)
+-                    DiagnosticsHub.shared.log(.debug, .pasteboard, "selection replacer restored original pasteboard contents")
+-                } else {
+-                    DiagnosticsHub.shared.log(.debug, .pasteboard, "selection replacer pasteboard mutated during delivery, skipping restore")
+-                }
++        // Document apps (like Apple Notes) sync asynchronously and benefit from a slightly longer delivery window
++        let baseDelay = configuration.pasteboardDeliveryRestoreDelay
++        let effectiveDelay = isRichDocApp ? max(baseDelay, Self.richDocumentRestoreDelay) : baseDelay
++
++        // An already-posted paste is external work: cancellation cannot shorten the
++        // delivery window. This unstructured task owns its independent bounded lifetime.
++        let deliveryTask = Task { @MainActor in
++            if effectiveDelay > 0 {
++                try? await Task.sleep(nanoseconds: UInt64(effectiveDelay * 1_000_000_000))
+             }
+         }
++        PasteboardCoordinator.shared.markDelivering(for: session)
++        _ = await deliveryTask.result
++        if restorePasteboard {
++            session.restoreImmediately(expectedChangeCount: changeCountAfterWrite)
++        } else {
++            session.commitPermanent()
++        }
++
+     }
+ 
+     /// Replaces the selection (convenience alias for replace).
+diff --git a/Sources/OpenSelection/SelectionRetrievalCoordinator.swift b/Sources/OpenSelection/SelectionRetrievalCoordinator.swift
+index b44e411..fdfc31d 100644
+--- a/Sources/OpenSelection/SelectionRetrievalCoordinator.swift
++++ b/Sources/OpenSelection/SelectionRetrievalCoordinator.swift
+@@ -50,6 +50,7 @@ public struct SelectionRetrievalCoordinator: Sendable {
+     public typealias SimpleTargetProvider = @Sendable () -> AXElementInspector.Target
+     public typealias CopyTrigger = PasteboardCopyEngine.CopyTrigger
+     public typealias LegacyCopyCapture = @Sendable (@escaping CopyTrigger) async -> SelectionResult?
++    public typealias DetailedCopyCapture = @Sendable (CopyRequest) async -> SelectionReadResponse
+     public typealias CopyCapture = @Sendable (CopyRequest) async -> SelectionResult?
+     public typealias MenuPress = @Sendable (AXUIElement?) -> Void
+     public typealias ScriptRunner = @Sendable (String) async throws -> String
+@@ -67,15 +68,13 @@ public struct SelectionRetrievalCoordinator: Sendable {
+             inFlight += 1
+             return true
+         }
+-        func release() {
+-            inFlight -= 1
+-        }
++        func release() { inFlight -= 1 }
+     }
+     private static let inspectGate = InspectConcurrencyGate()
+ 
+     public let configuration: SelectionConfiguration
+     private let inspect: TargetProvider
+-    private let copyCapture: CopyCapture
++    private let copyCapture: DetailedCopyCapture
+     private let menuPress: MenuPress
+     private let scriptRunner: ScriptRunner
+ 
+@@ -84,13 +83,23 @@ public struct SelectionRetrievalCoordinator: Sendable {
+         configuration: SelectionConfiguration = .default,
+         inspect: @escaping TargetProvider = { trace in AXElementInspector.inspect(trace: trace) },
+         copyCapture: CopyCapture? = nil,
++        detailedCopyCapture: DetailedCopyCapture? = nil,
+         menuPress: @escaping MenuPress = Self.pressEditCopyMenu,
+         scriptRunner: @escaping ScriptRunner = Self.defaultScriptRunner
+     ) {
+         self.configuration = configuration
+         self.inspect = inspect
+-        self.copyCapture = copyCapture ?? { request in
+-            await PasteboardCopyEngine(configuration: configuration).capture(trigger: request.trigger)
++        if let detailedCopyCapture {
++            self.copyCapture = detailedCopyCapture
++        } else if let copyCapture {
++            self.copyCapture = { request in
++                let result = await copyCapture(request)
++                return SelectionReadResponse(result: result, status: Task.isCancelled ? .cancelled : (result == nil ? .noSelection : .selection))
++            }
++        } else {
++            self.copyCapture = { request in
++                await PasteboardCopyEngine(configuration: configuration).captureResponse(trigger: request.trigger)
++            }
+         }
+         self.menuPress = menuPress
+         self.scriptRunner = scriptRunner
+@@ -101,6 +110,7 @@ public struct SelectionRetrievalCoordinator: Sendable {
+         configuration: SelectionConfiguration = .default,
+         inspect: @escaping SimpleTargetProvider,
+         copyCapture: CopyCapture? = nil,
++        detailedCopyCapture: DetailedCopyCapture? = nil,
+         menuPress: @escaping MenuPress = Self.pressEditCopyMenu,
+         scriptRunner: @escaping ScriptRunner = Self.defaultScriptRunner
+     ) {
+@@ -108,6 +118,7 @@ public struct SelectionRetrievalCoordinator: Sendable {
+             configuration: configuration,
+             inspect: { _ in inspect() },
+             copyCapture: copyCapture,
++            detailedCopyCapture: detailedCopyCapture,
+             menuPress: menuPress,
+             scriptRunner: scriptRunner
+         )
+@@ -118,6 +129,7 @@ public struct SelectionRetrievalCoordinator: Sendable {
+         configuration: SelectionConfiguration = .default,
+         inspectWithTrace: @escaping TargetProvider,
+         copyCapture: CopyCapture? = nil,
++        detailedCopyCapture: DetailedCopyCapture? = nil,
+         menuPress: @escaping MenuPress = Self.pressEditCopyMenu,
+         scriptRunner: @escaping ScriptRunner = Self.defaultScriptRunner
+     ) {
+@@ -125,6 +137,7 @@ public struct SelectionRetrievalCoordinator: Sendable {
+             configuration: configuration,
+             inspect: inspectWithTrace,
+             copyCapture: copyCapture,
++            detailedCopyCapture: detailedCopyCapture,
+             menuPress: menuPress,
+             scriptRunner: scriptRunner
+         )
+@@ -217,7 +230,7 @@ public struct SelectionRetrievalCoordinator: Sendable {
+     // MARK: - Retrieval Methods
+ 
+     /// Reads the current selection and context details for an app under `policy`.
+-    public func retrieveDetails(
++    public func retrieveResponse(
+         for app: AppIdentity = AppIdentity(),
+         policy: SelectionPolicy = .default,
+         cursor: CursorClass = .unknown,
+@@ -226,28 +239,63 @@ public struct SelectionRetrievalCoordinator: Sendable {
+         requireCopyEvidence: Bool = true,
+         trigger: TriggerSource = .programmatic,
+         trace: SelectionTrace? = nil
+-    ) async -> (result: SelectionResult?, isEditable: Bool) {
++    ) async -> SelectionReadResponse {
++        let activeTrace = trace ?? SelectionTrace.create(trigger: trigger)
++        return await SelectionTrace.$current.withValue(activeTrace) {
++            await retrieveTraced(for: app, policy: policy, cursor: cursor,
++                isSelectAll: isSelectAll, allowCopyFallback: allowCopyFallback,
++                requireCopyEvidence: requireCopyEvidence, trigger: trigger, trace: activeTrace)
++        }
++    }
++
++    private func retrieveTraced(
++        for app: AppIdentity = AppIdentity(),
++        policy: SelectionPolicy = .default,
++        cursor: CursorClass = .unknown,
++        isSelectAll: Bool = false,
++        allowCopyFallback: Bool = true,
++        requireCopyEvidence: Bool = true,
++        trigger: TriggerSource = .programmatic,
++        trace: SelectionTrace? = nil
++    ) async -> SelectionReadResponse {
+         let activeTrace = trace ?? SelectionTrace.create(trigger: trigger)
+         let bundleID = app.bundleIdentifier ?? "unknown"
+-        activeTrace.log(.debug, .cascade, "retrieval started", fields: [
++        func finish(_ result: SelectionResult? = nil, _ editable: Bool = false,
++                    _ status: SelectionReadStatus) -> SelectionReadResponse {
++            activeTrace.recordReadStatus(status)
++            activeTrace.complete(status: status, configured: policy.retrievalMode, winner: result?.strategy, bundleID: app.bundleIdentifier)
++            let final: FinalOutcome = status == .cancelled ? .cancelled
++                : result.map { .selection(strategy: $0.strategy, presence: .nonEmpty) } ?? .none
++            let report = activeTrace.buildReport(outcome: final)
++            if trace != nil || DiagnosticsHub.shared.isReportRequired(outcome: final, elapsedMicros: activeTrace.elapsedMicros) {
++                DiagnosticsHub.shared.emitReport(report)
++                return SelectionReadResponse(result: result?.withDiagnostics(report), isEditable: editable, status: status, traceID: activeTrace.id.rawValue)
++            }
++            return SelectionReadResponse(result: result, isEditable: editable, status: status, traceID: activeTrace.id.rawValue)
++        }
++        if Task.isCancelled { return finish(nil, false, .cancelled) }
++        if policy.disabled { return finish(nil, false, .policyBlocked) }
++
++        activeTrace.log(.trace, .cascade, "retrieval started", fields: [
+             "bundleID": .token(bundleID),
+             "cursor": .token(cursor.rawValue)
+         ])
+ 
+         let target = await inspectWithWatchdog(trace: activeTrace)
+         guard let target else {
+-            activeTrace.log(.warning, .ax, "ax inspect timed out", fields: [
++            activeTrace.log(.trace, .ax, "ax inspect returned no target", fields: [
+                 "bundleID": .token(bundleID)
+             ])
+-            if trace != nil || DiagnosticsHub.shared.isReportRequired(outcome: FinalOutcome.none, elapsedMicros: activeTrace.elapsedMicros) {
+-                let report = activeTrace.buildReport(outcome: FinalOutcome.none)
+-                DiagnosticsHub.shared.emitReport(report)
+-            }
+-            return (nil, false)
++            return finish(nil, false, Task.isCancelled ? .cancelled : activeTrace.selectionReadStatus)
+         }
+ 
+         let isEditable = Self.isEditableContext(target)
+ 
++        if let requestedPID = app.processIdentifier, let focusedApp = target.focusedApp {
++            var inspectedPID: pid_t = 0
++            guard AXUIElementGetPid(focusedApp, &inspectedPID) == .success,
++                  inspectedPID == requestedPID else { return finish(nil, false, .targetChanged) }
++        }
+         var targetPID: pid_t = app.processIdentifier ?? 0
+         if targetPID == 0, let axApp = target.focusedApp {
+             var pid: pid_t = 0
+@@ -303,11 +351,7 @@ public struct SelectionRetrievalCoordinator: Sendable {
+                     "bundleID": .token(bundleID),
+                     "role": .token(role)
+                 ])
+-                if trace != nil || DiagnosticsHub.shared.isReportRequired(outcome: FinalOutcome.none, elapsedMicros: activeTrace.elapsedMicros) {
+-                    let report = activeTrace.buildReport(outcome: FinalOutcome.none)
+-                    DiagnosticsHub.shared.emitReport(report)
+-                }
+-                return (nil, isEditable)
++                return finish(nil, isEditable, .copyBlocked)
+             }
+         }
+ 
+@@ -317,24 +361,16 @@ public struct SelectionRetrievalCoordinator: Sendable {
+                 "bundleID": .token(bundleID),
+                 "cursor": .token(cursor.rawValue)
+             ])
+-            if trace != nil || DiagnosticsHub.shared.isReportRequired(outcome: FinalOutcome.none, elapsedMicros: activeTrace.elapsedMicros) {
+-                let report = activeTrace.buildReport(outcome: FinalOutcome.none)
+-                DiagnosticsHub.shared.emitReport(report)
+-            }
+-            return (nil, isEditable)
++            return finish(nil, isEditable, .copyBlocked)
+         }
+ 
+         // Whole-container select gesture (⌘A, ⌘L) landing on a row selection (Finder, Mail, table views)
+         if isSelectAll, Self.isRowSelectionContext(target) {
+             activeTrace.log(.debug, .gate, "select-all on row-selection element skipped")
+-            if trace != nil || DiagnosticsHub.shared.isReportRequired(outcome: FinalOutcome.none, elapsedMicros: activeTrace.elapsedMicros) {
+-                let report = activeTrace.buildReport(outcome: FinalOutcome.none)
+-                DiagnosticsHub.shared.emitReport(report)
+-            }
+-            return (nil, isEditable)
++            return finish(nil, isEditable, .copyBlocked)
+         }
+ 
+-        activeTrace.log(.debug, .cascade, "gate passed", fields: [
++        activeTrace.log(.trace, .cascade, "gate passed", fields: [
+             "bundleID": .token(bundleID),
+             "strategy": .token(policy.retrievalMode.rawValue)
+         ])
+@@ -371,21 +407,22 @@ public struct SelectionRetrievalCoordinator: Sendable {
+             trace: activeTrace
+         ))
+ 
+-        let finalOutcome: FinalOutcome
+-        if let readResult {
+-            finalOutcome = .selection(strategy: readResult.strategy, presence: .nonEmpty)
+-        } else {
+-            finalOutcome = .none
+-        }
++        if Task.isCancelled { return finish(nil, isEditable, .cancelled) }
++        if activeTrace.selectionReadStatus == .targetChanged { return finish(nil, isEditable, .targetChanged) }
++        return finish(readResult, isEditable, readResult == nil ? activeTrace.selectionReadStatus : .selection)
++    }
+ 
+-        if trace != nil || DiagnosticsHub.shared.isReportRequired(outcome: finalOutcome, elapsedMicros: activeTrace.elapsedMicros) {
+-            let report = activeTrace.buildReport(outcome: finalOutcome)
+-            DiagnosticsHub.shared.emitReport(report)
+-            let resultWithDiagnostics = readResult?.withDiagnostics(report)
+-            return (resultWithDiagnostics, isEditable)
+-        } else {
+-            return (readResult, isEditable)
+-        }
++    /// Compatibility projection. New callers should use retrieveResponse to retain reasons.
++    public func retrieveDetails(
++        for app: AppIdentity = AppIdentity(), policy: SelectionPolicy = .default,
++        cursor: CursorClass = .unknown, isSelectAll: Bool = false,
++        allowCopyFallback: Bool = true, requireCopyEvidence: Bool = true,
++        trigger: TriggerSource = .programmatic, trace: SelectionTrace? = nil
++    ) async -> (result: SelectionResult?, isEditable: Bool) {
++        let response = await retrieveResponse(for: app, policy: policy, cursor: cursor,
++            isSelectAll: isSelectAll, allowCopyFallback: allowCopyFallback,
++            requireCopyEvidence: requireCopyEvidence, trigger: trigger, trace: trace)
++        return (response.result, response.isEditable)
+     }
+ 
+     /// Convenience for NSRunningApplication.
+@@ -471,6 +508,7 @@ public struct SelectionRetrievalCoordinator: Sendable {
+         let bundleID = app.bundleIdentifier ?? "unknown"
+         var strategies = strategyCascade(for: policy, target: target, bundleIdentifier: app.bundleIdentifier)
+         if !allowCopyFallback {
++            if strategies.contains(.keyboardCopy) || strategies.contains(.menuCopy) { trace.recordReadStatus(.copyBlocked) }
+             let nonCopy = strategies.filter { $0 != .keyboardCopy && $0 != .menuCopy }
+             if nonCopy.isEmpty {
+                 // The overlay gate forbids the synthetic ⌘C, not reading. An app whose cascade is
+@@ -479,17 +517,18 @@ public struct SelectionRetrievalCoordinator: Sendable {
+                 // post no events, so degrading to them keeps the gate's promise and can still read
+                 // the selection (Electron/web views expose it via AXWebArea).
+                 strategies = [.axTextControl, .axWebArea]
+-                trace.log(.debug, .gate, "overlay gate active, trying ax only", fields: ["bundleID": .token(bundleID)])
++                trace.log(.trace, .gate, "overlay gate active, trying ax only", fields: ["bundleID": .token(bundleID)])
+             } else {
+                 strategies = nonCopy
+             }
+         }
+ 
+         for (index, strategy) in strategies.enumerated() {
++            guard !Task.isCancelled else { trace.recordReadStatus(.cancelled); return nil }
+             let attemptStart = UInt32(min(UInt64(UInt32.max), trace.elapsedMicros))
+             if index > 0 {
+                 let previous = strategies[index - 1]
+-                trace.log(.debug, .cascade, "strategy fallback", fields: [
++                trace.log(.trace, .cascade, "strategy fallback", fields: [
+                     "bundleID": .token(bundleID),
+                     "fromStrategy": .token(previous.rawValue),
+                     "toStrategy": .token(strategy.rawValue)
+@@ -514,13 +553,14 @@ public struct SelectionRetrievalCoordinator: Sendable {
+                             trace: trace
+                         )
+                         evidence = ev
+-                        trace.log(.debug, .gate, "copy strategy permitted", fields: [
++                        trace.log(.trace, .gate, "copy strategy permitted", fields: [
+                             "bundleID": .token(bundleID),
+                             "strategy": .token(strategy.rawValue),
+                             "evidence": .token(ev.reason)
+                         ])
+                     } else {
+-                        trace.log(.debug, .gate, "copy strategy skipped, no evidence", fields: [
++                        trace.recordReadStatus(.copyBlocked)
++                        trace.log(.trace, .gate, "copy strategy skipped, no evidence", fields: [
+                             "bundleID": .token(bundleID),
+                             "strategy": .token(strategy.rawValue)
+                         ])
+@@ -538,6 +578,9 @@ public struct SelectionRetrievalCoordinator: Sendable {
+                 }
+             }
+             let (rawResult, outcome) = await run(strategy, app: app, target: target, evidence: evidence, trace: trace)
++            if trace.selectionReadStatus == .targetChanged || trace.selectionReadStatus == .cancelled {
++                return nil
++            }
+             if let result = Self.nonBlank(rawResult) {
+                 let duration = UInt32(min(UInt64(UInt32.max), trace.elapsedMicros - UInt64(attemptStart)))
+                 trace.recordAttempt(StrategyAttempt(
+@@ -547,12 +590,12 @@ public struct SelectionRetrievalCoordinator: Sendable {
+                     durationMicros: duration
+                 ))
+                 if index > 0 {
+-                    trace.log(.info, .cascade, "fallback strategy succeeded", fields: [
++                    trace.log(.trace, .cascade, "fallback strategy succeeded", fields: [
+                         "bundleID": .token(bundleID),
+                         "strategy": .token(strategy.rawValue)
+                     ])
+                 } else {
+-                    trace.log(.info, .cascade, "primary strategy succeeded", fields: [
++                    trace.log(.trace, .cascade, "primary strategy succeeded", fields: [
+                         "bundleID": .token(bundleID),
+                         "strategy": .token(strategy.rawValue)
+                     ])
+@@ -566,6 +609,12 @@ public struct SelectionRetrievalCoordinator: Sendable {
+                     trace: trace
+                 )
+             } else {
++                switch outcome {
++                case .timedOut: trace.recordReadStatus(.timedOut)
++                case .cancelled: trace.recordReadStatus(.cancelled)
++                case .failed: trace.recordReadStatus(.failed)
++                default: break
++                }
+                 let duration = UInt32(min(UInt64(UInt32.max), trace.elapsedMicros - UInt64(attemptStart)))
+                 trace.recordAttempt(StrategyAttempt(
+                     strategy: strategy,
+@@ -575,7 +624,7 @@ public struct SelectionRetrievalCoordinator: Sendable {
+                 ))
+             }
+         }
+-        trace.log(.info, .cascade, "all strategies exhausted", fields: ["bundleID": .token(bundleID)])
++        trace.log(.trace, .cascade, "all strategies exhausted", fields: ["bundleID": .token(bundleID)])
+         return nil
+     }
+ 
+@@ -718,6 +767,8 @@ public struct SelectionRetrievalCoordinator: Sendable {
+             return (nil, .empty(.noSelection))
+ 
+         case .axWebArea:
++            let phaseStart = trace?.elapsedMicros ?? 0
++            defer { if let trace { trace.addMetric("webAreaMicros", trace.elapsedMicros - phaseStart) } }
+             var snapshot: AXElementInspector.Target? = target
+             var attempts = 0
+             while attempts < configuration.webAreaSettleMaxRetries {
+@@ -726,6 +777,7 @@ public struct SelectionRetrievalCoordinator: Sendable {
+                 }
+                 attempts += 1
+                 if attempts < configuration.webAreaSettleMaxRetries {
++                    trace?.addMetric("webAreaRetries")
+                     try? await Task.sleep(nanoseconds: UInt64(configuration.webAreaSettleInterval * 1_000_000_000))
+                     if let element = snapshot?.webArea ?? snapshot?.focusedElement,
+                        let result = AXWebAreaStrategy.pollFresh(from: element) {
+@@ -734,7 +786,7 @@ public struct SelectionRetrievalCoordinator: Sendable {
+                     snapshot = await inspectWithWatchdog(trace: trace)
+                 }
+             }
+-            return (nil, attempts > 0 ? .timedOut : .empty(.noSelection))
++            return (nil, .empty(.noSelection))
+ 
+         case .officeScript:
+             return await runOfficeScript(for: app, target: target, trace: trace)
+@@ -751,12 +803,11 @@ public struct SelectionRetrievalCoordinator: Sendable {
+                 let maxConcurrent = configuration.axMaxConcurrentInspects
+                 trigger = {
+                     Task.detached {
+-                        await Self.pressCopyMenuWithWatchdog(
+-                            app: target.focusedApp,
+-                            press: press,
+-                            timeout: timeout,
+-                            maxConcurrent: maxConcurrent
+-                        )
++                        await SelectionTrace.$current.withValue(trace) {
++                            await Self.pressCopyMenuWithWatchdog(
++                                app: target.focusedApp, press: press,
++                                timeout: timeout, maxConcurrent: maxConcurrent)
++                        }
+                     }
+                 }
+             case .keyboardCopy:
+@@ -766,8 +817,14 @@ public struct SelectionRetrievalCoordinator: Sendable {
+                 return (nil, .empty(.noSelection))
+             }
+             let request = CopyRequest(trigger: trigger, evidence: evidence ?? CopyEvidence("unspecified", .weak))
+-            guard let captured = await copyCapture(request) else {
+-                return (nil, Task.isCancelled ? .cancelled : .empty(.noSelection))
++            let response = await copyCapture(request)
++            guard let captured = response.result else {
++                trace?.recordReadStatus(response.status)
++                switch response.status {
++                case .cancelled: return (nil, .cancelled)
++                case .timedOut: return (nil, .timedOut)
++                default: return (nil, .empty(.noSelection))
++                }
+             }
+             let res = SelectionResult(
+                 text: captured.text,
+@@ -864,7 +921,11 @@ public struct SelectionRetrievalCoordinator: Sendable {
+     // MARK: - Watchdog AX Workers
+ 
+     private func inspectWithWatchdog(trace: SelectionTrace? = nil) async -> AXElementInspector.Target? {
++        let phaseStart = trace?.elapsedMicros ?? 0
++        trace?.addMetric("axInspects")
++        defer { if let trace { trace.addMetric("axInspectMicros", trace.elapsedMicros - phaseStart) } }
+         guard await Self.inspectGate.tryAcquire(limit: configuration.axMaxConcurrentInspects) else {
++            trace?.recordReadStatus(.busy)
+             trace?.log(.warning, .ax, "inspect concurrency cap reached")
+             return nil
+         }
+@@ -876,8 +937,7 @@ public struct SelectionRetrievalCoordinator: Sendable {
+ 
+             timeout.set(Task {
+                 try? await Task.sleep(nanoseconds: UInt64(timeoutSeconds * 1_000_000_000))
+-                if resume.resume(continuation, with: nil) {
+-                    Task.detached { await Self.inspectGate.release() }
++                if resume.resume(continuation, with: nil, beforeResume: { trace?.recordReadStatus(.timedOut) }) {
+                     trace?.log(.warning, .ax, "ax inspect deadline exceeded", fields: [
+                         "timeoutMicros": .micros(UInt32(timeoutSeconds * 1_000_000))
+                     ])
+@@ -886,9 +946,9 @@ public struct SelectionRetrievalCoordinator: Sendable {
+ 
+             Self.axInspectQueue.async {
+                 let target = inspect(trace)
+-                if resume.resume(continuation, with: target) {
+-                    timeout.cancel()
+-                    Task.detached { await Self.inspectGate.release() }
++                Task {
++                    await Self.inspectGate.release()
++                    if resume.resume(continuation, with: target) { timeout.cancel() }
+                 }
+             }
+         }
+@@ -905,40 +965,25 @@ public struct SelectionRetrievalCoordinator: Sendable {
+         }
+ 
+         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+-            let isSettled = OSAllocatedUnfairLock(initialState: false)
++            let resume = OnceResume<Void>()
+             let watchdog = TaskBox()
+ 
+-            let finishOperation: @Sendable (Bool) -> Void = { didTimeout in
+-                let shouldRelinquish = isSettled.withLock { settled -> Bool in
+-                    guard !settled else { return false }
+-                    settled = true
+-                    return true
+-                }
+-                guard shouldRelinquish else { return }
+-
+-                if didTimeout {
++            watchdog.set(Task {
++                try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
++                if resume.resume(continuation, with: ()) {
+                     DiagnosticsHub.shared.log(.warning, .ax, "menu press deadline exceeded", fields: [
+                         "timeoutMicros": .micros(UInt32(timeout * 1_000_000))
+                     ])
+-                } else {
+-                    watchdog.cancel()
+-                }
+-
+-                Task.detached {
+-                    await inspectGate.release()
+                 }
+-                continuation.resume()
+-            }
+-
+-            watchdog.set(Task {
+-                try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+-                finishOperation(true)
+             })
+ 
+             nonisolated(unsafe) let element = app
+             axInspectQueue.async {
+                 press(element)
+-                finishOperation(false)
++                Task {
++                    await inspectGate.release()
++                    if resume.resume(continuation, with: ()) { watchdog.cancel() }
++                }
+             }
+         }
+     }
+@@ -1054,8 +1099,11 @@ public struct SelectionRetrievalCoordinator: Sendable {
+         guard evidence.strength == .weak,
+               evidence.reason == "ax-text-control" || evidence.reason == "beam-cursor+text-control"
+         else { return evidence }
++        let phaseStart = trace.elapsedMicros
++        defer { trace.addMetric("evidenceSettleMicros", trace.elapsedMicros - phaseStart) }
+         let maxRetries = max(0, configuration.evidenceSettleMaxRetries)
+         for _ in 0..<maxRetries {
++            trace.addMetric("evidenceRetries")
+             if Task.isCancelled { return evidence }
+             try? await Task.sleep(nanoseconds: UInt64(configuration.evidenceSettleInterval * 1_000_000_000))
+             guard let fresh = await inspectWithWatchdog(trace: trace) else { return evidence }
+@@ -1067,7 +1115,7 @@ public struct SelectionRetrievalCoordinator: Sendable {
+                 isFallbackFromAX: isFallbackFromAX
+             ), candidate.strength > evidence.strength
+             else { continue }
+-            trace.log(.debug, .gate, "copy evidence settled", fields: [
++            trace.log(.trace, .gate, "copy evidence settled", fields: [
+                 "from": .token(evidence.reason),
+                 "to": .token(candidate.reason)
+             ])
+diff --git a/Tests/OpenSelectionTests/AutomaticCopyCaptureTests.swift b/Tests/OpenSelectionTests/AutomaticCopyCaptureTests.swift
+index 7f2296d..aaf0b81 100644
+--- a/Tests/OpenSelectionTests/AutomaticCopyCaptureTests.swift
++++ b/Tests/OpenSelectionTests/AutomaticCopyCaptureTests.swift
+@@ -222,4 +222,37 @@ final class AutomaticCopyCaptureTests: XCTestCase {
+         XCTAssertNil(result)
+         XCTAssertEqual(board.changeCount, changeCount)
+     }
++
++    func testCopyMenuProbeEnforcesDeadlineWhenWorkerBlocks() async {
++        let probe = CopyMenuProbe()
++        let start = Date()
++        let result = await probe.run(hardLimit: 0.05, fallback: "fallback") {
++            Thread.sleep(forTimeInterval: 0.5)
++            return "finished"
++        }
++        let elapsed = Date().timeIntervalSince(start)
++        XCTAssertEqual(result, "fallback")
++        XCTAssertLessThan(elapsed, 0.25, "watchdog must enforce deadline even if worker blocks queue")
++    }
++    func testCopyMenuWorkerRetainsPermitAfterDeadline() async {
++        let probe = CopyMenuProbe()
++        probe.maxConcurrent = 1
++        let unblock = DispatchSemaphore(value: 0)
++        defer { unblock.signal() }
++        let first = await probe.run(hardLimit: 0.03, fallback: false) {
++            unblock.wait()
++            return true
++        }
++        XCTAssertFalse(first)
++        let capped = await probe.run(hardLimit: 0.03, fallback: false) {
++            XCTFail("A timed-out worker must retain its permit")
++            return true
++        }
++        XCTAssertFalse(capped)
++        unblock.signal()
++        try? await Task.sleep(nanoseconds: 30_000_000)
++        let recovered = await probe.run(hardLimit: 0.1, fallback: false) { true }
++        XCTAssertTrue(recovered)
++    }
++
+ }
+diff --git a/Tests/OpenSelectionTests/DiagnosticsPipelineTests.swift b/Tests/OpenSelectionTests/DiagnosticsPipelineTests.swift
+index d484a1a..4e9703b 100644
+--- a/Tests/OpenSelectionTests/DiagnosticsPipelineTests.swift
++++ b/Tests/OpenSelectionTests/DiagnosticsPipelineTests.swift
+@@ -19,6 +19,49 @@ final class DiagnosticsPipelineTests: XCTestCase {
+         super.tearDown()
+     }
+ 
++    func testSuccessfulFallbackProducesOneNormalSummaryWithoutPollingNoise() async throws {
++        let sink = SelectionLogTestSink(minimumLevel: .debug)
++        DiagnosticsHub.shared.removeAllSinks()
++        DiagnosticsHub.shared.install(sink)
++        let reader = SelectionRetrievalCoordinator(
++            configuration: SelectionConfiguration(webAreaSettleInterval: 0.001, webAreaSettleMaxRetries: 3),
++            inspect: { _ in AXElementInspector.Target(role: "AXWebArea", selectedText: "") },
++            detailedCopyCapture: { _ in .init(result: SelectionResult(text: "PRIVATE_CANARY", strategy: .keyboardCopy), status: .selection) })
++        let response = await reader.retrieveResponse(for: AppIdentity(bundleIdentifier: "com.test"),
++            requireCopyEvidence: false, trigger: .dragEnd)
++        await DiagnosticsHub.shared.flush()
++        let events = sink.events.withLock { $0 }
++        XCTAssertEqual(events.count, 1)
++        let summary = try XCTUnwrap(events.first)
++        XCTAssertEqual(summary.message, "selection completed")
++        XCTAssertEqual(summary.level, .info)
++        XCTAssertEqual(summary.traceID.rawValue, response.traceID)
++        XCTAssertEqual(summary.fields["configuredStrategy"], .token("ax-text-control"))
++        XCTAssertEqual(summary.fields["winningStrategy"], .token("keyboard-copy"))
++        XCTAssertEqual(summary.fields["trigger"], .token("dragEnd"))
++        XCTAssertEqual(summary.fields["webAreaRetries"], .int(2))
++        XCTAssertEqual(summary.fields["fallbackReason"], .token("noSelection"))
++        XCTAssertFalse(String(describing: events).contains("PRIVATE_CANARY"))
++    }
++
++    func testVerboseCaptureEventsInheritRequestTraceAndContextDoesNotLeak() async {
++        let sink = SelectionLogTestSink(minimumLevel: .trace)
++        DiagnosticsHub.shared.removeAllSinks()
++        DiagnosticsHub.shared.install(sink)
++        let reader = SelectionRetrievalCoordinator(
++            inspect: { _ in AXElementInspector.Target() },
++            detailedCopyCapture: { _ in
++                await Task { DiagnosticsHub.shared.log(.trace, .pasteboard, "capture detail") }.value
++                return .init(result: SelectionResult(text: "text", strategy: .keyboardCopy), status: .selection)
++            })
++        let response = await reader.retrieveResponse()
++        await DiagnosticsHub.shared.flush()
++        let events = sink.events.withLock { $0 }
++        XCTAssertTrue(events.contains { $0.message == "capture detail" })
++        XCTAssertTrue(events.allSatisfy { $0.traceID.rawValue == response.traceID })
++        XCTAssertNil(SelectionTrace.current)
++    }
++
+     func testLogLevelOrdering() {
+         XCTAssertLessThan(LogLevel.trace, LogLevel.debug)
+         XCTAssertLessThan(LogLevel.debug, LogLevel.info)
+@@ -140,3 +183,11 @@ final class DiagnosticsPipelineTests: XCTestCase {
+         XCTAssertTrue(msgs.contains(where: { $0.contains("test legacy message") }))
+     }
+ }
++
++
++private final class SelectionLogTestSink: OpenSelectionDiagnosticsSink, Sendable {
++    let minimumLevel: LogLevel
++    let events = OSAllocatedUnfairLock<[DiagnosticEvent]>(initialState: [])
++    init(minimumLevel: LogLevel) { self.minimumLevel = minimumLevel }
++    func record(_ event: DiagnosticEvent) { events.withLock { $0.append(event) } }
++}
+diff --git a/Tests/OpenSelectionTests/SelectionReplacerTests.swift b/Tests/OpenSelectionTests/SelectionReplacerTests.swift
+index 4bff178..29ae6b1 100644
+--- a/Tests/OpenSelectionTests/SelectionReplacerTests.swift
++++ b/Tests/OpenSelectionTests/SelectionReplacerTests.swift
+@@ -40,7 +40,8 @@ final class SelectionReplacerTests: XCTestCase {
+             focusedElementProvider: { _ in AXUIElementCreateSystemWide() },
+             directAXReplacer: { _, _ in true },
+             keyPoster: { _, _ in box.keyPosted = true },
+-            appActivator: { _ in }
++            appActivator: { _ in },
++            targetActiveChecker: { _ in true }
+         )
+ 
+         try await replacer.replace(with: "replacement", in: dummyApp)
+@@ -68,7 +69,8 @@ final class SelectionReplacerTests: XCTestCase {
+                 box.postedKeyCode = keyCode
+                 box.postedFlags = flags
+             },
+-            appActivator: { _ in box.activated = true }
++            appActivator: { _ in box.activated = true },
++            targetActiveChecker: { _ in true }
+         )
+ 
+         try await replacer.replace(with: "transient text", in: dummyApp, restorePasteboard: true)
+@@ -94,7 +96,8 @@ final class SelectionReplacerTests: XCTestCase {
+             pasteboard: testPasteboard,
+             directAXReplacer: { _, _ in false },
+             keyPoster: { _, _ in },
+-            appActivator: { _ in }
++            appActivator: { _ in },
++            targetActiveChecker: { _ in true }
+         )
+ 
+         try await replacer.replace(with: "permanent text", in: dummyApp, restorePasteboard: false)
+@@ -124,7 +127,8 @@ final class SelectionReplacerTests: XCTestCase {
+                 box.pasteboard?.clearContents()
+                 box.pasteboard?.setString("user copied this mid-flight", forType: .string)
+             },
+-            appActivator: { _ in }
++            appActivator: { _ in },
++            targetActiveChecker: { _ in true }
+         )
+ 
+         try await replacer.replace(with: "transient text", in: dummyApp, restorePasteboard: true)
+@@ -139,7 +143,8 @@ final class SelectionReplacerTests: XCTestCase {
+             pasteboard: testPasteboard,
+             directAXReplacer: { _, _ in false },
+             keyPoster: { _, _ in },
+-            appActivator: { _ in }
++            appActivator: { _ in },
++            targetActiveChecker: { _ in true }
+         )
+ 
+         try await replacer.replace(with: "no app text", in: nil, restorePasteboard: false)
+@@ -157,7 +162,8 @@ final class SelectionReplacerTests: XCTestCase {
+                 box.postedKeyCode = code
+                 box.postedFlags = flags
+             },
+-            appActivator: { _ in }
++            appActivator: { _ in },
++            targetActiveChecker: { _ in true }
+         )
+ 
+         try await replacer.replace(
+@@ -184,7 +190,8 @@ final class SelectionReplacerTests: XCTestCase {
+             pasteboard: testPasteboard,
+             directAXReplacer: { _, _ in false },
+             keyPoster: { _, _ in },
+-            appActivator: { _ in }
++            appActivator: { _ in },
++            targetActiveChecker: { _ in true }
+         )
+ 
+         // ISO Latin-1 bytes that are not valid UTF-8: they must survive the String bridge intact.
+@@ -203,7 +210,8 @@ final class SelectionReplacerTests: XCTestCase {
+             pasteboard: testPasteboard,
+             directAXReplacer: { _, _ in false },
+             keyPoster: { _, _ in },
+-            appActivator: { _ in }
++            appActivator: { _ in },
++            targetActiveChecker: { _ in true }
+         )
+         let proprietaryType = NSPasteboard.PasteboardType("com.apple.notes.richtext")
+         let proprietaryData = Data([0x00, 0x01, 0xFE, 0xFF])
+@@ -244,4 +252,85 @@ final class SelectionReplacerTests: XCTestCase {
+         XCTAssertTrue(formatted.contains("\n"), "Formatted text should restore paragraph breaks from RTF")
+         XCTAssertGreaterThanOrEqual(result.metrics.paragraphs, 2)
+     }
++    @MainActor
++    func testRapidPastesConsumeTheirOwnPayloadsDuringDeliveryWindows() async throws {
++        let board = testPasteboard!
++        board.setString("original", forType: .string)
++        let firstPosted = expectation(description: "first paste posted")
++        let consumed = expectation(description: "both external pastes consumed")
++        consumed.expectedFulfillmentCount = 2
++        var payloads: [String] = []
++        var posts = 0
++        let replacer = SelectionReplacer(
++            configuration: SelectionConfiguration(pasteboardDeliveryRestoreDelay: 0.06),
++            pasteboard: board, focusedElementProvider: { _ in nil },
++            directAXReplacer: { _, _ in false },
++            keyPoster: { _, _ in
++                posts += 1
++                if posts == 1 { firstPosted.fulfill() }
++                Task { @MainActor in
++                    try? await Task.sleep(nanoseconds: 20_000_000)
++                    payloads.append(board.string(forType: .string) ?? "missing")
++                    consumed.fulfill()
++                }
++            }, appActivator: { _ in }, targetActiveChecker: { _ in true }
++        )
++        let first = Task { try await replacer.replace(with: "one", in: .current) }
++        await fulfillment(of: [firstPosted], timeout: 1)
++        let second = Task { try await replacer.replace(with: "two", in: .current) }
++        try await first.value
++        try await second.value
++        await fulfillment(of: [consumed], timeout: 1)
++        XCTAssertEqual(payloads, ["one", "two"])
++        XCTAssertEqual(board.string(forType: .string), "original")
++    }
++
++    @MainActor
++    func testFailedActivationLeavesBaselineAndDoesNotPost() async {
++        testPasteboard.setString("original", forType: .string)
++        let baselineCount = testPasteboard.changeCount
++        var posted = false
++        let replacer = SelectionReplacer(pasteboard: testPasteboard,
++            focusedElementProvider: { _ in nil }, directAXReplacer: { _, _ in false },
++            keyPoster: { _, _ in posted = true }, appActivator: { _ in },
++            targetActiveChecker: { _ in false })
++        do {
++            try await replacer.replace(with: "payload", in: .current)
++            XCTFail("Expected target failure")
++        } catch { }
++        XCTAssertFalse(posted)
++        XCTAssertEqual(testPasteboard.changeCount, baselineCount)
++        XCTAssertEqual(testPasteboard.string(forType: .string), "original")
++    }
++
++    @MainActor
++    func testCancelledCaptureDrainsPostedCopyBeforePaste() async throws {
++        let board = testPasteboard!
++        board.setString("original", forType: .string)
++        let copyPosted = expectation(description: "copy posted")
++        var pasted: String?
++        let capture = Task { @MainActor in
++            await PasteboardCopyEngine(isCopyAuthorized: { true }).capture(pasteboard: board, timeout: 0.15) {
++                copyPosted.fulfill()
++                Task { @MainActor in
++                    try? await Task.sleep(nanoseconds: 20_000_000)
++                    board.clearContents(); board.setString("late copy", forType: .string)
++                }
++            }
++        }
++        await fulfillment(of: [copyPosted], timeout: 1)
++        capture.cancel()
++        let replacer = SelectionReplacer(
++            configuration: SelectionConfiguration(pasteboardDeliveryRestoreDelay: 0.03),
++            pasteboard: board, focusedElementProvider: { _ in nil },
++            directAXReplacer: { _, _ in false },
++            keyPoster: { _, _ in pasted = board.string(forType: .string) },
++            appActivator: { _ in }, targetActiveChecker: { _ in true })
++        try await replacer.replace(with: "paste payload", in: .current)
++        let captured = await capture.value
++        XCTAssertNil(captured)
++        XCTAssertEqual(pasted, "paste payload")
++        XCTAssertEqual(board.string(forType: .string), "original")
++    }
++
+ }
+diff --git a/Tests/OpenSelectionTests/SelectionRetrievalCoordinatorTests.swift b/Tests/OpenSelectionTests/SelectionRetrievalCoordinatorTests.swift
+index 8d0e4f3..7fa1025 100644
+--- a/Tests/OpenSelectionTests/SelectionRetrievalCoordinatorTests.swift
++++ b/Tests/OpenSelectionTests/SelectionRetrievalCoordinatorTests.swift
+@@ -1268,7 +1268,7 @@ final class SelectionRetrievalCoordinatorTests: XCTestCase {
+         XCTAssertEqual(second?.text, "overlap text", "second overlapping gesture must not be dropped")
+     }
+ 
+-    func testInspectPermitFreesAtWatchdogDeadlineWhileWorkerStillHung() async {
++    func testFreshInspectUsesRemainingCapacityWhileWorkerStillHung() async {
+         let zombieUnblock = DispatchSemaphore(value: 0)
+         defer { zombieUnblock.signal() }
+         let hungCoordinator = SelectionRetrievalCoordinator(
+@@ -1303,6 +1303,17 @@ final class SelectionRetrievalCoordinatorTests: XCTestCase {
+         zombieUnblock.signal()
+     }
+ 
++    func testRejectsAXSnapshotFromAnotherProcess() async {
++        let coordinator = SelectionRetrievalCoordinator(inspect: {
++            AXElementInspector.Target(focusedApp: AXUIElementCreateApplication(2002),
++                                      role: "AXTextField", selectedText: "wrong app text")
++        })
++        let result = await coordinator.retrieve(
++            for: AppIdentity(bundleIdentifier: "com.test.app", processIdentifier: 1001),
++            policy: .default, cursor: .unknown)
++        XCTAssertNil(result)
++    }
++
+     func testConcurrencyCapFailsFastWhenSaturated() async {
+         let inspectStarted = expectation(description: "cap-filling inspects started")
+         let maxConcurrent = SelectionConfiguration.default.axMaxConcurrentInspects
+@@ -1349,7 +1360,7 @@ final class SelectionRetrievalCoordinatorTests: XCTestCase {
+         }
+     }
+ 
+-    func testMenuCopyPressPermitFreesAtWatchdogDeadlineWhileWorkerStillHung() async {
++    func testFreshInspectUsesRemainingCapacityWhileMenuWorkerStillHung() async {
+         let pressStarted = expectation(description: "hung menu press started")
+         let zombieUnblock = DispatchSemaphore(value: 0)
+         defer { zombieUnblock.signal() }
+@@ -1394,7 +1405,7 @@ final class SelectionRetrievalCoordinatorTests: XCTestCase {
+                        "permit must be usable again right after the press watchdog deadline")
+     }
+ 
+-    func testFourHungMenuCopyPressesDoNotPermanentlyLockOutInspect() async {
++    func testHungMenuWorkersHoldPermitsUntilTheyExit() async {
+         let starts = PressStartSignal()
+         let maxConcurrent = SelectionConfiguration.default.axMaxConcurrentInspects
+         let zombieUnblock = DispatchSemaphore(value: 0)
+@@ -1443,6 +1454,13 @@ final class SelectionRetrievalCoordinatorTests: XCTestCase {
+ 
+         try? await Task.sleep(nanoseconds: UInt64((hungCoordinator.configuration.axReadTimeout + 0.1) * 1_000_000_000))
+ 
++        let stillBlocked = await freshCoordinator.retrieve(
++            for: AppIdentity(bundleIdentifier: "com.test.app"), policy: inspectPolicy, cursor: .unknown
++        )
++        XCTAssertNil(stillBlocked, "Timed-out workers must continue to hold the cap")
++        for _ in 0..<maxConcurrent { zombieUnblock.signal() }
++        // Allow the returning workers to execute their permit-release defer.
++        try? await Task.sleep(nanoseconds: 50_000_000)
+         let recoveredStart = Date()
+         let recovered = await freshCoordinator.retrieve(
+             for: AppIdentity(bundleIdentifier: "com.test.app"),
+@@ -1453,6 +1471,7 @@ final class SelectionRetrievalCoordinatorTests: XCTestCase {
+                           "inspect must not stay locked out after press watchdogs fire")
+         XCTAssertEqual(recovered?.text, "fresh")
+ 
++        for _ in 0..<maxConcurrent { zombieUnblock.signal() }
+         for task in hungTasks { _ = await task.value }
+     }
+ 
+diff --git a/Sources/OpenSelection/PasteboardCoordinator.swift b/Sources/OpenSelection/PasteboardCoordinator.swift
+new file mode 100644
+index 00000000..c54d1bf1
+--- /dev/null
++++ b/Sources/OpenSelection/PasteboardCoordinator.swift
+@@ -0,0 +1,245 @@
++// PasteboardCoordinator.swift
++// OpenSelection
++//
++// Single owner for all temporary clipboard operations across background selection capture
++// and action delivery. Coordinates ownership, enforces operation priority (user action >
++// background capture), preserves baseline snapshots across overlapping operations, tracks
++// external mutations, serializes delivery windows, and invalidates stale restorations.
++import AppKit
++import Foundation
++import os
++
++public enum PasteboardOperationPriority: Int, Comparable, Sendable {
++    case backgroundCapture = 0
++    case userAction = 1
++
++    public static func < (lhs: Self, rhs: Self) -> Bool {
++        lhs.rawValue < rhs.rawValue
++    }
++}
++
++@MainActor
++public final class PasteboardSession: Sendable {
++    public let id = UUID()
++    public fileprivate(set) var didRestore = false
++    public let priority: PasteboardOperationPriority
++    public let pasteboard: NSPasteboard
++
++    private let cancelledLock = OSAllocatedUnfairLock(initialState: false)
++    public var isCancelled: Bool {
++        cancelledLock.withLock { $0 }
++    }
++
++    private let copyPostedLock = OSAllocatedUnfairLock(initialState: false)
++    public var isCopyPosted: Bool {
++        copyPostedLock.withLock { $0 }
++    }
++
++    private let onRestore: @Sendable (PasteboardSession, Int?) -> Void
++    private let onCommitPermanent: @Sendable (PasteboardSession) -> Void
++
++    fileprivate init(
++        priority: PasteboardOperationPriority,
++        pasteboard: NSPasteboard,
++        onRestore: @escaping @Sendable (PasteboardSession, Int?) -> Void,
++        onCommitPermanent: @escaping @Sendable (PasteboardSession) -> Void
++    ) {
++        self.priority = priority
++        self.pasteboard = pasteboard
++        self.onRestore = onRestore
++        self.onCommitPermanent = onCommitPermanent
++    }
++
++    fileprivate func markCancelled() {
++        cancelledLock.withLock { $0 = true }
++    }
++
++    fileprivate func markCopyPosted() {
++        copyPostedLock.withLock { $0 = true }
++    }
++
++    /// Restores the baseline snapshot to the pasteboard if this session is still the active owner.
++    public func restoreImmediately(expectedChangeCount: Int? = nil) {
++        guard !isCancelled else { return }
++        onRestore(self, expectedChangeCount)
++    }
++
++    /// Commits the current pasteboard contents permanently (no restore).
++    public func commitPermanent() {
++        guard !isCancelled else { return }
++        onCommitPermanent(self)
++    }
++}
++
++@MainActor
++public final class PasteboardCoordinator: Sendable {
++    public static let shared = PasteboardCoordinator()
++
++    private struct ActiveState {
++        let session: PasteboardSession
++        let baselineSnapshot: PasteboardSnapshot
++        let initialChangeCount: Int
++        var ownedChangeCount: Int?
++        var pendingRestoreTask: Task<Void, Never>?
++        // Includes preparation/activation as well as the external delivery window.
++        var isExclusive = false
++    }
++
++    private var states: [NSPasteboard.Name: ActiveState] = [:]
++    private var waiters: [NSPasteboard.Name: [UUID: CheckedContinuation<Void, Never>]] = [:]
++    private var waitingUserActions: [NSPasteboard.Name: Int] = [:]
++
++    public init() {}
++
++    /// Acquires ownership before any suspension or write. Posted operations keep ownership
++    /// until their bounded external delivery window finishes, even if their caller cancels.
++    public func acquireSession(
++        priority: PasteboardOperationPriority,
++        pasteboard: NSPasteboard = .general
++    ) async throws -> PasteboardSession {
++        let name = pasteboard.name
++        if priority == .userAction { waitingUserActions[name, default: 0] += 1 }
++        defer {
++            if priority == .userAction { waitingUserActions[name, default: 0] -= 1 }
++        }
++        while true {
++            try Task.checkCancellation()
++            if let session = beginSession(priority: priority, pasteboard: pasteboard) {
++                states[name]?.isExclusive = true
++                return session
++            }
++            await waitForRelease(on: name)
++        }
++    }
++
++    public func yieldForInFlightOperations(on pasteboard: NSPasteboard = .general) async {
++        while states[pasteboard.name]?.isExclusive == true, !Task.isCancelled {
++            await waitForRelease(on: pasteboard.name)
++        }
++    }
++
++    private func waitForRelease(on name: NSPasteboard.Name) async {
++        let id = UUID()
++        await withTaskCancellationHandler {
++            await withCheckedContinuation { continuation in
++                if Task.isCancelled { continuation.resume(); return }
++                waiters[name, default: [:]][id] = continuation
++            }
++        } onCancel: {
++            Task { @MainActor [weak self] in
++                self?.waiters[name]?.removeValue(forKey: id)?.resume()
++            }
++        }
++    }
++
++    private func wakeWaiters(on name: NSPasteboard.Name) {
++        let pending = waiters.removeValue(forKey: name) ?? [:]
++        for continuation in pending.values { continuation.resume() }
++    }
++
++    /// Synchronous acquisition is useful for work that has not yet posted side effects.
++    /// It never preempts a committed capture, paste, or an async acquisition's preparation.
++    @discardableResult
++    public func beginSession(
++        priority: PasteboardOperationPriority,
++        pasteboard: NSPasteboard = .general
++    ) -> PasteboardSession? {
++        let name = pasteboard.name
++        if priority == .backgroundCapture, waitingUserActions[name, default: 0] > 0 { return nil }
++        let baseline: PasteboardSnapshot
++        if let existing = states[name] {
++            guard !existing.isExclusive, priority >= existing.session.priority else { return nil }
++            let expected = existing.ownedChangeCount ?? existing.initialChangeCount
++            baseline = pasteboard.changeCount == expected
++                ? existing.baselineSnapshot : PasteboardSnapshot.capture(pasteboard)
++            existing.session.markCancelled()
++            existing.pendingRestoreTask?.cancel()
++        } else {
++            baseline = PasteboardSnapshot.capture(pasteboard)
++        }
++        let session = PasteboardSession(
++            priority: priority,
++            pasteboard: pasteboard,
++            onRestore: { [weak self] session, expected in
++                MainActor.assumeIsolated { self?.handleRestore(for: session, expectedChangeCount: expected) }
++            },
++            onCommitPermanent: { [weak self] session in
++                MainActor.assumeIsolated { self?.finish(session) }
++            }
++        )
++        states[name] = ActiveState(session: session, baselineSnapshot: baseline,
++                                   initialChangeCount: pasteboard.changeCount)
++        return session
++    }
++
++    public func recordOwnedWrite(changeCount: Int, for session: PasteboardSession) {
++        guard isSessionActive(for: session) else { return }
++        states[session.pasteboard.name]?.ownedChangeCount = changeCount
++    }
++
++    public func markDirty(for session: PasteboardSession, changeCount: Int? = nil) {
++        recordOwnedWrite(changeCount: changeCount ?? session.pasteboard.changeCount, for: session)
++    }
++
++    public func markCopyPosted(for session: PasteboardSession, task: Task<Void, Never>? = nil) {
++        guard isSessionActive(for: session) else { return }
++        session.markCopyPosted()
++        states[session.pasteboard.name]?.isExclusive = true
++    }
++
++    public func markCaptureFinished(for session: PasteboardSession) {
++        // Restoration/commit releases ownership; do not unlock before that happens.
++    }
++
++    public func markDelivering(for session: PasteboardSession, task: Task<Void, Never>? = nil) {
++        guard isSessionActive(for: session) else { return }
++        states[session.pasteboard.name]?.isExclusive = true
++    }
++
++    public func markDeliveryFinished(for session: PasteboardSession) {
++        // The caller restores or commits synchronously after its delivery window.
++    }
++
++    public func scheduleRestore(for session: PasteboardSession, delay: TimeInterval,
++                                expectedChangeCount: Int? = nil) {
++        guard isSessionActive(for: session) else { return }
++        states[session.pasteboard.name]?.pendingRestoreTask?.cancel()
++        if delay <= 0 { handleRestore(for: session, expectedChangeCount: expectedChangeCount); return }
++        states[session.pasteboard.name]?.pendingRestoreTask = Task { @MainActor [weak self] in
++            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
++            guard !Task.isCancelled else { return }
++            self?.handleRestore(for: session, expectedChangeCount: expectedChangeCount)
++        }
++    }
++
++    /// Call only for unposted operations. Permanent clipboard writes must acquire a user
++    /// session first so they cannot overtake a copy/paste event already in flight.
++    public func cancelAndClear(pasteboard: NSPasteboard = .general) {
++        guard let state = states[pasteboard.name], !state.isExclusive else { return }
++        state.session.markCancelled()
++        state.pendingRestoreTask?.cancel()
++        states[pasteboard.name] = nil
++        wakeWaiters(on: pasteboard.name)
++    }
++
++    public func isSessionActive(for session: PasteboardSession) -> Bool {
++        states[session.pasteboard.name]?.session.id == session.id && !session.isCancelled
++    }
++
++    private func handleRestore(for session: PasteboardSession, expectedChangeCount: Int?) {
++        guard let state = states[session.pasteboard.name], isSessionActive(for: session) else { return }
++        let expected = expectedChangeCount ?? state.ownedChangeCount ?? state.initialChangeCount
++        if state.ownedChangeCount != nil, session.pasteboard.changeCount == expected {
++            state.baselineSnapshot.restore(to: session.pasteboard, transientMarkers: true)
++            session.didRestore = true
++        }
++        finish(session)
++    }
++
++    private func finish(_ session: PasteboardSession) {
++        guard isSessionActive(for: session) else { return }
++        states[session.pasteboard.name]?.pendingRestoreTask?.cancel()
++        states[session.pasteboard.name] = nil
++        wakeWaiters(on: session.pasteboard.name)
++    }
++}
+diff --git a/Sources/OpenSelection/SelectionReadResponse.swift b/Sources/OpenSelection/SelectionReadResponse.swift
+new file mode 100644
+index 00000000..ffe7ce93
+--- /dev/null
++++ b/Sources/OpenSelection/SelectionReadResponse.swift
+@@ -0,0 +1,22 @@
++import Foundation
++
++/// Stable, content-free outcome codes for selection retrieval and its callers.
++public enum SelectionReadStatus: String, Sendable, Codable, Equatable {
++    case selection, noSelection, targetChanged, timedOut, copyBlocked, cancelled
++    case clipboardFallback, policyBlocked, busy, failed, tooLarge
++}
++
++/// The result and the reason it is present or absent travel together.
++public struct SelectionReadResponse: Sendable {
++    public let result: SelectionResult?
++    public let isEditable: Bool
++    public let traceID: UInt64?
++    public let status: SelectionReadStatus
++
++    public init(result: SelectionResult? = nil, isEditable: Bool = false, status: SelectionReadStatus, traceID: UInt64? = nil) {
++        self.traceID = traceID
++        self.result = result
++        self.isEditable = isEditable
++        self.status = status
++    }
++}
+diff --git a/Tests/OpenSelectionTests/PasteboardCoordinatorTests.swift b/Tests/OpenSelectionTests/PasteboardCoordinatorTests.swift
+new file mode 100644
+index 00000000..85203272
+--- /dev/null
++++ b/Tests/OpenSelectionTests/PasteboardCoordinatorTests.swift
+@@ -0,0 +1,187 @@
++// PasteboardCoordinatorTests.swift
++// OpenSelectionTests
++import XCTest
++import AppKit
++@testable import OpenSelection
++
++@MainActor
++final class PasteboardCoordinatorTests: XCTestCase {
++
++    private func createTestPasteboard(initial: String = "Original User Clipboard") -> NSPasteboard {
++        let board = NSPasteboard(name: .init("com.openselection.tests.coord.\(UUID().uuidString)"))
++        board.clearContents()
++        board.setString(initial, forType: .string)
++        return board
++    }
++
++    func testUserActionPreemptsBackgroundCaptureAndInheritsBaselineSnapshot() {
++        let board = createTestPasteboard(initial: "Original User Clipboard")
++        defer { board.releaseGlobally() }
++
++        let coordinator = PasteboardCoordinator()
++
++        // 1. Background capture begins session
++        let bgSession = coordinator.beginSession(priority: .backgroundCapture, pasteboard: board)
++        XCTAssertNotNil(bgSession)
++        XCTAssertFalse(bgSession!.isCancelled)
++
++        // Background capture writes temporary content to pasteboard
++        board.clearContents()
++        board.setString("Background Synthetic Copy", forType: .string)
++        coordinator.markDirty(for: bgSession!)
++
++        // 2. User action arrives while background capture is in flight
++        let userSession = coordinator.beginSession(priority: .userAction, pasteboard: board)
++        XCTAssertNotNil(userSession)
++        XCTAssertTrue(bgSession!.isCancelled, "Background capture must be cancelled when user action arrives")
++        XCTAssertFalse(userSession!.isCancelled)
++
++        // User action writes its temporary content
++        board.clearContents()
++        board.setString("User Action Paste Payload", forType: .string)
++        coordinator.markDirty(for: userSession!)
++
++        // Background capture tries to restore (e.g. when its loop finishes)
++        bgSession!.restoreImmediately()
++        XCTAssertEqual(board.string(forType: .string), "User Action Paste Payload",
++                       "Cancelled background capture must NOT restore over active user action")
++
++        // 3. User action restores
++        userSession!.restoreImmediately()
++        XCTAssertEqual(board.string(forType: .string), "Original User Clipboard",
++                       "User action must restore the baseline snapshot from before background capture mutated the board")
++    }
++
++    func testRapidSuccessiveUserActionsDoNotSnapshotTemporaryText() async {
++        let board = createTestPasteboard(initial: "Original User Clipboard")
++        defer { board.releaseGlobally() }
++
++        let coordinator = PasteboardCoordinator()
++
++        // 1. First user action begins
++        let session1 = coordinator.beginSession(priority: .userAction, pasteboard: board)
++        XCTAssertNotNil(session1)
++
++        // Action 1 writes temporary text
++        board.clearContents()
++        board.setString("Temporary Paste 1", forType: .string)
++        coordinator.markDirty(for: session1!)
++        let changeCount1 = board.changeCount
++        coordinator.scheduleRestore(for: session1!, delay: 0.1, expectedChangeCount: changeCount1)
++
++        // 2. Second user action arrives rapidly before Action 1's delay expires
++        let session2 = coordinator.beginSession(priority: .userAction, pasteboard: board)
++        XCTAssertNotNil(session2)
++        XCTAssertTrue(session1!.isCancelled, "Action 1 must be cancelled by Action 2")
++        XCTAssertFalse(session2!.isCancelled)
++
++        // Action 2 writes its temporary text
++        board.clearContents()
++        board.setString("Temporary Paste 2", forType: .string)
++        coordinator.markDirty(for: session2!)
++        let changeCount2 = board.changeCount
++        coordinator.scheduleRestore(for: session2!, delay: 0.05, expectedChangeCount: changeCount2)
++
++        // Wait for Action 2's restore delay to expire
++        try? await Task.sleep(nanoseconds: 70_000_000)
++
++        // Verify: Board is restored to "Original User Clipboard", NOT "Temporary Paste 1"
++        XCTAssertEqual(board.string(forType: .string), "Original User Clipboard",
++                       "Action 2 must restore the true original clipboard, never Action 1's temporary text")
++
++        // Wait for Action 1's original delay to also expire to ensure it doesn't fire stale restore
++        try? await Task.sleep(nanoseconds: 60_000_000)
++        XCTAssertEqual(board.string(forType: .string), "Original User Clipboard")
++    }
++
++    func testLowerPriorityBackgroundCaptureRejectedWhileUserActionActive() {
++        let board = createTestPasteboard()
++        defer { board.releaseGlobally() }
++
++        let coordinator = PasteboardCoordinator()
++
++        let userSession = coordinator.beginSession(priority: .userAction, pasteboard: board)
++        XCTAssertNotNil(userSession)
++
++        let bgSession = coordinator.beginSession(priority: .backgroundCapture, pasteboard: board)
++        XCTAssertNil(bgSession, "Background capture must be rejected while user action owns the pasteboard")
++
++        userSession!.restoreImmediately()
++    }
++
++    func testCancelAndClearAbortsPendingRestores() async {
++        let board = createTestPasteboard(initial: "Original User Clipboard")
++        defer { board.releaseGlobally() }
++
++        let coordinator = PasteboardCoordinator()
++
++        let session = coordinator.beginSession(priority: .userAction, pasteboard: board)
++        board.clearContents()
++        board.setString("Temporary Paste", forType: .string)
++        coordinator.markDirty(for: session!)
++        coordinator.scheduleRestore(for: session!, delay: 0.05, expectedChangeCount: board.changeCount)
++
++        // User explicitly copies something
++        coordinator.cancelAndClear(pasteboard: board)
++        board.clearContents()
++        board.setString("Explicit Permanent Copy", forType: .string)
++
++        // Wait for restore delay
++        try? await Task.sleep(nanoseconds: 80_000_000)
++
++        XCTAssertEqual(board.string(forType: .string), "Explicit Permanent Copy",
++                       "Cancelled restore must not overwrite the explicit permanent copy")
++    }
++
++    func testExternalMutationSkipsRestoration() {
++        let board = createTestPasteboard(initial: "Original User Clipboard")
++        defer { board.releaseGlobally() }
++
++        let coordinator = PasteboardCoordinator()
++
++        let session = coordinator.beginSession(priority: .userAction, pasteboard: board)
++        board.clearContents()
++        board.setString("Temporary Paste", forType: .string)
++        coordinator.markDirty(for: session!)
++        let changeCount = board.changeCount
++
++        // External app writes to pasteboard
++        board.clearContents()
++        board.setString("External App Data", forType: .string)
++
++        // Session attempts restore with original expected changeCount
++        session!.restoreImmediately(expectedChangeCount: changeCount)
++
++        XCTAssertEqual(board.string(forType: .string), "External App Data",
++                       "Restoration must be skipped when external mutation changed changeCount")
++    }
++    func testNewSessionPreservesExternalCopyBetweenTemporaryWrites() {
++        let board = createTestPasteboard(initial: "A")
++        defer { board.releaseGlobally() }
++        let coordinator = PasteboardCoordinator()
++        let first = coordinator.beginSession(priority: .userAction, pasteboard: board)!
++        board.clearContents(); board.setString("temporary", forType: .string)
++        coordinator.recordOwnedWrite(changeCount: board.changeCount, for: first)
++        board.clearContents(); board.setString("B", forType: .string)
++        let second = coordinator.beginSession(priority: .userAction, pasteboard: board)!
++        board.clearContents(); board.setString("second temporary", forType: .string)
++        coordinator.recordOwnedWrite(changeCount: board.changeCount, for: second)
++        second.restoreImmediately()
++        XCTAssertEqual(board.string(forType: .string), "B")
++    }
++
++    func testPostedCaptureCannotBePreempted() {
++        let board = createTestPasteboard()
++        defer { board.releaseGlobally() }
++        let coordinator = PasteboardCoordinator()
++        let capture = coordinator.beginSession(priority: .backgroundCapture, pasteboard: board)!
++        coordinator.markCopyPosted(for: capture)
++        XCTAssertNil(coordinator.beginSession(priority: .userAction, pasteboard: board))
++        coordinator.cancelAndClear(pasteboard: board)
++        XCTAssertTrue(coordinator.isSessionActive(for: capture))
++        capture.commitPermanent()
++        XCTAssertNotNil(coordinator.beginSession(priority: .userAction, pasteboard: board))
++        coordinator.cancelAndClear(pasteboard: board)
++    }
++
++}
+diff --git a/Tests/OpenSelectionTests/SelectionReadResponseTests.swift b/Tests/OpenSelectionTests/SelectionReadResponseTests.swift
+new file mode 100644
+index 00000000..c6668950
+--- /dev/null
++++ b/Tests/OpenSelectionTests/SelectionReadResponseTests.swift
+@@ -0,0 +1,151 @@
++import XCTest
++import AppKit
++import ApplicationServices
++@testable import OpenSelection
++
++final class SelectionReadResponseTests: XCTestCase {
++    func testEmptyNativeReadIsDistinctFromCopyBlocked() async {
++        let reader = SelectionRetrievalCoordinator(inspect: { _ in
++            AXElementInspector.Target(role: "AXTextField", selectedText: "")
++        })
++        let native = await reader.retrieveResponse(allowCopyFallback: false)
++        XCTAssertNil(native.result)
++        XCTAssertEqual(native.status, .copyBlocked)
++        let response = await reader.retrieveResponse(
++            for: AppIdentity(bundleIdentifier: "com.apple.TextEdit"), allowCopyFallback: false)
++        XCTAssertEqual(response.status, .noSelection)
++    }
++
++    func testDisabledPolicyIsExplainedWithoutInspecting() async {
++        let reader = SelectionRetrievalCoordinator(inspect: { _ in
++            XCTFail("Disabled read must not inspect"); return AXElementInspector.Target()
++        })
++        let response = await reader.retrieveResponse(policy: SelectionPolicy(disabled: true))
++        XCTAssertEqual(response.status, .policyBlocked)
++    }
++
++    func testInspectionTimeoutHasStableReason() async {
++        let reader = SelectionRetrievalCoordinator(
++            configuration: SelectionConfiguration(axReadTimeout: 0.01),
++            inspect: { _ in Thread.sleep(forTimeInterval: 0.08); return AXElementInspector.Target() })
++        let response = await reader.retrieveResponse()
++        XCTAssertNil(response.result)
++        XCTAssertEqual(response.status, .timedOut)
++    }
++
++    func testCancellationBeforeReadIsExplained() async {
++        let task = Task {
++            withUnsafeCurrentTask { $0?.cancel() }
++            return await SelectionRetrievalCoordinator().retrieveResponse()
++        }
++        let response = await task.value
++        XCTAssertEqual(response.status, .cancelled)
++    }
++
++    func testCopyFailureSurvivesCompatibilityBoundary() async {
++        let reader = SelectionRetrievalCoordinator(
++            inspect: { _ in AXElementInspector.Target() },
++            detailedCopyCapture: { _ in .init(status: .copyBlocked) })
++        let response = await reader.retrieveResponse()
++        XCTAssertEqual(response.status, .copyBlocked)
++        XCTAssertNil(response.result)
++    }
++
++    func testChangedInspectedProcessIsExplained() async {
++        let reader = SelectionRetrievalCoordinator(inspect: { _ in
++            AXElementInspector.Target(focusedApp: AXUIElementCreateApplication(getpid()))
++        })
++        let response = await reader.retrieveResponse(for: AppIdentity(processIdentifier: getpid() + 1))
++        XCTAssertEqual(response.status, .targetChanged)
++    }
++
++    func testReportContainsReasonWithoutSelectedText() async throws {
++        let trace = SelectionTrace.create(trigger: .programmatic)
++        let reader = SelectionRetrievalCoordinator(inspect: { _ in
++            AXElementInspector.Target(role: "AXTextField", selectedText: "PRIVATE_CANARY")
++        })
++        let response = await reader.retrieveResponse(allowCopyFallback: false, trace: trace)
++        XCTAssertEqual(response.status, .selection)
++        let report = trace.buildReport(outcome: .none)
++        XCTAssertEqual(report.readStatus, .selection)
++        let data = try JSONEncoder().encode(report)
++        XCTAssertFalse(String(decoding: data, as: UTF8.self).contains("PRIVATE_CANARY"))
++        var old = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
++        old.removeValue(forKey: "readStatus")
++        old.removeValue(forKey: "metrics")
++        old.removeValue(forKey: "clipboardRestored")
++        let decoded = try JSONDecoder().decode(CascadeReport.self, from: JSONSerialization.data(withJSONObject: old))
++        XCTAssertNil(decoded.readStatus)
++    }
++
++    @MainActor
++    func testCaptureSummaryRecordsActualRestorationAndTiming() async {
++        let board = NSPasteboard(name: .init(UUID().uuidString))
++        defer { board.releaseGlobally() }
++        board.setString("original", forType: .string)
++        let trace = SelectionTrace.create(trigger: .dragEnd)
++        let response = await SelectionTrace.$current.withValue(trace) {
++            await PasteboardCopyEngine(isCopyAuthorized: { true }).captureResponse(pasteboard: board) {
++                board.clearContents()
++                board.setString("selection", forType: .string)
++            }
++        }
++        XCTAssertEqual(response.status, .selection)
++        XCTAssertEqual(board.string(forType: .string), "original")
++        let report = trace.buildReport(outcome: .selection(strategy: .keyboardCopy, presence: .nonEmpty))
++        XCTAssertEqual(report.clipboardRestored, true)
++        XCTAssertNotNil(report.metrics?["copyCaptureMicros"])
++        let blockedTrace = SelectionTrace.create(trigger: .dragEnd)
++        _ = await SelectionTrace.$current.withValue(blockedTrace) {
++            await PasteboardCopyEngine(isCopyAuthorized: { false }).captureResponse(pasteboard: board) {}
++        }
++        XCTAssertNil(blockedTrace.buildReport(outcome: .none).clipboardRestored)
++    }
++
++    @MainActor
++    func testCopyTimeoutAndAuthorizationDenialAreDistinct() async {
++        let board = NSPasteboard(name: .init(UUID().uuidString))
++        defer { board.releaseGlobally() }
++        let blocked = await PasteboardCopyEngine(isCopyAuthorized: { false })
++            .captureResponse(pasteboard: board, timeout: 0.01) { XCTFail("Must not post") }
++        XCTAssertEqual(blocked.status, .copyBlocked)
++        let timeout = await PasteboardCopyEngine(isCopyAuthorized: { true })
++            .captureResponse(pasteboard: board, timeout: 0.01) {}
++        XCTAssertEqual(timeout.status, .timedOut)
++    }
++
++    @MainActor
++    func testUserCopyWhileCapturePendingPreservesUserClipboardAndReason() async {
++        let board = NSPasteboard(name: .init(UUID().uuidString))
++        defer { board.releaseGlobally() }
++        board.setString("original", forType: .string)
++        var physicalCopy = false
++        var engine = PasteboardCopyEngine(isCopyAuthorized: { true })
++        engine.userCopyObserved = { physicalCopy }
++        let response = await engine.captureResponse(pasteboard: board, timeout: 0.05) {
++            Task { @MainActor in
++                try? await Task.sleep(nanoseconds: 2_000_000)
++                physicalCopy = true
++                board.clearContents()
++                board.setString("user copy", forType: .string)
++            }
++        }
++        XCTAssertEqual(response.status, .copyBlocked)
++        XCTAssertNil(response.result)
++        XCTAssertEqual(board.string(forType: .string), "user copy")
++    }
++
++    @MainActor
++    func testSwitchDuringMenuReadDoesNotPostCopy() async {
++        var pid: pid_t? = 123
++        let board = NSPasteboard(name: .init(UUID().uuidString))
++        defer { board.releaseGlobally() }
++        let response = await AutomaticCopyCapture.captureResponse(
++            request: CopyRequest(trigger: { XCTFail("Stale target must not receive copy") },
++                                 evidence: CopyEvidence("test", .weak)),
++            pasteboard: board, frontmostPID: { pid },
++            menuState: { _ in pid = 456; return .enabled },
++            overlayPresent: { false })
++        XCTAssertEqual(response.status, .targetChanged)
++    }
++}

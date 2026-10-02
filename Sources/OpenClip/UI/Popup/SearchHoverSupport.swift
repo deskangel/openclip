@@ -1,17 +1,16 @@
 // SearchHoverSupport.swift
 // OpenClip
 //
-// Hover-target plumbing for the action-search palette (result rows + Esc keycap).
+// Hover-target plumbing for the action-search palette (result rows and chrome).
 // Split out of PopupSearchView.swift; mirrors the bar's PopupHoverSupport pattern.
 import SwiftUI
 import Core
 
-/// Hover targets within the action-search palette (result rows + Esc keycap).
+/// Hover targets within the action-search palette.
 enum SearchHoverTarget: Hashable {
     case searchBar
     case bottomDock
     case row(Int)
-    case esc
 }
 
 struct SearchHoverFramePreferenceKey: PreferenceKey {

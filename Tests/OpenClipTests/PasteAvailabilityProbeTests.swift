@@ -128,7 +128,7 @@ final class PasteAvailabilityProbeGateTests: XCTestCase {
 
     /// When the gate is full, a new probe must fail immediately.
     /// After the time limit, the gate must work again while the workers stay blocked.
-    func testSaturatedGateFailsFastThenRecoversAtDeadlineWhileWorkersStillHung() async {
+    func testSaturatedGateRecoversOnlyAfterWorkersExit() async {
         let limit = Constants.pasteProbeMaxConcurrent
         let started = expectation(description: "cap-filling lookups started")
         started.expectedFulfillmentCount = limit
@@ -166,11 +166,15 @@ final class PasteAvailabilityProbeGateTests: XCTestCase {
         }
         try? await Task.sleep(nanoseconds: 100_000_000) // Wait for the detached release.
 
-        // Before the change, the blocked worker kept the permit.
+        let cappedProbe = PasteAvailabilityProbe(lookup: { _ in XCTFail("Hung workers still own permits"); return true }, timeout: 1)
+        let capped = await cappedProbe.probePaste(pid: 1)
+        XCTAssertNil(capped)
+        for _ in 0..<limit { unblock.signal() }
+        try? await Task.sleep(nanoseconds: 50_000_000)
         let freshProbe = PasteAvailabilityProbe(lookup: { _ in false }, timeout: 1.0)
         let freshStart = Date()
         let fresh = await freshProbe.probePaste(pid: 1)
-        XCTAssertEqual(fresh, false, "permits must be free again after the deadline")
+        XCTAssertEqual(fresh, false, "permits must be free after workers exit")
         XCTAssertLessThan(Date().timeIntervalSince(freshStart), 0.3,
                           "a fresh probe must not wait behind abandoned workers")
     }
