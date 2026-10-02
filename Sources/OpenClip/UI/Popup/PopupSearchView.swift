@@ -335,22 +335,112 @@ public struct PopupSearchView: View {
         )
     }
 
-    private var contextSourceTitle: String {
-        activeSelectionContext.isClipboardFallback
-            ? String(localized: "Clipboard")
-            : String(localized: "Selection")
+    private var selectionSourceAvailable: Bool {
+        !context.selection.isClipboardFallback
+            && !context.selection.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    private var contextSourceIcon: String {
-        activeSelectionContext.isClipboardFallback ? "doc.on.clipboard" : "text.cursor"
+    private var clipboardSourceAvailable: Bool {
+        let clipboardContext = activeSelectionContext.isClipboardFallback ? activeSelectionContext : alternateContext
+        guard let clipboardContext else { return false }
+        return !clipboardContext.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func sourceIconColor(isActive: Bool, isAvailable: Bool) -> Color {
+        let color = isActive
+            ? PopupThemeModel.restForeground(for: effectiveTheme)
+            : PopupThemeModel.restSecondary(for: effectiveTheme).opacity(0.72)
+        return isAvailable ? color : color.opacity(0.35)
+    }
+
+    @ViewBuilder
+    private var sourceToggleBackground: some View {
+        if effectiveTheme == "glass",
+           #available(macOS 26.0, *),
+           !NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency {
+            Capsule()
+                .fill(Color.primary.opacity(colorScheme == .dark ? 0.04 : 0.02))
+                .background(.ultraThinMaterial, in: Capsule())
+                .glassEffect(.regular.interactive(), in: Capsule())
+        } else {
+            Capsule()
+                .fill(Color.primary.opacity(colorScheme == .dark ? 0.08 : 0.05))
+                .overlay(
+                    Capsule().stroke(
+                        colorScheme == .dark ? Color.white.opacity(0.14) : Color.black.opacity(0.08),
+                        lineWidth: 0.5
+                    )
+                )
+        }
     }
 
     private func toggleContextSource() {
         guard let alternateContext else { return }
         let nextContext = activeSelectionContext.isClipboardFallback ? context.selection : alternateContext
+        setContextSource(nextContext)
+    }
+
+    private func setContextSource(_ nextContext: SelectionContext?) {
+        guard let nextContext else { return }
         activeSelectionContext = nextContext
         onContextChanged?(nextContext)
         isFocused = true
+    }
+
+    private var customSourceSwitcher: some View {
+        HStack(spacing: 2) {
+            Button {
+                setContextSource(context.selection)
+            } label: {
+                Image("MenuBarIcon")
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 14, height: 14)
+                    .foregroundColor(sourceIconColor(
+                        isActive: !activeSelectionContext.isClipboardFallback,
+                        isAvailable: selectionSourceAvailable
+                    ))
+                    .frame(width: 24, height: 22)
+                    .background {
+                        if selectionSourceAvailable && !activeSelectionContext.isClipboardFallback {
+                            Capsule().fill(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.11))
+                        }
+                    }
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .disabled(!selectionSourceAvailable)
+            .help(String(localized: "Selection"))
+            .accessibilityLabel(String(localized: "Selection"))
+            .accessibilityAddTraits(selectionSourceAvailable && !activeSelectionContext.isClipboardFallback ? .isSelected : [])
+
+            Button {
+                setContextSource(activeSelectionContext.isClipboardFallback ? activeSelectionContext : alternateContext)
+            } label: {
+                Image(systemName: "doc.on.clipboard")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(sourceIconColor(
+                        isActive: activeSelectionContext.isClipboardFallback,
+                        isAvailable: clipboardSourceAvailable
+                    ))
+                    .frame(width: 24, height: 22)
+                    .background {
+                        if clipboardSourceAvailable && activeSelectionContext.isClipboardFallback {
+                            Capsule().fill(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.11))
+                        }
+                    }
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .disabled(!clipboardSourceAvailable)
+            .help(String(localized: "Clipboard"))
+            .accessibilityLabel(String(localized: "Clipboard"))
+            .accessibilityAddTraits(clipboardSourceAvailable && activeSelectionContext.isClipboardFallback ? .isSelected : [])
+        }
+        .padding(2)
+        .background { sourceToggleBackground }
+        .accessibilityHint(String(localized: "Press Tab to switch between selection and clipboard"))
     }
 
     private var searchFieldRow: some View {
@@ -398,38 +488,7 @@ public struct PopupSearchView: View {
 
             Spacer(minLength: 4)
 
-            if !query.isEmpty {
-                Button {
-                    query = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 13))
-                        .foregroundColor(PopupThemeModel.restSecondary(for: effectiveTheme).opacity(0.8))
-                }
-                .buttonStyle(.plain)
-            }
-
-            Button {
-                toggleContextSource()
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: contextSourceIcon)
-                        .font(.system(size: 10, weight: .medium))
-                    Text(contextSourceTitle)
-                        .font(.system(size: 10.5, weight: .medium))
-                        .lineLimit(1)
-                }
-                .foregroundColor(PopupThemeModel.restSecondary(for: effectiveTheme))
-                .padding(.horizontal, 7)
-                .padding(.vertical, 4)
-                .background(Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.06), in: Capsule())
-                .contentShape(Capsule())
-            }
-            .buttonStyle(.plain)
-            .disabled(alternateContext == nil)
-            .help(alternateContext == nil ? contextSourceTitle : String(localized: "Tab to switch text source"))
-            .accessibilityLabel(contextSourceTitle)
-            .accessibilityHint(alternateContext == nil ? "" : String(localized: "Press Tab to switch between selection and clipboard"))
+            customSourceSwitcher
         }
         .padding(.horizontal, 18)
         .offset(y: 2)
@@ -730,7 +789,7 @@ public struct PopupSearchView: View {
     @ViewBuilder
     private var footerActionButtons: some View {
         if rowCount > 0 {
-            HStack(spacing: PopupMetrics.searchFooterButtonSpacing) {
+            HStack(spacing: 4) {
                 footerButton(
                     title: isSelectedAI
                         ? PaletteAIPrompt.secondaryActionTitle(canPaste: modeStore.canPaste)
@@ -780,23 +839,9 @@ public struct PopupSearchView: View {
                 effectiveTheme: effectiveTheme,
                 colorScheme: colorScheme,
                 isHovered: hoveredFooterButton == id,
-                tint: isAccent ? .accentColor : nil,
-                cornerRadius: PopupMetrics.searchFooterOuterCornerRadius,
-                innerCornerRadius: PopupMetrics.searchFooterInnerCornerRadius,
-                isLeading: id == .paste,
-                isTrailing: id == .run
+                tint: isAccent ? .accentColor : nil
             )
-            .contentShape(
-                UnevenRoundedRectangle(
-                    cornerRadii: RectangleCornerRadii(
-                        topLeading: id == .paste ? PopupMetrics.searchFooterOuterCornerRadius : PopupMetrics.searchFooterInnerCornerRadius,
-                        bottomLeading: id == .paste ? PopupMetrics.searchFooterOuterCornerRadius : PopupMetrics.searchFooterInnerCornerRadius,
-                        bottomTrailing: id == .run ? PopupMetrics.searchFooterOuterCornerRadius : PopupMetrics.searchFooterInnerCornerRadius,
-                        topTrailing: id == .run ? PopupMetrics.searchFooterOuterCornerRadius : PopupMetrics.searchFooterInnerCornerRadius
-                    ),
-                    style: .continuous
-                )
-            )
+            .contentShape(RoundedRectangle(cornerRadius: PopupMetrics.footerButtonCornerRadius, style: .continuous))
         }
         .buttonStyle(.plain)
         .onHover { isHovering in

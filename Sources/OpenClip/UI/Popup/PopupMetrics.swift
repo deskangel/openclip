@@ -58,13 +58,8 @@ public enum PopupMetrics {
     public static let searchCornerRadius: CGFloat = 12.0
     /// Corner radius for individual search palette result rows.
     public static let searchRowCornerRadius: CGFloat = 8.0
-    /// Corner radius for the joined search-palette footer buttons.
-    public static let searchFooterOuterCornerRadius: CGFloat = 2.0
-    public static let searchFooterInnerCornerRadius: CGFloat = 1.0
-    /// Gap between joined search-palette footer buttons.
-    public static let searchFooterButtonSpacing: CGFloat = 1.0
-    /// Radius used by independent result-card footer controls.
-    public static let footerButtonCornerRadius: CGFloat = 12.0
+    /// Shared radius for footer controls in the search palette and result card.
+    public static let footerButtonCornerRadius: CGFloat = 10.0
     /// Corner radius for floating toast bubbles.
     public static let toastCornerRadius: CGFloat = 14.0
     /// Maximum character length displayed in floating toast bubbles before truncating with an ellipsis.

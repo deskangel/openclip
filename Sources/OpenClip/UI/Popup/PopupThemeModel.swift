@@ -238,22 +238,9 @@ struct PopupFooterButtonChrome: ViewModifier {
     let colorScheme: ColorScheme
     let isHovered: Bool
     var tint: Color? = nil
-    var cornerRadius: CGFloat = PopupMetrics.footerButtonCornerRadius
-    var innerCornerRadius: CGFloat? = nil
-    var isLeading: Bool = false
-    var isTrailing: Bool = false
 
-    private var shape: UnevenRoundedRectangle {
-        let inner = innerCornerRadius ?? cornerRadius
-        return UnevenRoundedRectangle(
-            cornerRadii: RectangleCornerRadii(
-                topLeading: isLeading ? cornerRadius : inner,
-                bottomLeading: isLeading ? cornerRadius : inner,
-                bottomTrailing: isTrailing ? cornerRadius : inner,
-                topTrailing: isTrailing ? cornerRadius : inner
-            ),
-            style: .continuous
-        )
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: PopupMetrics.footerButtonCornerRadius, style: .continuous)
     }
 
     func body(content: Content) -> some View {
@@ -307,22 +294,14 @@ extension View {
         effectiveTheme: String,
         colorScheme: ColorScheme,
         isHovered: Bool,
-        tint: Color? = nil,
-        cornerRadius: CGFloat = PopupMetrics.footerButtonCornerRadius,
-        innerCornerRadius: CGFloat? = nil,
-        isLeading: Bool = false,
-        isTrailing: Bool = false
+        tint: Color? = nil
     ) -> some View {
         modifier(
             PopupFooterButtonChrome(
                 effectiveTheme: effectiveTheme,
                 colorScheme: colorScheme,
                 isHovered: isHovered,
-                tint: tint,
-                cornerRadius: cornerRadius,
-                innerCornerRadius: innerCornerRadius,
-                isLeading: isLeading,
-                isTrailing: isTrailing
+                tint: tint
             )
         )
     }

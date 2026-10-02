@@ -1010,7 +1010,7 @@ public struct ResultCardView: View {
 
     @ViewBuilder
     private var fileButtons: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 4) {
             Button {
                 onCopy()
             } label: {
@@ -1386,7 +1386,7 @@ public struct ResultCardView: View {
     /// offers Close.
     @ViewBuilder
     private var resultButtons: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 4) {
             Button {
                 onCopy()
             } label: {
