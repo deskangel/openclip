@@ -38,7 +38,7 @@ public struct PopupView: View {
     /// Called when the result card should close outright (Esc) — the popup goes away rather than
     /// falling back to the bar.
     public let onDismissContent: @MainActor () -> Void
-    /// Called as the result card's header handle is dragged, so the controller can move the panel.
+    /// Called as the result card or search header is dragged, so the controller can move the panel.
     public let onCardDrag: (@MainActor (ResultCardDragPhase) -> Void)?
     /// Called as a resize handle of the result card or the search palette is dragged, so the
     /// controller can resize the surface (and the panel around it) and remember the size.
@@ -541,6 +541,7 @@ public struct PopupView: View {
             usageRecency: ActionUsageStore.shared.recency,
             onResult: onResult,
             onExit: onExitSearch,
+            onDrag: { phase in onCardDrag?(phase) },
             onExitScope: {
                 modeStore.scope = nil
                 onExitSearch()

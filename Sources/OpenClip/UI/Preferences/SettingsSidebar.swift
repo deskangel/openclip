@@ -14,6 +14,16 @@ import SwiftUI
 import AppKit
 import Core
 
+extension SettingKey where Value == Bool {
+    static var preferencesActionsSectionExpanded: SettingKey<Bool> {
+        SettingKey<Bool>("preferencesSidebar.actionsExpanded", defaultValue: true)
+    }
+
+    static var preferencesInstalledSectionExpanded: SettingKey<Bool> {
+        SettingKey<Bool>("preferencesSidebar.installedExpanded", defaultValue: true)
+    }
+}
+
 // MARK: - Rows
 
 /// One sidebar row, resolved to strings so the filter can run over it without touching the models.
@@ -242,6 +252,8 @@ struct SettingsSidebar: View {
     @Binding var query: String
     let systemRows: [SettingsSidebarRow]
     let extensionRows: [SettingsSidebarRow]
+    @Setting(SettingKey.preferencesActionsSectionExpanded) private var actionsSectionExpanded
+    @Setting(SettingKey.preferencesInstalledSectionExpanded) private var installedSectionExpanded
     @State private var hoveredRowID: String? = nil
 
     private var filteredSystemRows: [SettingsSidebarRow] {
@@ -254,6 +266,10 @@ struct SettingsSidebar: View {
 
     private var hasResults: Bool {
         !filteredSystemRows.isEmpty || !filteredExtensionRows.isEmpty
+    }
+
+    private var isFiltering: Bool {
+        !SettingsSidebarRow.words(in: query).isEmpty
     }
 
     var body: some View {
@@ -280,35 +296,35 @@ struct SettingsSidebar: View {
                         }
 
                         let (bundled, installed) = SettingsSidebarOrder.split(filteredExtensionRows)
+                        let actionsExpanded = actionsSectionExpanded || isFiltering
+                        let installedExpanded = installedSectionExpanded || isFiltering
 
                         if !bundled.isEmpty {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(String(localized: "Actions"))
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(SettingsDesignTokens.secondaryText.opacity(0.7))
-                                    .padding(.leading, 10)
-                                    .padding(.top, SettingsDesignTokens.sidebarGroupSpacing)
-                                    .padding(.bottom, 4)
+                                sectionHeader("Actions", isExpanded: actionsExpanded) {
+                                    actionsSectionExpanded.toggle()
+                                }
 
-                                ForEach(bundled) { row in
-                                    rowView(row)
-                                        .id(row.page.id)
+                                if actionsExpanded {
+                                    ForEach(bundled) { row in
+                                        rowView(row)
+                                            .id(row.page.id)
+                                    }
                                 }
                             }
                         }
 
                         if !installed.isEmpty {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(String(localized: "Installed"))
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(SettingsDesignTokens.secondaryText.opacity(0.7))
-                                    .padding(.leading, 10)
-                                    .padding(.top, SettingsDesignTokens.sidebarGroupSpacing)
-                                    .padding(.bottom, 4)
+                                sectionHeader("Installed", isExpanded: installedExpanded) {
+                                    installedSectionExpanded.toggle()
+                                }
 
-                                ForEach(installed) { row in
-                                    rowView(row)
-                                        .id(row.page.id)
+                                if installedExpanded {
+                                    ForEach(installed) { row in
+                                        rowView(row)
+                                            .id(row.page.id)
+                                    }
                                 }
                             }
                         }
@@ -337,6 +353,33 @@ struct SettingsSidebar: View {
                 scrollSelectionIntoView(proxy, animated: false)
             }
         }
+    }
+
+    private func sectionHeader(
+        _ title: LocalizedStringKey,
+        isExpanded: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 8, weight: .bold))
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    .frame(width: 10)
+
+                Text(title)
+                    .font(.system(size: 11, weight: .semibold))
+
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(SettingsDesignTokens.secondaryText.opacity(0.7))
+            .contentShape(Rectangle())
+            .padding(.leading, 10)
+            .padding(.top, SettingsDesignTokens.sidebarGroupSpacing)
+            .padding(.bottom, 4)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
     }
 
     private var searchField: some View {

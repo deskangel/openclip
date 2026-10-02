@@ -177,6 +177,15 @@ areas; stale debt notes are worse than none.
   model are gone, and the inline status banner is gone too: every `StatusFeedback` renders as a
   floating toast (`ToastPanelController`) with no queue — a status shows over the card — and
   `showsLoading` actions (manifest `"loading"`) use the early-close spinner toast.
+- **Search and result-card footers share separate theme-aware buttons.**
+  `PopupFooterButtonChrome` uses a native `.glassEffect` rounded rectangle for the glass theme on
+  macOS 26+, with a material/tint fallback; secondary actions are neutral and the primary action
+  uses the accent color. Buttons have a 12pt radius, compact targets, and a 6pt gap, with an 8pt
+  trailing inset so the final button sits closer to the popup edge.
+- **The search header can move the popup.** Dragging its magnifying glass or the clear strips above
+  and below the text field uses the result card's panel-drag path; editing and selecting search text
+  remains on the text field. The pre-search bar frame moves by the same delta so leaving search
+  returns the bar to the dragged position.
 - **Define has a single display picker; popover mode is a system Look Up popover, not inline
   content.** `DefineAction` exposes one `definitionDisplay` picker (`card` default / `popover` /
   `dictionary`), replacing the old `openInDictionaryApp` boolean; a legacy `true` migrates to

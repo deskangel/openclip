@@ -809,11 +809,11 @@ public class PopupWindowController {
         panel.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? Self.fallbackScreenBounds
     }
 
-    /// Where the panel sat, and where the cursor was, when the current card drag began. Nil while
+    /// Where the panel sat, and where the cursor was, when the current header drag began. Nil while
     /// no drag is in flight.
     private var cardDragAnchor: (mouse: CGPoint, origin: CGPoint)?
 
-    /// Moves the panel with the cursor while the card's header handle is dragged. The move is
+    /// Moves the panel with the cursor while the card or search header is dragged. The move is
     /// computed from the *absolute* cursor position against the anchor taken at `.began`, never
     /// from the gesture's own translation: the window moves out from under the pointer, so a
     /// translation-based move would fight itself and crawl. `mouseLocation` is injectable so the
@@ -830,9 +830,16 @@ public class PopupWindowController {
             panel.setFrameOrigin(CGPoint(x: anchor.origin.x + (mouse.x - anchor.mouse.x),
                                          y: anchor.origin.y + (mouse.y - anchor.mouse.y)))
         case .ended:
+            if modeStore.mode == .search, let anchor = cardDragAnchor, var frame = preSearchFrame {
+                frame.origin.x += panel.frame.origin.x - anchor.origin.x
+                frame.origin.y += panel.frame.origin.y - anchor.origin.y
+                preSearchFrame = frame
+            }
             cardDragAnchor = nil
             panel.endUserDrag()
-            hasUserMovedCard = true
+            if modeStore.mode == .content {
+                hasUserMovedCard = true
+            }
         }
     }
 

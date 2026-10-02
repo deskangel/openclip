@@ -163,6 +163,9 @@ xcodegen generate
 ./scripts/package_app.sh
 ```
 
+The test runner shows grouped progress by test class by default. Add `--verbose` to see the
+complete Xcode and XCTest output. Use `./scripts/test.sh core` for the fast Core test subset.
+
 > [!NOTE]
 > Local builds are signed **ad-hoc**, so no Apple Developer account, certificate, or network
 > access is needed to build or run OpenClip from source. They carry the same hardened runtime and

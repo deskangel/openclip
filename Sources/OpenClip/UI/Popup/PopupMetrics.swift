@@ -55,9 +55,11 @@ public enum PopupMetrics {
     /// Corner radius for modal result cards and the action-search palette.
     public static let cardCornerRadius: CGFloat = 14.0
     /// Corner radius for the action-search palette.
-    public static let searchCornerRadius: CGFloat = 14.0
+    public static let searchCornerRadius: CGFloat = 12.0
     /// Corner radius for individual search palette result rows.
     public static let searchRowCornerRadius: CGFloat = 8.0
+    /// Shared radius for footer controls in the search palette and result card.
+    public static let footerButtonCornerRadius: CGFloat = 12.0
     /// Corner radius for floating toast bubbles.
     public static let toastCornerRadius: CGFloat = 14.0
     /// Maximum character length displayed in floating toast bubbles before truncating with an ellipsis.
@@ -113,13 +115,13 @@ public enum PopupMetrics {
     public static let searchPanelContentWidth: CGFloat = 340.0
     public static var searchPanelWidth: CGFloat { searchPanelContentWidth + 2 * popupShadowInset }
     public static let searchMaxRows: Int = 6
-    public static let searchResultRowHeight: CGFloat = 31
+    public static let searchResultRowHeight: CGFloat = 30
     /// Fraction of an extra result row shown beyond `searchMaxRows` so the next action peeks,
     /// hinting that the list scrolls.
     public static let searchPeekRowFraction: CGFloat = 0.0
     /// Smallest size the palette allows: compacts to default width (340 pt) and visible rows height.
     public static let searchPaletteMinWidth: CGFloat = searchPanelContentWidth
-    public static let searchPaletteMinHeight: CGFloat = 276.0
+    public static let searchPaletteMinHeight: CGFloat = 270.0
     /// Shared height cap for the popup panel (search palette field + result rows and content cards).
     /// Lifted per session via `PopupPanel.heightCap` while a resizable surface shows.
     public static let popupMaxHeight: CGFloat = 312

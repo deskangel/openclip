@@ -54,7 +54,7 @@ public class PopupPanel: NSPanel {
         set { horizontalAnchor = newValue ? .center : .none }
     }
 
-    /// True for the duration of a user drag of the panel (result card header). The controller's
+    /// True for the duration of a user drag of the panel (result card or search header). The controller's
     /// hover tracking stops toggling `ignoresMouseEvents` while it is set: a fast drag can take the
     /// cursor across the transparent shadow ring, and making the panel ignore mouse events
     /// mid-drag would strand it under the pointer.
@@ -73,10 +73,10 @@ public class PopupPanel: NSPanel {
         self.isOpaque = false
         self.hasShadow = false   // SwiftUI draws its own shadow; panel shadow causes double artifacts
         self.acceptsMouseMovedEvents = true
-        self.isMovable = true    // borderless, but the result card moves the panel by its header
+        self.isMovable = true    // borderless; SwiftUI header gestures move the panel
     }
 
-    /// Opens a user drag of the panel (the result card's header handle). The move itself is driven
+    /// Opens a user drag of the panel (the result card or search header). The move itself is driven
     /// by `PopupWindowController.handleCardDrag` — AppKit's own `performDrag` is unreachable here,
     /// since `NSHostingView` answers `hitTest` for the whole card and never lets an AppKit handle
     /// see the `mouseDown`. The user placing the panel deliberately outranks automatic placement,

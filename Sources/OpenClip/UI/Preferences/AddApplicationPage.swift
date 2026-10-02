@@ -29,7 +29,7 @@ public struct AddApplicationPage: View {
         for app in NSWorkspace.shared.runningApplications {
             if app.activationPolicy == .regular,
                let bid = app.bundleIdentifier,
-               bid != "com.openclip.OpenClip",
+               !bid.hasPrefix("com.openclip."),
                map[bid] == nil {
                 let name = app.localizedName ?? bid
                 let path = app.bundleURL?.path ?? ""

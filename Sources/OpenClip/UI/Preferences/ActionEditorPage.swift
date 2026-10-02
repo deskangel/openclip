@@ -286,49 +286,6 @@ public struct ActionEditorPage: View {
         }
     }
 
-    private var actionDescription: String {
-        let state = manifestState ?? Self.locateManifest(for: action)
-        if let desc = state?.manifest.localizedDescription?.resolve() ?? state?.manifest.description,
-           !desc.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return desc
-        }
-        switch action.id {
-        case "builtin.calculate":
-            return String(localized: "Evaluate math expressions.")
-        case "builtin.define":
-            return String(localized: "Look a word up in the macOS Dictionary.")
-        case "builtin.search":
-            return String(localized: "Search the web with your chosen engine.")
-        case "builtin.copy":
-            return String(localized: "Copy the selected text.")
-        case "builtin.paste":
-            return String(localized: "Paste the clipboard content.")
-        case "builtin.cut":
-            return String(localized: "Cut the selected text.")
-        case "builtin.calendar":
-            return String(localized: "Add the selected text as a calendar event.")
-        case "builtin.openurl":
-            return String(localized: "Open the selected text as a link.")
-        case "builtin.reveal_in_finder":
-            return String(localized: "Reveal the selected file path in Finder.")
-        case "builtin.completion":
-            return String(localized: "Complete the word you are typing.")
-        default:
-            break
-        }
-        if ActionIdentity.isAIPreset(action) || action.chrome.launchesAI {
-            return String(localized: "Run the selected text through AI.")
-        }
-        if isCustomAction {
-            return String(localized: "A custom action you wrote.")
-        }
-        if let packageID = ActionIdentity.extensionPackageID(of: action),
-           let info = InstalledExtensionInfo.info(for: packageID, in: coordinator.actions) {
-            return info.name
-        }
-        return ""
-    }
-
     private var actionEnabledBinding: Binding<Bool> {
         ActionEnablement.binding(
             for: action,
@@ -527,14 +484,7 @@ public struct ActionEditorPage: View {
                                     .padding(.vertical, 1.5)
                                     .background(Capsule().fill(Color(white: 1.0, opacity: 0.08)))
                             }
-                        }
 
-                        if !actionDescription.isEmpty {
-                            Text(actionDescription)
-                                .font(.system(size: 12))
-                                .foregroundStyle(SettingsDesignTokens.secondaryText)
-                                .lineLimit(2)
-                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
 
@@ -545,7 +495,6 @@ public struct ActionEditorPage: View {
                         .toggleStyle(.switch)
                         .controlSize(.regular)
                 }
-
                 if let packageID = extensionPackageID {
                     Divider()
                         .opacity(0.3)
@@ -616,7 +565,10 @@ public struct ActionEditorPage: View {
                     SettingsRow(
                         title: "Icon",
                         subtitle: "Choose a custom symbol for the popup bar.",
-                        systemImage: "app.dashed"
+                        systemImage: "app.dashed",
+                        iconTileTint: heroTint,
+                        plainIcon: true,
+                        descriptionOnHover: true
                     ) {
                         Button {
                             isIconPickerPresented = true
@@ -647,19 +599,12 @@ public struct ActionEditorPage: View {
                     SettingsRow(
                         title: "Name",
                         subtitle: "Custom title shown in search and the popup bar.",
-                        systemImage: "textformat"
+                        systemImage: "textformat",
+                        iconTileTint: Color(red: 0.10, green: 0.74, blue: 0.66),
+                        plainIcon: true,
+                        descriptionOnHover: true
                     ) {
-                        TextField(action.title, text: $customTitle, prompt: Text(action.title))
-                            .textFieldStyle(.plain)
-                            .font(.system(size: 13))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 5)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                    .fill(Color(white: 1.0, opacity: 0.08))
-                            )
-                            .frame(maxWidth: 220)
-                            .disabled(manifestMissing)
+                        customNameField
                     }
 
                     SettingsDivider()
@@ -667,7 +612,10 @@ public struct ActionEditorPage: View {
                     SettingsRow(
                         title: "Show as",
                         subtitle: "Display as an icon or as text in the popup bar.",
-                        systemImage: "rectangle.split.2x1"
+                        systemImage: "rectangle.split.2x1",
+                        iconTileTint: SettingsTint.customize,
+                        plainIcon: true,
+                        descriptionOnHover: true
                     ) {
                         Picker("", selection: $displayMode) {
                             Text("Icon").tag(0)
@@ -691,7 +639,11 @@ public struct ActionEditorPage: View {
                         if hasTriggers {
                             SettingsRow(
                                 title: "Keyboard Shortcut",
-                                subtitle: "Global hotkey to run this action directly."
+                                subtitle: "Global hotkey to run this action directly.",
+                                systemImage: "keyboard",
+                                iconTileTint: SettingsDesignTokens.iconTileColor(forSystemImage: "keyboard"),
+                                plainIcon: true,
+                                descriptionOnHover: true
                             ) {
                                 Shortcut(for: .actionHotkey(action.id))
                             }
@@ -700,7 +652,11 @@ public struct ActionEditorPage: View {
 
                             SettingsRow(
                                 title: "Search Alias",
-                                subtitle: "Keyword to jump to this action in the search palette."
+                                subtitle: "Keyword to jump to this action in the search palette.",
+                                systemImage: "text.magnifyingglass",
+                                iconTileTint: SettingsDesignTokens.iconTileColor(forSystemImage: "magnifyingglass"),
+                                plainIcon: true,
+                                descriptionOnHover: true
                             ) {
                                 HStack(spacing: 8) {
                                     if let aliasError {
@@ -730,7 +686,11 @@ public struct ActionEditorPage: View {
                         if hasOutput {
                             SettingsRow(
                                 title: "When finished",
-                                subtitle: "Where to send the output of this action."
+                                subtitle: "Where to send the output of this action.",
+                                systemImage: "arrow.turn.down.right",
+                                iconTileTint: SettingsDesignTokens.iconTileColor(forSystemImage: "arrow.turn.down.right"),
+                                plainIcon: true,
+                                descriptionOnHover: true
                             ) {
                                 Picker("", selection: $deliveryPrefString) {
                                     Text("Show in card").tag("preview")
@@ -978,6 +938,21 @@ public struct ActionEditorPage: View {
         } message: {
             Text(String(localized: "This will remove the extension and all of its commands from OpenClip."))
         }
+    }
+
+    @ViewBuilder
+    private var customNameField: some View {
+        TextField(action.title, text: $customTitle, prompt: Text(action.title))
+            .textFieldStyle(.plain)
+            .font(.system(size: 13))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color(white: 1.0, opacity: 0.08))
+            )
+            .frame(maxWidth: 220)
+            .disabled(manifestMissing)
     }
 
     // MARK: - Extension Updates & Uninstall

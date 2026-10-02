@@ -1,8 +1,10 @@
 #!/bin/bash
 # OpenClip Test Runner Script
-# Usage: ./scripts/test.sh [--unit | TestClassName]
-#   --unit        run the unit suite (skips live-integration tests)
-#   TestClassName run a single test class (e.g. ActionRegistryTests)
+# Usage: ./scripts/test.sh [core | all | TestClassName] [--verbose]
+#   core          run the fast Core domain suite
+#   all           run the full test suite
+#   TestClassName run one test class (e.g. ActionRegistryTests)
+#   --verbose     show the full xcodebuild and XCTest output
 
 set -eo pipefail
 
@@ -42,6 +44,8 @@ CORE_TEST_FLAGS=(
 )
 
 run_xcodebuild() {
+    local group_total="$1"
+    shift
     local extra_args=("$@")
     # Force tests to run in English (-testLanguage en) so hardcoded English assertions in the
     # suite are deterministic regardless of the host machine's locale (dev machines run zh-Hans;
@@ -51,26 +55,62 @@ run_xcodebuild() {
 
     if [ "$VERBOSE" = true ]; then
         "${cmd[@]}"
-    elif command -v xcbeautify >/dev/null 2>&1; then
-        if [ -n "${GITHUB_ACTIONS:-}" ]; then
-            "${cmd[@]}" 2>&1 | xcbeautify --renderer github-actions --is-ci
-        else
-            "${cmd[@]}" 2>&1 | xcbeautify
-        fi
     else
-        # Fallback filter that retains test suites, test cases, passes, failures, assertion error lines, and final status
-        "${cmd[@]}" 2>&1 | grep -E "Test Suite|Test Case|passed|failed|failure|error:|SUCCEEDED|FAILED|\*\*"
+        local output_file
+        output_file="$(mktemp "${TMPDIR:-/tmp}/openclip-tests.XXXXXX")"
+        printf 'Running tests in %s groups. Use --verbose for full output.\n' "$group_total"
+
+        if "${cmd[@]}" 2>&1 | tee "$output_file" | awk -v total="$group_total" '
+            index($0, "Test Suite ") && index($0, " started at ") {
+                suite = $0
+                quote = sprintf("%c", 39)
+                sub("^.*Test Suite " quote, "", suite)
+                sub(quote ".*", "", suite)
+                if (suite == "All tests" || suite ~ /\.xctest$/) next
+                sub(/^.*\./, "", suite)
+                if (!seen[suite]++) {
+                    count++
+                    printf "[%d/%d] %s\n", count, total, suite
+                    fflush()
+                }
+            }
+        '; then
+            awk '/Executed [0-9]+ tests/ { summary = $0 }
+                 /\*\* TEST SUCCEEDED \*\*/ { result = $0 }
+                 END {
+                     if (summary != "") print summary
+                     if (result != "") print result
+                     if (summary == "" && result == "") print "Test run finished."
+                 }' "$output_file"
+            rm -f "$output_file"
+        else
+            local status=$?
+            printf '\nTest run failed. Relevant output:\n'
+            awk '
+                /Test Case .* failed/ { print; next }
+                /\/Sources\/.*:[0-9]+: error:/ || /\/Tests\/.*:[0-9]+: error:/ { print; next }
+                /\*\* BUILD FAILED \*\*/ || /\*\* TEST FAILED \*\*/ { print; next }
+                /Executed [0-9]+ tests, with [1-9][0-9]* failures/ { summary = $0 }
+                END { if (summary != "") print summary }
+            ' "$output_file"
+            printf '\nRun again with --verbose to see the complete build and test log.\n'
+            rm -f "$output_file"
+            return "$status"
+        fi
     fi
 }
 
 if [ "$TEST_ARG" = "core" ]; then
-    echo "Running Core domain test suite..."
-    run_xcodebuild "${CORE_TEST_FLAGS[@]}"
-elif [ "$TEST_ARG" = "--unit" ] || [ "$TEST_ARG" = "all" ] || [ -z "$TEST_ARG" ]; then
-    echo "Running full test suite (0 skips)..."
-    run_xcodebuild
+    run_xcodebuild "${#CORE_TEST_FLAGS[@]}" "${CORE_TEST_FLAGS[@]}"
+elif [ "$TEST_ARG" = "all" ] || [ -z "$TEST_ARG" ]; then
+    TEST_GROUP_TOTAL="$(rg --no-filename -o 'class [A-Za-z0-9_]+Tests: XCTestCase' Tests/OpenClipTests \
+        | sed -E 's/^class ([A-Za-z0-9_]+Tests): XCTestCase$/\1/' \
+        | sort -u | wc -l | tr -d '[:space:]')"
+    run_xcodebuild "$TEST_GROUP_TOTAL"
 else
-    echo "Running test class: $TEST_ARG..."
-    run_xcodebuild -only-testing:OpenClipTests/"$TEST_ARG"
+    if [[ "$TEST_ARG" == -* ]]; then
+        printf 'Unknown option: %s\nUsage: ./scripts/test.sh [core | all | TestClassName] [--verbose]\n' "$TEST_ARG" >&2
+        exit 2
+    fi
+    run_xcodebuild 1 -only-testing:OpenClipTests/"$TEST_ARG"
 fi
-

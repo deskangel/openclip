@@ -23,14 +23,20 @@ public struct BrowserTabOpener {
         try await AppleScriptRunner.shared.run(source, timeout: timeout)
     }
     /// Hands the URL to the app through LaunchServices. Returns whether LaunchServices accepted it.
-    var openWithApplication: @MainActor @Sendable (URL, String) -> Bool = { url, bundleID in
-        NSWorkspace.shared.open(
-            [url],
-            withAppBundleIdentifier: bundleID,
-            options: [],
-            additionalEventParamDescriptor: nil,
-            launchIdentifiers: nil
-        )
+    var openWithApplication: @MainActor @Sendable (URL, String) async -> Bool = { url, bundleID in
+        guard let applicationURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
+            return false
+        }
+        let configuration = NSWorkspace.OpenConfiguration()
+        return await withCheckedContinuation { continuation in
+            NSWorkspace.shared.open(
+                [url],
+                withApplicationAt: applicationURL,
+                configuration: configuration
+            ) { application, error in
+                continuation.resume(returning: application != nil && error == nil)
+            }
+        }
     }
     /// Last resort: the system default handler.
     var openDefault: @MainActor @Sendable (URL) -> Void = { url in
@@ -50,7 +56,7 @@ public struct BrowserTabOpener {
                 Log.resultHandler.error("browser tab via AppleScript failed for \(bundleID, privacy: .public): \(error.localizedDescription, privacy: .private); falling back to LaunchServices")
             }
         }
-        if !openWithApplication(url, bundleID) {
+        if !(await openWithApplication(url, bundleID)) {
             openDefault(url)
         }
     }

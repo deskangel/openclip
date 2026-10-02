@@ -12,6 +12,7 @@ import Core
 @MainActor
 struct AboutTab: View {
     @State private var isExporting = false
+    @State private var isReleaseNotesPopoverPresented = false
     @ObservedObject private var updateManager = AppUpdateManager.shared
 
     private var version: String {
@@ -31,18 +32,7 @@ struct AboutTab: View {
                         SettingsDivider()
 
                         if let notes = updateManager.availableUpdateReleaseNotes, !notes.isEmpty {
-                            DisclosureGroup("Release Notes") {
-                                ScrollView {
-                                    Text(LocalizedStringKey(notes))
-                                        .font(.callout)
-                                        .textSelection(.enabled)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .padding(.vertical, 4)
-                                }
-                                .frame(maxHeight: 140)
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
+                            releaseNotesRow(notes: notes, version: newVersion)
                             SettingsDivider()
                         }
                     }
@@ -179,6 +169,7 @@ struct AboutTab: View {
                 HStack(spacing: 4) {
                     Image(systemName: "heart.fill")
                         .font(.caption.weight(.semibold))
+                        .foregroundStyle(.red)
                     Text(String(localized: "Donate"))
                     Image(systemName: "arrow.up.right")
                         .font(.caption2.weight(.semibold))
@@ -234,6 +225,30 @@ struct AboutTab: View {
                         updateManager.installUpdateOnQuit()
                     }
                 }
+            }
+        }
+    }
+
+    private func releaseNotesRow(notes: String, version: String) -> some View {
+        SettingsRow(title: "Release Notes", subtitle: LocalizedStringKey("Version \(version)")) {
+            Button {
+                isReleaseNotesPopoverPresented = true
+            } label: {
+                Label("View Notes", systemImage: "doc.text")
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(SettingsDesignTokens.primaryText)
+                    .padding(.horizontal, 10)
+                    .frame(height: 24)
+                    .settingsGlassCapsule()
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .popover(isPresented: $isReleaseNotesPopoverPresented, arrowEdge: .trailing) {
+                ReleaseNotesPopover(
+                    notes: notes,
+                    format: updateManager.availableUpdateReleaseNotesFormat,
+                    version: version
+                )
             }
         }
     }
@@ -314,5 +329,79 @@ struct AboutTab: View {
                 )
             }
         }
+    }
+}
+
+private struct ReleaseNotesPopover: View {
+    let notes: String
+    let format: String?
+    let version: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Release Notes")
+                    .font(.headline)
+                Text("Version \(version)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            SettingsDivider()
+
+            ScrollView {
+                Text(formattedNotes)
+                    .font(.callout)
+                    .lineSpacing(3)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.bottom, 4)
+            }
+            .frame(maxHeight: 300)
+        }
+        .padding(16)
+        .frame(width: 380, alignment: .leading)
+    }
+
+    private var formattedNotes: AttributedString {
+        switch format?.lowercased() {
+        case "plain-text":
+            return AttributedString(notes)
+        case "html":
+            return htmlAttributedNotes
+        case "markdown", nil:
+            return (try? AttributedString(markdown: notes, options: .init(interpretedSyntax: .full)))
+                ?? AttributedString(notes)
+        default:
+            return AttributedString(notes)
+        }
+    }
+
+    private var htmlAttributedNotes: AttributedString {
+        let document = """
+        <meta charset="utf-8"><style>
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 13px; }
+        h1, h2, h3 { margin: 0 0 8px; }
+        p, ul, ol { margin: 0 0 8px; }
+        ul, ol { padding-left: 20px; }
+        </style>\(notes)
+        """
+        let options: [NSAttributedString.DocumentReadingOptionKey: Any] = [
+            .documentType: NSAttributedString.DocumentType.html,
+            .characterEncoding: String.Encoding.utf8.rawValue
+        ]
+        guard let imported = try? NSAttributedString(
+            data: Data(document.utf8),
+            options: options,
+            documentAttributes: nil
+        ) else {
+            return AttributedString(notes)
+        }
+
+        let readable = NSMutableAttributedString(attributedString: imported)
+        if readable.length > 0 {
+            readable.addAttribute(.foregroundColor, value: NSColor.labelColor, range: NSRange(location: 0, length: readable.length))
+        }
+        return AttributedString(readable)
     }
 }

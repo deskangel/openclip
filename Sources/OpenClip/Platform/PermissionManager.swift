@@ -72,7 +72,7 @@ public final class PermissionManager: ObservableObject {
             do {
                 _ = try await ShellProcessRunner.run(ShellProcessRunner.Invocation(
                     executableURL: URL(fileURLWithPath: "/usr/bin/tccutil"),
-                    arguments: ["reset", "Accessibility", "com.openclip.OpenClip"],
+                    arguments: ["reset", "Accessibility", Bundle.main.bundleIdentifier ?? "com.openclip.OpenClip"],
                     environment: [:]
                 ))
             } catch {

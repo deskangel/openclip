@@ -11,6 +11,8 @@ extension SettingsCatalog {
     static var appKeys: [AnySettingKey] {
         [
             SettingKey.showMenuBarIcon.erased,
+            SettingKey.preferencesActionsSectionExpanded.erased,
+            SettingKey.preferencesInstalledSectionExpanded.erased,
             SettingKey.resultCardWidth.erased,
             SettingKey.resultCardHeight.erased,
 

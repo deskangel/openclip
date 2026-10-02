@@ -83,6 +83,9 @@ struct SettingsRowLabel: View {
     /// Renders the glyph as a plain, secondary-colored symbol instead of a colored tile. A neutral
     /// anchor for control rows, where a saturated tile would just be decoration.
     var plainIcon: Bool
+    var descriptionOnHover: Bool
+    @State private var isHovered = false
+    @State private var isDescriptionPresented = false
 
     /// Creates a settings label with an optional localized subtitle.
     init(
@@ -90,7 +93,8 @@ struct SettingsRowLabel: View {
         subtitle: LocalizedStringKey? = nil,
         systemImage: String? = nil,
         iconTileTint: Color? = nil,
-        plainIcon: Bool = false
+        plainIcon: Bool = false,
+        descriptionOnHover: Bool = false
     ) {
         self.title = title
         self.subtitle = subtitle
@@ -98,6 +102,7 @@ struct SettingsRowLabel: View {
         self.systemImage = systemImage
         self.iconTileTint = iconTileTint
         self.plainIcon = plainIcon
+        self.descriptionOnHover = descriptionOnHover
     }
 
     /// Creates a settings label with an optional prebuilt subtitle view.
@@ -106,7 +111,8 @@ struct SettingsRowLabel: View {
         subtitleText: Text?,
         systemImage: String? = nil,
         iconTileTint: Color? = nil,
-        plainIcon: Bool = false
+        plainIcon: Bool = false,
+        descriptionOnHover: Bool = false
     ) {
         self.title = title
         self.subtitle = nil
@@ -114,6 +120,7 @@ struct SettingsRowLabel: View {
         self.systemImage = systemImage
         self.iconTileTint = iconTileTint
         self.plainIcon = plainIcon
+        self.descriptionOnHover = descriptionOnHover
     }
 
     var body: some View {
@@ -122,7 +129,7 @@ struct SettingsRowLabel: View {
                 if plainIcon {
                     Image(systemName: systemImage)
                         .font(.system(size: 13, weight: .regular))
-                        .foregroundStyle(SettingsDesignTokens.secondaryText)
+                        .foregroundStyle(iconTileTint ?? SettingsDesignTokens.secondaryText)
                         .frame(width: 20, alignment: .center)
                 } else {
                     let tint = iconTileTint ?? SettingsDesignTokens.iconTileColor(forSystemImage: systemImage)
@@ -130,22 +137,59 @@ struct SettingsRowLabel: View {
                 }
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(SettingsDesignTokens.rowTitleColor)
-                if let subtitleText {
-                    subtitleText
-                        .font(.caption)
-                        .foregroundStyle(SettingsDesignTokens.rowSubtitleColor)
-                        .fixedSize(horizontal: false, vertical: true)
-                } else if let subtitle {
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(SettingsDesignTokens.rowSubtitleColor)
-                        .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 5) {
+                    Text(title)
+                        .font(.system(size: 13, weight: .regular))
+                        .foregroundStyle(SettingsDesignTokens.rowTitleColor)
+
+                    if descriptionOnHover && (subtitle != nil || subtitleText != nil) {
+                        Button {
+                            isDescriptionPresented = true
+                        } label: {
+                            Image(systemName: "info.circle")
+                                .font(.system(size: 11, weight: .regular))
+                                .foregroundStyle(SettingsDesignTokens.secondaryText)
+                                .frame(width: 16, height: 16)
+                                .contentShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .opacity(isHovered || isDescriptionPresented ? 1 : 0)
+                        .help(String(localized: "Show setting description"))
+                        .accessibilityLabel(String(localized: "Show setting description"))
+                        .popover(isPresented: $isDescriptionPresented, arrowEdge: .leading) {
+                            Group {
+                                if let subtitleText {
+                                    subtitleText
+                                } else if let subtitle {
+                                    Text(subtitle)
+                                }
+                            }
+                            .font(.system(size: 12))
+                            .foregroundStyle(SettingsDesignTokens.primaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: 280, alignment: .leading)
+                            .padding(12)
+                        }
+                    }
+                }
+
+                if !descriptionOnHover {
+                    if let subtitleText {
+                        subtitleText
+                            .font(.caption)
+                            .foregroundStyle(SettingsDesignTokens.rowSubtitleColor)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else if let subtitle {
+                        Text(subtitle)
+                            .font(.caption)
+                            .foregroundStyle(SettingsDesignTokens.rowSubtitleColor)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
         }
+        .onHover { isHovered = $0 }
+        .animation(.easeInOut(duration: 0.12), value: isHovered || isDescriptionPresented)
     }
 }
 
@@ -157,6 +201,7 @@ struct SettingsRow<Trailing: View>: View {
     var systemImage: String?
     var iconTileTint: Color?
     var plainIcon: Bool
+    var descriptionOnHover: Bool
     var showChevron: Bool
     @ViewBuilder var trailing: () -> Trailing
 
@@ -167,6 +212,7 @@ struct SettingsRow<Trailing: View>: View {
         systemImage: String? = nil,
         iconTileTint: Color? = nil,
         plainIcon: Bool = false,
+        descriptionOnHover: Bool = false,
         showChevron: Bool = false,
         @ViewBuilder trailing: @escaping () -> Trailing
     ) {
@@ -176,6 +222,7 @@ struct SettingsRow<Trailing: View>: View {
         self.systemImage = systemImage
         self.iconTileTint = iconTileTint
         self.plainIcon = plainIcon
+        self.descriptionOnHover = descriptionOnHover
         self.showChevron = showChevron
         self.trailing = trailing
     }
@@ -187,6 +234,7 @@ struct SettingsRow<Trailing: View>: View {
         systemImage: String? = nil,
         iconTileTint: Color? = nil,
         plainIcon: Bool = false,
+        descriptionOnHover: Bool = false,
         showChevron: Bool = false,
         @ViewBuilder trailing: @escaping () -> Trailing
     ) {
@@ -196,6 +244,7 @@ struct SettingsRow<Trailing: View>: View {
         self.systemImage = systemImage
         self.iconTileTint = iconTileTint
         self.plainIcon = plainIcon
+        self.descriptionOnHover = descriptionOnHover
         self.showChevron = showChevron
         self.trailing = trailing
     }
@@ -208,7 +257,8 @@ struct SettingsRow<Trailing: View>: View {
                     subtitleText: subtitleText,
                     systemImage: systemImage,
                     iconTileTint: iconTileTint,
-                    plainIcon: plainIcon
+                    plainIcon: plainIcon,
+                    descriptionOnHover: descriptionOnHover
                 )
             } else {
                 SettingsRowLabel(
@@ -216,7 +266,8 @@ struct SettingsRow<Trailing: View>: View {
                     subtitle: subtitle,
                     systemImage: systemImage,
                     iconTileTint: iconTileTint,
-                    plainIcon: plainIcon
+                    plainIcon: plainIcon,
+                    descriptionOnHover: descriptionOnHover
                 )
             }
             Spacer(minLength: 12)

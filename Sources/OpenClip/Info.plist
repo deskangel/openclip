@@ -32,6 +32,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>openclip</string>
+				<string>openclip-dev</string>
 			</array>
 		</dict>
 	</array>

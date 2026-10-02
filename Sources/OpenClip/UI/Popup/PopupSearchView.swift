@@ -26,6 +26,8 @@ public struct PopupSearchView: View {
     public let resultsAbove: Bool
     public let onResult: @MainActor (ActionResult) -> Void
     public let onExit: @MainActor () -> Void
+    /// Reports a drag from the search header so the popup owner can move the panel.
+    public let onDrag: @MainActor (ResultCardDragPhase) -> Void
     /// Routes AI preset selections (chrome source `.ai`) to the popup's AI card flow instead of
     /// `perform`. Passed the registered AI action id (`ai.preset.<presetID>`); nil disables the
     /// route and falls back to `perform`.
@@ -90,6 +92,13 @@ public struct PopupSearchView: View {
     private let presenter: any ActionPresenting
     @State private var hoverFrames: [SearchHoverTarget: CGRect] = [:]
     @State private var hoveredTarget: SearchHoverTarget?
+    @State private var hoveredFooterButton: FooterButton?
+    @State private var isDraggingSearch = false
+
+    private enum FooterButton: Hashable {
+        case paste
+        case run
+    }
 
     private var effectiveTheme: String {
         if !environmentEffectiveTheme.isEmpty {
@@ -128,7 +137,7 @@ public struct PopupSearchView: View {
 
     /// The search header height and bottom footer height.
     static let searchHeaderHeight: CGFloat = 42.0
-    static let footerHeight: CGFloat = 32.0
+    static let footerHeight: CGFloat = 34.0
     private static let rowSpacing: CGFloat = 2.0
     private static let listBottomPadding: CGFloat = 6.0
 
@@ -210,6 +219,7 @@ public struct PopupSearchView: View {
         usageRecency: [String: Int] = [:],
         onResult: @escaping @MainActor (ActionResult) -> Void,
         onExit: @escaping @MainActor () -> Void,
+        onDrag: @escaping @MainActor (ResultCardDragPhase) -> Void = { _ in },
         onExitScope: @escaping @MainActor () -> Void = {},
         onRunAI: @escaping @MainActor (String) -> Void = { _ in },
         onRunAIPrompt: @escaping @MainActor (String, Bool, Bool) -> Void = { _, _, _ in },
@@ -229,6 +239,7 @@ public struct PopupSearchView: View {
         self.usageRecency = usageRecency
         self.onResult = onResult
         self.onExit = onExit
+        self.onDrag = onDrag
         self.onExitScope = onExitScope
         self.onRunAI = onRunAI
         self.onRunAIPrompt = onRunAIPrompt
@@ -313,7 +324,9 @@ public struct PopupSearchView: View {
     private var searchFieldRow: some View {
         HStack(spacing: 12) {
             searchIcon
-                .frame(width: 20, alignment: .center)
+                .frame(width: 20, height: Self.searchHeaderHeight - 4, alignment: .center)
+                .contentShape(Rectangle())
+                .gesture(searchHeaderDragGesture)
 
             TextField(
                 scope == nil
@@ -386,10 +399,40 @@ public struct PopupSearchView: View {
         .padding(.horizontal, 18)
         .offset(y: 2)
         .frame(height: Self.searchHeaderHeight)
+        .overlay {
+            VStack(spacing: 0) {
+                searchHeaderDragStrip
+                Spacer(minLength: 0)
+                searchHeaderDragStrip
+            }
+        }
         .searchHoverTarget(.searchBar)
         .onHover { hovering in
             useLocalHoverFallback(for: .searchBar, isHovering: hovering)
         }
+    }
+
+    private var searchHeaderDragStrip: some View {
+        Color.clear
+            .frame(height: 8)
+            .contentShape(Rectangle())
+            .gesture(searchHeaderDragGesture)
+    }
+
+    private var searchHeaderDragGesture: some Gesture {
+        DragGesture(minimumDistance: 2)
+            .onChanged { _ in
+                if !isDraggingSearch {
+                    isDraggingSearch = true
+                    onDrag(.began)
+                }
+                onDrag(.changed)
+            }
+            .onEnded { _ in
+                guard isDraggingSearch else { return }
+                isDraggingSearch = false
+                onDrag(.ended)
+            }
     }
 
     /// Closes the palette by dropping the scope back to the full list (Esc with an empty scoped
@@ -636,13 +679,11 @@ public struct PopupSearchView: View {
     /// The plain, borderless bottom bar matching the top search field.
     private var bottomBarRow: some View {
         HStack(spacing: 8) {
-            statusLabel
-                .padding(.leading, 14)
-
             Spacer(minLength: 8)
 
             footerActionButtons
-                .padding(.trailing, 14)
+                .padding(.trailing, 8)
+                .offset(y: -2)
         }
         .frame(height: Self.footerHeight)
         .searchHoverTarget(.bottomDock)
@@ -652,54 +693,27 @@ public struct PopupSearchView: View {
     }
 
     @ViewBuilder
-    private var statusLabel: some View {
-        if rowCount > 0 {
-            Text(rowCount == 1 ? String(localized: "1 action") : String(localized: "\(rowCount) actions"))
-                .font(.system(size: 11, weight: .regular))
-                .foregroundColor(PopupThemeModel.restSecondary(for: effectiveTheme).opacity(0.85))
-        } else {
-            Text(String(localized: "No matches"))
-                .font(.system(size: 11, weight: .regular))
-                .foregroundColor(PopupThemeModel.restSecondary(for: effectiveTheme).opacity(0.7))
-        }
-    }
-
-    @ViewBuilder
     private var footerActionButtons: some View {
         if rowCount > 0 {
             HStack(spacing: 6) {
-                if isSelectedAI {
-                    hintBadge(
-                        title: PaletteAIPrompt.secondaryActionTitle(canPaste: modeStore.canPaste),
-                        shortcut: "⇧⏎",
-                        isAccent: false
-                    ) {
-                        runSelected(replace: true)
-                    }
+                footerButton(
+                    title: isSelectedAI
+                        ? PaletteAIPrompt.secondaryActionTitle(canPaste: modeStore.canPaste)
+                        : "",
+                    shortcut: "⇧⏎",
+                    id: .paste,
+                    isAccent: false
+                ) {
+                    runSelected(replace: true)
+                }
 
-                    hintBadge(
-                        title: PaletteAIPrompt.primaryActionTitle(),
-                        shortcut: "⏎",
-                        isAccent: true
-                    ) {
-                        runSelected(replace: false)
-                    }
-                } else {
-                    hintBadge(
-                        title: "",
-                        shortcut: "⇧⏎",
-                        isAccent: false
-                    ) {
-                        runSelected(replace: true)
-                    }
-
-                    hintBadge(
-                        title: String(localized: "Run"),
-                        shortcut: "⏎",
-                        isAccent: true
-                    ) {
-                        runSelected(replace: false)
-                    }
+                footerButton(
+                    title: isSelectedAI ? PaletteAIPrompt.primaryActionTitle() : String(localized: "Run"),
+                    shortcut: "⏎",
+                    id: .run,
+                    isAccent: true
+                ) {
+                    runSelected(replace: false)
                 }
             }
             .animation(.easeInOut(duration: 0.15), value: isSelectedAI)
@@ -707,48 +721,38 @@ public struct PopupSearchView: View {
     }
 
     @ViewBuilder
-    private func hintBadge(title: String, shortcut: String, isAccent: Bool, action: @escaping () -> Void) -> some View {
+    private func footerButton(
+        title: String,
+        shortcut: String,
+        id: FooterButton,
+        isAccent: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
             HStack(spacing: 4) {
                 if !title.isEmpty {
                     Text(title)
                         .font(.system(size: 11.5, weight: isAccent ? .semibold : .medium))
-                        .foregroundColor(
-                            isAccent
-                                ? Color.white
-                                : PopupThemeModel.restForeground(for: effectiveTheme).opacity(0.85)
-                        )
+                        .foregroundColor(isAccent ? .white : PopupThemeModel.restForeground(for: effectiveTheme).opacity(0.85))
                 }
                 Text(shortcut)
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundColor(
-                        isAccent
-                            ? Color.white.opacity(0.95)
-                            : PopupThemeModel.restSecondary(for: effectiveTheme)
-                    )
+                    .foregroundColor(isAccent ? .white.opacity(0.95) : PopupThemeModel.restSecondary(for: effectiveTheme))
             }
-            .padding(.horizontal, title.isEmpty ? 8 : 10)
+            .padding(.horizontal, title.isEmpty ? 8 : 12)
             .padding(.vertical, 5)
-            .background(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(
-                        isAccent
-                            ? Color.accentColor
-                            : Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.07)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .stroke(
-                                isAccent
-                                    ? Color.white.opacity(0.20)
-                                    : (colorScheme == .dark ? Color.white.opacity(0.14) : Color.black.opacity(0.08)),
-                                lineWidth: 0.5
-                            )
-                    )
+            .popupFooterButtonChrome(
+                effectiveTheme: effectiveTheme,
+                colorScheme: colorScheme,
+                isHovered: hoveredFooterButton == id,
+                tint: isAccent ? .accentColor : nil
             )
-            .contentShape(Rectangle())
+            .contentShape(RoundedRectangle(cornerRadius: PopupMetrics.footerButtonCornerRadius, style: .continuous))
         }
         .buttonStyle(.plain)
+        .onHover { isHovering in
+            hoveredFooterButton = isHovering ? id : nil
+        }
     }
 
     private func moveSelection(by delta: Int) {

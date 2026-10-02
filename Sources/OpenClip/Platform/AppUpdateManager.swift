@@ -32,6 +32,9 @@ public final class AppUpdateManager: NSObject, ObservableObject, SPUUpdaterDeleg
     /// Release notes for the detected update version, extracted from appcast description.
     @Published public private(set) var availableUpdateReleaseNotes: String?
 
+    /// Sparkle format for the embedded release notes (markdown, html, or plain-text).
+    @Published public private(set) var availableUpdateReleaseNotesFormat: String?
+
     /// True when the update archive has been downloaded and staged to install upon app termination.
     @Published public private(set) var isUpdateStagedForQuitInstall: Bool = false
 
@@ -179,6 +182,7 @@ public final class AppUpdateManager: NSObject, ObservableObject, SPUUpdaterDeleg
         Log.updates.info("Sparkle found valid update: v\(version, privacy: .public)")
         self.availableUpdateVersion = version
         self.availableUpdateReleaseNotes = item.itemDescription
+        self.availableUpdateReleaseNotesFormat = item.itemDescriptionFormat
         if notifyOnUpdate {
             self.postUpdateNotification(version: version, isReadyToInstall: false)
         }
@@ -188,6 +192,7 @@ public final class AppUpdateManager: NSObject, ObservableObject, SPUUpdaterDeleg
         Log.updates.info("Sparkle: no update found or up to date: \(error.localizedDescription, privacy: .private)")
         self.availableUpdateVersion = nil
         self.availableUpdateReleaseNotes = nil
+        self.availableUpdateReleaseNotesFormat = nil
         self.isUpdateStagedForQuitInstall = false
         self.immediateInstallationBlock = nil
     }
@@ -196,6 +201,7 @@ public final class AppUpdateManager: NSObject, ObservableObject, SPUUpdaterDeleg
         Log.updates.info("Sparkle: no update found or up to date")
         self.availableUpdateVersion = nil
         self.availableUpdateReleaseNotes = nil
+        self.availableUpdateReleaseNotesFormat = nil
         self.isUpdateStagedForQuitInstall = false
         self.immediateInstallationBlock = nil
     }
@@ -203,20 +209,27 @@ public final class AppUpdateManager: NSObject, ObservableObject, SPUUpdaterDeleg
     public func updater(_ updater: SPUUpdater, willInstallUpdate item: SUAppcastItem) {
         self.availableUpdateVersion = nil
         self.availableUpdateReleaseNotes = nil
+        self.availableUpdateReleaseNotesFormat = nil
         self.isUpdateStagedForQuitInstall = false
         self.immediateInstallationBlock = nil
     }
 
-    public func updater(_ updater: SPUUpdater, willInstallUpdateOnQuit item: SUAppcastItem, immediateInstallationBlock: @escaping () -> Void) {
+    public func updater(
+        _ updater: SPUUpdater,
+        willInstallUpdateOnQuit item: SUAppcastItem,
+        immediateInstallationBlock: @escaping () -> Void
+    ) -> Bool {
         let version = item.displayVersionString ?? item.versionString
         Log.updates.info("Sparkle: update v\(version, privacy: .public) downloaded and staged for install on quit")
         self.availableUpdateVersion = version
         self.availableUpdateReleaseNotes = item.itemDescription
+        self.availableUpdateReleaseNotesFormat = item.itemDescriptionFormat
         self.isUpdateStagedForQuitInstall = true
         self.immediateInstallationBlock = immediateInstallationBlock
         if notifyOnUpdate {
             self.postUpdateNotification(version: version, isReadyToInstall: true)
         }
+        return true
     }
 
     public func updater(_ updater: SPUUpdater, didAbortWithError error: any Error) {
@@ -271,10 +284,12 @@ public final class AppUpdateManager: NSObject, ObservableObject, SPUUpdaterDeleg
     public func setAvailableUpdateVersionForTesting(
         _ version: String?,
         releaseNotes: String? = nil,
+        releaseNotesFormat: String? = nil,
         isStagedForQuit: Bool = false
     ) {
         self.availableUpdateVersion = version
         self.availableUpdateReleaseNotes = releaseNotes
+        self.availableUpdateReleaseNotesFormat = releaseNotesFormat ?? (releaseNotes == nil ? nil : "markdown")
         self.isUpdateStagedForQuitInstall = isStagedForQuit
     }
 }

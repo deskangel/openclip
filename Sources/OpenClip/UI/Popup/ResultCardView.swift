@@ -48,7 +48,7 @@ private struct FilePreviewMetadata {
 // MARK: - Card Drag
 
 
-/// Phases of a drag on the card's header handle. The card only reports them; the controller owns
+/// Phases of a drag on the card or search header. The views only report them; the controller owns
 /// the panel and does the moving.
 ///
 /// AppKit dragging is not an option here: the panel is borderless (no title bar),
@@ -121,8 +121,8 @@ public struct ResultCardView: View {
     @State private var isCopyHovered = false
     @State private var isPasteHovered = false
     @State private var isSaveHovered = false
-    @State private var isQuickLookHovered = false
     @State private var isDismissHovered = false
+    @State private var isQuickLookHovered = false
     @State private var isPinHovered = false
     @State private var isCardHovered = false
     @State private var previewImage: NSImage?
@@ -342,7 +342,7 @@ public struct ResultCardView: View {
     // MARK: - Chrome
 
     private static let cardCornerRadius: CGFloat = PopupMetrics.cardCornerRadius
-    private static let buttonCornerRadius: CGFloat = 6.0
+    private static let buttonCornerRadius: CGFloat = PopupMetrics.footerButtonCornerRadius
 
     private func cardChrome<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         content()
@@ -360,9 +360,10 @@ public struct ResultCardView: View {
                     .font(.system(size: 11, weight: .bold))
                     .foregroundColor(isChevronHovered ? .primary : PopupThemeModel.restForeground(for: effectiveTheme).opacity(0.65))
                     .frame(width: 22, height: 22)
-                    .background(
-                        isChevronHovered ? Color.primary.opacity(0.08) : Color.clear,
-                        in: Circle()
+                    .popupHeaderButtonChrome(
+                        effectiveTheme: effectiveTheme,
+                        colorScheme: colorScheme,
+                        isHovered: isChevronHovered
                     )
                     .contentShape(Circle())
             }
@@ -425,9 +426,10 @@ public struct ResultCardView: View {
                 .font(.system(size: 9.5, weight: .bold))
                 .foregroundColor(isCloseHovered ? .primary : PopupThemeModel.restForeground(for: effectiveTheme).opacity(0.65))
                 .frame(width: 22, height: 22)
-                .background(
-                    isCloseHovered ? Color.primary.opacity(0.08) : Color.clear,
-                    in: Circle()
+                .popupHeaderButtonChrome(
+                    effectiveTheme: effectiveTheme,
+                    colorScheme: colorScheme,
+                    isHovered: isCloseHovered
                 )
                 .contentShape(Circle())
         }
@@ -463,11 +465,11 @@ public struct ResultCardView: View {
                 .font(.system(size: 10, weight: .bold))
                 .foregroundColor(showsDiff ? .white : PopupThemeModel.restForeground(for: effectiveTheme).opacity(isDiffHovered ? 0.9 : 0.6))
                 .frame(width: 22, height: 22)
-                .background(
-                    showsDiff
-                        ? (isDiffHovered ? Color.accentColor : Color.accentColor.opacity(0.85))
-                        : (isDiffHovered ? Color.primary.opacity(0.08) : Color.clear),
-                    in: Circle()
+                .popupHeaderButtonChrome(
+                    effectiveTheme: effectiveTheme,
+                    colorScheme: colorScheme,
+                    isHovered: isDiffHovered,
+                    tint: showsDiff ? .accentColor : nil
                 )
                 .contentShape(Circle())
         }
@@ -485,11 +487,11 @@ public struct ResultCardView: View {
                 .font(.system(size: 10, weight: .bold))
                 .foregroundColor(isPinned ? .white : PopupThemeModel.restForeground(for: effectiveTheme).opacity(isPinHovered ? 0.9 : 0.6))
                 .frame(width: 22, height: 22)
-                .background(
-                    isPinned
-                        ? (isPinHovered ? Color.accentColor : Color.accentColor.opacity(0.85))
-                        : (isPinHovered ? Color.primary.opacity(0.08) : Color.clear),
-                    in: Circle()
+                .popupHeaderButtonChrome(
+                    effectiveTheme: effectiveTheme,
+                    colorScheme: colorScheme,
+                    isHovered: isPinHovered,
+                    tint: isPinned ? .accentColor : nil
                 )
                 .contentShape(Circle())
         }
@@ -821,25 +823,6 @@ public struct ResultCardView: View {
 
     // MARK: - Footer
 
-    private func glassButtonBackground(isHovered: Bool) -> some View {
-        let shape = RoundedRectangle(cornerRadius: Self.buttonCornerRadius, style: .continuous)
-        let strokeColor = colorScheme == .dark ? Color.white.opacity(0.14) : Color.black.opacity(0.08)
-        let fillOpacity: Double = isHovered
-            ? (colorScheme == .dark ? 0.18 : 0.12)
-            : (colorScheme == .dark ? 0.12 : 0.07)
-
-        return shape
-            .fill(Color.primary.opacity(fillOpacity))
-            .overlay(shape.stroke(strokeColor, lineWidth: 0.5))
-    }
-
-    private func pasteButtonBackground(isHovered: Bool) -> some View {
-        let shape = RoundedRectangle(cornerRadius: Self.buttonCornerRadius, style: .continuous)
-        return shape
-            .fill(Color.accentColor.opacity(isHovered ? 0.85 : 1.0))
-            .overlay(shape.stroke(Color.white.opacity(0.20), lineWidth: 0.5))
-    }
-
     static func isTyping(text: String) -> Bool {
         !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
@@ -868,7 +851,10 @@ public struct ResultCardView: View {
         }
         .animation(PopupMetrics.springOrImmediate(response: 0.28, dampingFraction: 0.82), value: isTypingFollowUp)
         .animation(.easeInOut(duration: 0.15), value: showsResultButtons)
-        .padding(.horizontal, 14)
+        .padding(.leading, 14)
+        // Keep the footer controls close to the card edge; the resize grip occupies only the
+        // bottom-right corner, so a compact inset leaves it clear without wasting footer width.
+        .padding(.trailing, 10)
         .padding(.bottom, 6)
         .frame(height: Self.baseBottomInset)
     }
@@ -1008,9 +994,12 @@ public struct ResultCardView: View {
                         .lineLimit(1)
                         .foregroundColor(PopupThemeModel.restForeground(for: effectiveTheme).opacity(0.85))
                         .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(glassButtonBackground(isHovered: isDismissHovered))
-                        .contentShape(RoundedRectangle(cornerRadius: Self.buttonCornerRadius, style: .continuous))
+                        .padding(.vertical, 6)
+                        .popupFooterButtonChrome(
+                            effectiveTheme: effectiveTheme,
+                            colorScheme: colorScheme,
+                            isHovered: isDismissHovered
+                        )
                 }
                 .buttonStyle(.plain)
                 .help(String(localized: "Dismiss the error (⎋)"))
@@ -1021,55 +1010,64 @@ public struct ResultCardView: View {
 
     @ViewBuilder
     private var fileButtons: some View {
-        Button {
-            onCopy()
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "doc.on.doc")
-                    .font(.system(size: 10.5, weight: .medium))
-                Text(String(localized: "Copy File"))
-                    .font(.system(size: 11.5, weight: .medium))
-                Text("⌘C")
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundColor(PopupThemeModel.restSecondary(for: effectiveTheme))
+        HStack(spacing: 6) {
+            Button {
+                onCopy()
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "doc.on.doc")
+                        .font(.system(size: 10.5, weight: .medium))
+                    Text(String(localized: "Copy File"))
+                        .font(.system(size: 11.5, weight: .medium))
+                    Text("⌘C")
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundColor(PopupThemeModel.restSecondary(for: effectiveTheme))
+                }
+                .lineLimit(1)
+                .fixedSize()
+                .foregroundColor(PopupThemeModel.restForeground(for: effectiveTheme).opacity(0.85))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .popupFooterButtonChrome(
+                    effectiveTheme: effectiveTheme,
+                    colorScheme: colorScheme,
+                    isHovered: isCopyHovered
+                )
             }
-            .lineLimit(1)
-            .fixedSize()
-            .foregroundColor(PopupThemeModel.restForeground(for: effectiveTheme).opacity(0.85))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(glassButtonBackground(isHovered: isCopyHovered))
-            .contentShape(RoundedRectangle(cornerRadius: Self.buttonCornerRadius, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .help(String(localized: "Copy the file to the clipboard and close (⌘C)"))
-        .accessibilityLabel("Copy file and close")
-        .onHover { isCopyHovered = $0 }
+            .buttonStyle(.plain)
+            .help(String(localized: "Copy the file to the clipboard and close (⌘C)"))
+            .accessibilityLabel("Copy file and close")
+            .onHover { isCopyHovered = $0 }
 
-        Button {
-            (onSave ?? onPaste)()
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "arrow.down.circle")
-                    .font(.system(size: 11, weight: .semibold))
-                Text(String(localized: "Save"))
-                    .font(.system(size: 11.5, weight: .semibold))
-                Image(systemName: "return")
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    .opacity(0.9)
+            Button {
+                (onSave ?? onPaste)()
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.down.circle")
+                        .font(.system(size: 11, weight: .semibold))
+                    Text(String(localized: "Save"))
+                        .font(.system(size: 11.5, weight: .medium))
+                    Image(systemName: "return")
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .opacity(0.9)
+                }
+                .lineLimit(1)
+                .fixedSize()
+                .foregroundColor(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .popupFooterButtonChrome(
+                    effectiveTheme: effectiveTheme,
+                    colorScheme: colorScheme,
+                    isHovered: isSaveHovered,
+                    tint: .accentColor
+                )
             }
-            .lineLimit(1)
-            .fixedSize()
-            .foregroundColor(.white)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(pasteButtonBackground(isHovered: isSaveHovered))
-            .contentShape(RoundedRectangle(cornerRadius: Self.buttonCornerRadius, style: .continuous))
+            .buttonStyle(.plain)
+            .help(String(localized: "Save the file to your configured save location and close (⏎)"))
+            .accessibilityLabel("Save file and close")
+            .onHover { isSaveHovered = $0 }
         }
-        .buttonStyle(.plain)
-        .help(String(localized: "Save the file to your configured save location and close (⏎)"))
-        .accessibilityLabel("Save file and close")
-        .onHover { isSaveHovered = $0 }
     }
 
     /// Renders the file result by kind: an inline image, an inline PDF, inline text, or the
@@ -1293,7 +1291,11 @@ public struct ResultCardView: View {
                 .foregroundColor(PopupThemeModel.restForeground(for: effectiveTheme).opacity(0.85))
                 .padding(.horizontal, 10)
                 .padding(.vertical, 4)
-                .background(glassButtonBackground(isHovered: isQuickLookHovered))
+                .popupFooterButtonChrome(
+                    effectiveTheme: effectiveTheme,
+                    colorScheme: colorScheme,
+                    isHovered: isQuickLookHovered
+                )
                 .contentShape(RoundedRectangle(cornerRadius: Self.buttonCornerRadius, style: .continuous))
             }
             .buttonStyle(.plain)
@@ -1376,15 +1378,6 @@ public struct ResultCardView: View {
         self.hasAttemptedImageLoad = true
     }
 
-    @ViewBuilder
-    private func copyButtonBackground(isHovered: Bool) -> some View {
-        if isCopyPrimary {
-            pasteButtonBackground(isHovered: isHovered)
-        } else {
-            glassButtonBackground(isHovered: isHovered)
-        }
-    }
-
     private var isCopyPrimary: Bool {
         canPaste == false
     }
@@ -1393,7 +1386,7 @@ public struct ResultCardView: View {
     /// offers Close.
     @ViewBuilder
     private var resultButtons: some View {
-        Group {
+        HStack(spacing: 6) {
             Button {
                 onCopy()
             } label: {
@@ -1412,11 +1405,15 @@ public struct ResultCardView: View {
                 }
                 .lineLimit(1)
                 .fixedSize()
-                .foregroundColor(isCopyPrimary ? Color.white : PopupThemeModel.restForeground(for: effectiveTheme).opacity(0.85))
+                .foregroundColor(isCopyPrimary ? .white : PopupThemeModel.restForeground(for: effectiveTheme).opacity(0.85))
                 .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(copyButtonBackground(isHovered: isCopyHovered))
-                .contentShape(RoundedRectangle(cornerRadius: Self.buttonCornerRadius, style: .continuous))
+                .padding(.vertical, 6)
+                .popupFooterButtonChrome(
+                    effectiveTheme: effectiveTheme,
+                    colorScheme: colorScheme,
+                    isHovered: isCopyHovered,
+                    tint: isCopyPrimary ? .accentColor : nil
+                )
             }
             .buttonStyle(.plain)
             .help(isCopyPrimary ? String(localized: "Copy the response to the clipboard and close (⏎)") : String(localized: "Copy the response to the clipboard and close (⌘C)"))
@@ -1438,9 +1435,13 @@ public struct ResultCardView: View {
                     .fixedSize()
                     .foregroundColor(.white)
                     .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(pasteButtonBackground(isHovered: isPasteHovered))
-                    .contentShape(RoundedRectangle(cornerRadius: Self.buttonCornerRadius, style: .continuous))
+                    .padding(.vertical, 6)
+                    .popupFooterButtonChrome(
+                        effectiveTheme: effectiveTheme,
+                        colorScheme: colorScheme,
+                        isHovered: isPasteHovered,
+                        tint: .accentColor
+                    )
                 }
                 .buttonStyle(.plain)
                 .help(String(localized: "Paste the response over the selection (⏎)"))

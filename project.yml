@@ -29,6 +29,7 @@ targets:
           - CFBundleURLName: com.openclip.url
             CFBundleURLSchemes:
               - openclip
+              - openclip-dev
         LSUIElement: true
         NSHumanReadableCopyright: "Copyright © 2026 Ganesh M and OpenClip Contributors. AGPL-3.0 licensed."
         NSAppleEventsUsageDescription: "OpenClip needs to control other apps to run your AppleScript actions and to paste results back into the app you were using."
@@ -52,6 +53,7 @@ targets:
         INFOPLIST_KEY_CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_ENTITLEMENTS: Sources/OpenClip/OpenClip.entitlements
+        PRODUCT_MODULE_NAME: OpenClip
         # Ad-hoc is the default so a clone builds and runs with no Apple Developer account.
         # scripts/sign_artifact.sh overrides the identity for signed/notarized builds.
         CODE_SIGN_IDENTITY: "-"
@@ -62,6 +64,13 @@ targets:
         SWIFT_STRICT_CONCURRENCY: complete
         SWIFT_EMIT_LOC_STRINGS: YES
         LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+      configs:
+        Debug:
+          PRODUCT_BUNDLE_IDENTIFIER: com.openclip.OpenClip.dev
+          INFOPLIST_KEY_CFBundleDisplayName: OpenClip Dev
+        Release:
+          PRODUCT_BUNDLE_IDENTIFIER: com.openclip.OpenClip
+          INFOPLIST_KEY_CFBundleDisplayName: OpenClip
     dependencies:
       - target: Core
       - package: OpenSelection

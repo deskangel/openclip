@@ -231,6 +231,153 @@ public extension EnvironmentValues {
 
 // MARK: - Shared Card Chrome
 
+/// Shared footer control surface for the search palette and result card. Glass uses the native
+/// Liquid Glass effect on macOS 26+, while classic themes and older systems keep their tinted fill.
+struct PopupFooterButtonChrome: ViewModifier {
+    let effectiveTheme: String
+    let colorScheme: ColorScheme
+    let isHovered: Bool
+    var tint: Color? = nil
+
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: PopupMetrics.footerButtonCornerRadius, style: .continuous)
+    }
+
+    func body(content: Content) -> some View {
+        Group {
+            if effectiveTheme == "glass",
+               #available(macOS 26.0, *),
+               !NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency {
+                if let tint {
+                    content
+                        .background(shape.fill(tint.opacity(isHovered ? 0.38 : 0.28)))
+                        .background(.ultraThinMaterial, in: shape)
+                        .glassEffect(.regular.tint(tint.opacity(0.42)).interactive(), in: shape)
+                        .overlay(shape.stroke(Color.white.opacity(0.24), lineWidth: 0.5))
+                } else {
+                    content
+                        .background(shape.fill(Color.primary.opacity(isHovered ? 0.14 : 0.08)))
+                        .background(.ultraThinMaterial, in: shape)
+                        .glassEffect(.regular.interactive(), in: shape)
+                        .overlay(
+                            shape.stroke(
+                                colorScheme == .dark ? Color.white.opacity(0.18) : Color.black.opacity(0.10),
+                                lineWidth: 0.5
+                            )
+                        )
+                }
+            } else {
+                content
+                    .background(
+                        shape.fill(
+                        tint?.opacity(isHovered ? 0.85 : 1.0)
+                            ?? Color.primary.opacity(isHovered
+                                ? (colorScheme == .dark ? 0.18 : 0.12)
+                                : (colorScheme == .dark ? 0.12 : 0.07))
+                        )
+                    )
+                    .overlay(
+                        shape.stroke(
+                            tint == nil
+                                ? (colorScheme == .dark ? Color.white.opacity(0.14) : Color.black.opacity(0.08))
+                                : Color.white.opacity(0.20),
+                            lineWidth: 0.5
+                        )
+                    )
+            }
+        }
+    }
+}
+
+extension View {
+    func popupFooterButtonChrome(
+        effectiveTheme: String,
+        colorScheme: ColorScheme,
+        isHovered: Bool,
+        tint: Color? = nil
+    ) -> some View {
+        modifier(
+            PopupFooterButtonChrome(
+                effectiveTheme: effectiveTheme,
+                colorScheme: colorScheme,
+                isHovered: isHovered,
+                tint: tint
+            )
+        )
+    }
+
+    func popupHeaderButtonChrome(
+        effectiveTheme: String,
+        colorScheme: ColorScheme,
+        isHovered: Bool,
+        tint: Color? = nil
+    ) -> some View {
+        modifier(
+            PopupHeaderButtonChrome(
+                effectiveTheme: effectiveTheme,
+                colorScheme: colorScheme,
+                isHovered: isHovered,
+                tint: tint
+            )
+        )
+    }
+}
+
+/// Compact circular chrome for the result card's header controls.
+private struct PopupHeaderButtonChrome: ViewModifier {
+    let effectiveTheme: String
+    let colorScheme: ColorScheme
+    let isHovered: Bool
+    var tint: Color? = nil
+
+    private let shape = Circle()
+
+    func body(content: Content) -> some View {
+        Group {
+            if effectiveTheme == "glass",
+               #available(macOS 26.0, *),
+               !NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency {
+                if let tint {
+                    content
+                        .background(shape.fill(tint.opacity(isHovered ? 0.38 : 0.28)))
+                        .background(.ultraThinMaterial, in: shape)
+                        .glassEffect(.regular.tint(tint.opacity(0.42)).interactive(), in: shape)
+                        .overlay(shape.stroke(Color.white.opacity(0.24), lineWidth: 0.5))
+                } else {
+                    content
+                        .background(shape.fill(Color.primary.opacity(isHovered ? 0.14 : 0.08)))
+                        .background(.ultraThinMaterial, in: shape)
+                        .glassEffect(.regular.interactive(), in: shape)
+                        .overlay(
+                            shape.stroke(
+                                colorScheme == .dark ? Color.white.opacity(0.18) : Color.black.opacity(0.10),
+                                lineWidth: 0.5
+                            )
+                        )
+                }
+            } else {
+                content
+                    .background(
+                        shape.fill(
+                            tint?.opacity(isHovered ? 0.85 : 1.0)
+                                ?? Color.primary.opacity(isHovered
+                                    ? (colorScheme == .dark ? 0.18 : 0.12)
+                                    : (colorScheme == .dark ? 0.12 : 0.07))
+                        )
+                    )
+                    .overlay(
+                        shape.stroke(
+                            tint == nil
+                                ? (colorScheme == .dark ? Color.white.opacity(0.14) : Color.black.opacity(0.08))
+                                : Color.white.opacity(0.20),
+                            lineWidth: 0.5
+                        )
+                    )
+            }
+        }
+    }
+}
+
 public struct PopupCardChromeModifier: ViewModifier {
     public let cornerRadius: CGFloat
     public let effectiveTheme: String
@@ -326,4 +473,3 @@ public extension View {
         modifier(PopupCardChromeModifier(cornerRadius: cornerRadius, effectiveTheme: effectiveTheme, colorScheme: colorScheme))
     }
 }
-
