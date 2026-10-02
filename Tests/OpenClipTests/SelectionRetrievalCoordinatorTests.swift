@@ -1124,7 +1124,7 @@ final class SelectionRetrievalCoordinatorTests: XCTestCase {
 
         await DiagnosticsHub.shared.flush()
 
-        let msgs = testSink.messages.withLock { $0 }
+        let msgs = testSink.messages.withLock { $0 }.filter { $0.contains("[\(trace.id)]") }
 
         XCTAssertTrue(msgs.contains { $0.contains("Testing diagnostic event") && $0.contains("testKey=testValue") })
         XCTAssertEqual(msgs.filter { $0.contains("selection completed") }.count, 1)
