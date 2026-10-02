@@ -54,8 +54,8 @@ public enum PopupMetrics {
     public static let popupCornerRadius: CGFloat = 12.0
     /// Corner radius for modal result cards and the action-search palette.
     public static let cardCornerRadius: CGFloat = 16.0
-    /// Corner radius for the action-search palette.
-    public static let searchCornerRadius: CGFloat = 14.0
+    /// Corner radius for the action-search palette, reduced by 2 pt from the shared card radius.
+    public static let searchCornerRadius: CGFloat = 12.0
     /// Corner radius for individual search palette result rows.
     public static let searchRowCornerRadius: CGFloat = 8.0
     /// Corner radius for the joined search-palette footer buttons.
