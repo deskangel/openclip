@@ -730,7 +730,7 @@ public struct PopupSearchView: View {
     @ViewBuilder
     private var footerActionButtons: some View {
         if rowCount > 0 {
-            HStack(spacing: 6) {
+            HStack(spacing: PopupMetrics.searchFooterButtonSpacing) {
                 footerButton(
                     title: isSelectedAI
                         ? PaletteAIPrompt.secondaryActionTitle(canPaste: modeStore.canPaste)
@@ -780,9 +780,23 @@ public struct PopupSearchView: View {
                 effectiveTheme: effectiveTheme,
                 colorScheme: colorScheme,
                 isHovered: hoveredFooterButton == id,
-                tint: isAccent ? .accentColor : nil
+                tint: isAccent ? .accentColor : nil,
+                cornerRadius: PopupMetrics.searchFooterOuterCornerRadius,
+                innerCornerRadius: PopupMetrics.searchFooterInnerCornerRadius,
+                isLeading: id == .paste,
+                isTrailing: id == .run
             )
-            .contentShape(RoundedRectangle(cornerRadius: PopupMetrics.footerButtonCornerRadius, style: .continuous))
+            .contentShape(
+                UnevenRoundedRectangle(
+                    cornerRadii: RectangleCornerRadii(
+                        topLeading: id == .paste ? PopupMetrics.searchFooterOuterCornerRadius : PopupMetrics.searchFooterInnerCornerRadius,
+                        bottomLeading: id == .paste ? PopupMetrics.searchFooterOuterCornerRadius : PopupMetrics.searchFooterInnerCornerRadius,
+                        bottomTrailing: id == .run ? PopupMetrics.searchFooterOuterCornerRadius : PopupMetrics.searchFooterInnerCornerRadius,
+                        topTrailing: id == .run ? PopupMetrics.searchFooterOuterCornerRadius : PopupMetrics.searchFooterInnerCornerRadius
+                    ),
+                    style: .continuous
+                )
+            )
         }
         .buttonStyle(.plain)
         .onHover { isHovering in
