@@ -768,6 +768,98 @@ final class ActionsOutlineDropTests: XCTestCase {
         XCTAssertFalse(pkgBinding.wrappedValue)
     }
 
+    func testActionEnablementToggleChildOfExtensionGroupEnablesParentGroup() {
+        let group1 = DummyAction(
+            id: "com.pkg.leafy.g1",
+            title: "Group 1",
+            chrome: ActionChrome(rowStyle: .actionGroup, popupBehavior: .showSubActions, source: .extensionPkg(packageID: "com.pkg.leafy"))
+        )
+        let group2 = DummyAction(
+            id: "com.pkg.leafy.g2",
+            title: "Group 2",
+            chrome: ActionChrome(rowStyle: .actionGroup, popupBehavior: .showSubActions, source: .extensionPkg(packageID: "com.pkg.leafy"))
+        )
+        let child2 = DummyAction(
+            id: "com.pkg.leafy.g2.child",
+            title: "Child 2",
+            chrome: ActionChrome(source: .extensionPkg(packageID: "com.pkg.leafy"))
+        )
+        coordinator.register(action: group1)
+        coordinator.register(action: group2)
+        coordinator.register(action: child2)
+
+        var disabledPackages: Set<String> = []
+        var disabledActionIDs: Set<String> = ["com.pkg.leafy.g1", "com.pkg.leafy.g2", "com.pkg.leafy.g2.child"]
+
+        let childBinding = ActionEnablement.binding(
+            for: child2,
+            disabledActionIDs: Binding(get: { disabledActionIDs }, set: { disabledActionIDs = $0 }),
+            disabledPackages: Binding(get: { disabledPackages }, set: { disabledPackages = $0 }),
+            coordinator: coordinator
+        )
+
+        XCTAssertFalse(childBinding.wrappedValue)
+        childBinding.wrappedValue = true
+
+        // Child's specific parent group (g2) must be un-disabled
+        XCTAssertFalse(disabledActionIDs.contains("com.pkg.leafy.g2"))
+        XCTAssertFalse(disabledActionIDs.contains("com.pkg.leafy.g2.child"))
+        // Other group (g1) remains disabled
+        XCTAssertTrue(disabledActionIDs.contains("com.pkg.leafy.g1"))
+        XCTAssertTrue(childBinding.wrappedValue)
+    }
+
+    func testActionEnablementToggleGroupContainerKeepsChildCommandsEnabled() {
+        let group = DummyAction(
+            id: "com.pkg.leafy.g1",
+            title: "Group 1",
+            chrome: ActionChrome(rowStyle: .actionGroup, popupBehavior: .showSubActions, source: .extensionPkg(packageID: "com.pkg.leafy"))
+        )
+        let child1 = DummyAction(
+            id: "com.pkg.leafy.g1.c1",
+            title: "Child 1",
+            chrome: ActionChrome(source: .extensionPkg(packageID: "com.pkg.leafy"))
+        )
+        let child2 = DummyAction(
+            id: "com.pkg.leafy.g1.c2",
+            title: "Child 2",
+            chrome: ActionChrome(source: .extensionPkg(packageID: "com.pkg.leafy"))
+        )
+        let standalone = DummyAction(
+            id: "com.pkg.leafy.standalone",
+            title: "Standalone",
+            chrome: ActionChrome(source: .extensionPkg(packageID: "com.pkg.leafy"))
+        )
+        coordinator.register(action: group)
+        coordinator.register(action: child1)
+        coordinator.register(action: child2)
+        coordinator.register(action: standalone)
+
+        var disabledPackages: Set<String> = ["com.pkg.leafy"]
+        var disabledActionIDs: Set<String> = []
+
+        let groupBinding = ActionEnablement.binding(
+            for: group,
+            disabledActionIDs: Binding(get: { disabledActionIDs }, set: { disabledActionIDs = $0 }),
+            disabledPackages: Binding(get: { disabledPackages }, set: { disabledPackages = $0 }),
+            coordinator: coordinator
+        )
+
+        XCTAssertFalse(groupBinding.wrappedValue)
+        groupBinding.wrappedValue = true
+
+        // Package un-disabled
+        XCTAssertFalse(disabledPackages.contains("com.pkg.leafy"))
+        // Group container un-disabled
+        XCTAssertFalse(disabledActionIDs.contains("com.pkg.leafy.g1"))
+        // Group children must NOT be disabled
+        XCTAssertFalse(disabledActionIDs.contains("com.pkg.leafy.g1.c1"))
+        XCTAssertFalse(disabledActionIDs.contains("com.pkg.leafy.g1.c2"))
+        // Sibling outside the group is disabled
+        XCTAssertTrue(disabledActionIDs.contains("com.pkg.leafy.standalone"))
+        XCTAssertTrue(groupBinding.wrappedValue)
+    }
+
     func testAcceptDropBeforePackageHeaderPlacesActionBeforePackageActions() {
         _ = outlineCoordinator.rebuildTree()
         let standaloneAction = DummyAction(

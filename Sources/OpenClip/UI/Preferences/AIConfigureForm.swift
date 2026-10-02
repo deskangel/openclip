@@ -267,6 +267,7 @@ public struct AIConfigureForm: View {
                             cloudKeyDebounceTask = Task {
                                 try? await Task.sleep(nanoseconds: 500_000_000)
                                 guard !Task.isCancelled else { return }
+                                guard aiManager.activeProviderType == .cloud else { return }
                                 fetchCloudModels()
                             }
                         }
@@ -315,7 +316,11 @@ public struct AIConfigureForm: View {
                 fetchCloudModels()
             }
         }
+        .onDisappear {
+            cloudKeyDebounceTask?.cancel()
+        }
         .onChange(of: aiManager.activeProviderRaw) { newRaw in
+            cloudKeyDebounceTask?.cancel()
             if newRaw == AIProviderType.cli.rawValue {
                 checkCLIAuth()
                 fetchCLIModels()

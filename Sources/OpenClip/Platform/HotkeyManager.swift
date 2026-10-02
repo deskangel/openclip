@@ -367,17 +367,14 @@ public final class HotkeyManager {
         var selectionBounds: CGRect? = nil
 
         let copyCapture: SelectionRetrievalCoordinator.CopyCapture = { request in
-            await PasteboardCopyEngine(isCopyAuthorized: {
-                isTriggerAuthorized()
-                    && !CopyTriggerGate.isForeignOverlayPresent(at: NSEvent.mouseLocation)
-            }).capture(trigger: request.trigger)
+            await PasteboardCopyEngine(isCopyAuthorized: isTriggerAuthorized).capture(trigger: request.trigger)
         }
 
         if let result = await SelectionRetrievalCoordinator(copyCapture: copyCapture).retrieve(
             for: appIdentity,
             policy: policy,
             cursor: CursorClassifier.current.asCore,
-            allowCopyFallback: !CopyTriggerGate.isForeignOverlayPresent(at: NSEvent.mouseLocation),
+            allowCopyFallback: true,
             requireCopyEvidence: false
         ) {
             retrievedText = result.text
