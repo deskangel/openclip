@@ -39,6 +39,16 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.get(.contextualPillPosition), "right")
     }
 
+    func testContextualPillAutoFollowsHorizontalAlignment() {
+        XCTAssertFalse(ContextualPillPosition.auto.isTrailing(for: .left))
+        XCTAssertFalse(ContextualPillPosition.auto.isTrailing(for: .center))
+        XCTAssertTrue(ContextualPillPosition.auto.isTrailing(for: .right))
+        for alignment in PopupBarAlignment.allCases {
+            XCTAssertFalse(ContextualPillPosition.left.isTrailing(for: alignment))
+            XCTAssertTrue(ContextualPillPosition.right.isTrailing(for: alignment))
+        }
+    }
+
     @MainActor
     func testActionOptionKeyNameAndRoundTrip() {
         let key = SettingKey.actionOption(actionID: "com.test.action", optionID: "prefix")

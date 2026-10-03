@@ -105,6 +105,7 @@ public struct PopupView: View {
     @Setting(SettingKey.contextualActionsEnabled) private var contextualActionsEnabled
     @Setting(SettingKey.disabledContextualActionIDs) private var disabledContextualIDs
     @Setting(SettingKey.contextualPillPosition) private var contextualPillPosition
+    @Setting(SettingKey.popupAlignment) private var popupAlignment
     @Environment(\.colorScheme) private var colorScheme
 
     private var themeCategory: PopupThemeModel.Category {
@@ -360,7 +361,8 @@ public struct PopupView: View {
 
     /// True when the contextual island is drawn after (to the right of) the standard island.
     private var contextualIslandTrailing: Bool {
-        contextualPillPosition == "right"
+        let position = ContextualPillPosition(rawValue: contextualPillPosition) ?? .left
+        return position.isTrailing(for: PopupBarAlignment(rawValue: popupAlignment) ?? .left)
     }
 
     /// Bar actions in left-to-right order; `.action(index)` hover targets index into this list.

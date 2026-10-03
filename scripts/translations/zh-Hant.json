@@ -707,6 +707,6 @@
   "Tab to switch text source": "按 Tab 鍵切換文字來源",
   "Press Tab to switch between selection and clipboard": "按 Tab 鍵在選取文字和剪貼簿之間切換",
   "Contextual Pill": "情境膠囊",
-  "Show contextual actions to the left or right of the main bar.": "在主列的左側或右側顯示情境動作。",
+  "Show contextual actions to the left or right of the main bar. Auto follows the horizontal position.": "在主列的左側或右側顯示情境動作。「自動」會跟隨水平位置。",
   "Contextual Pill Position": "情境膠囊位置"
 }

@@ -707,6 +707,6 @@
   "Tab to switch text source": "Tab pour changer la source du texte",
   "Press Tab to switch between selection and clipboard": "Appuyez sur Tab pour basculer entre la sélection et le presse-papiers",
   "Contextual Pill": "Pastille contextuelle",
-  "Show contextual actions to the left or right of the main bar.": "Afficher les actions contextuelles à gauche ou à droite de la barre principale.",
+  "Show contextual actions to the left or right of the main bar. Auto follows the horizontal position.": "Afficher les actions contextuelles à gauche ou à droite de la barre principale. Auto suit la position horizontale.",
   "Contextual Pill Position": "Position de la pastille contextuelle"
 }

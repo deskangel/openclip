@@ -228,16 +228,17 @@ struct PopupThemeSelector: View {
 
                 SettingsRow(
                     title: "Contextual Pill",
-                    subtitle: "Show contextual actions to the left or right of the main bar."
+                    subtitle: "Show contextual actions to the left or right of the main bar. Auto follows the horizontal position."
                 ) {
                     segmentedPicker(
                         selection: $contextualPillPosition,
                         options: [
-                            AppearanceOption(label: "Left", value: "left"),
-                            AppearanceOption(label: "Right", value: "right"),
+                            AppearanceOption(label: "Auto", value: ContextualPillPosition.auto.rawValue),
+                            AppearanceOption(label: "Left", value: ContextualPillPosition.left.rawValue),
+                            AppearanceOption(label: "Right", value: ContextualPillPosition.right.rawValue),
                         ],
                         label: "Contextual Pill Position",
-                        width: 120
+                        width: 170
                     )
                     .disabled(!contextualActionsEnabled)
                 }
