@@ -148,6 +148,7 @@ are readable or writable; anything else is reported in `skipped`.
 | `startAtLogin` | Bool | `false` | |
 | `isAIEnabled` | Bool | `true` | AI on/off only — see below |
 | `popupTheme` | String | `"classic"` | `classic` \| `glass` |
+| `showSearchAllActions` | Bool | `true` | Show the search button on the popup bar |
 | `popupThemeColor` | String | `"system"` | `system` \| `light` \| `dark` |
 | `popupAlignment` | String | `"left"` | `left` \| `center` \| `right` |
 | `popupVerticalPosition` | String | `"auto"` | `auto` \| `above` \| `below` |

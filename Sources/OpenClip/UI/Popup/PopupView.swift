@@ -102,6 +102,7 @@ public struct PopupView: View {
     @Setting(SettingKey.popupThemeColor) private var themeColor
     @Setting(SettingKey.popupScale) private var popupScale
     @Setting(SettingKey.popupPageSize) private var pageSize
+    @Setting(SettingKey.showSearchAllActions) private var showSearchAllActions
     @Setting(SettingKey.contextualActionsEnabled) private var contextualActionsEnabled
     @Setting(SettingKey.disabledContextualActionIDs) private var disabledContextualIDs
     @Environment(\.colorScheme) private var colorScheme
@@ -330,7 +331,7 @@ public struct PopupView: View {
 
     private var pages: [[any Action]] {
         let leadingWidth = hasCompletions ? (chevronWidth) : 0
-        let trailingWidth = buttonWidth // search button
+        let trailingWidth = showSearchAllActions ? buttonWidth : 0
         // Reads `inlineResults` so a preview arriving re-packs the page at the button's real width
         // instead of overflowing the budget (the published dictionary already drives a re-render).
         return PopupPageLayout.computePages(
@@ -775,23 +776,25 @@ public struct PopupView: View {
 
             // Action-search affordance: command glyph. Kept outside
             // the paged actions so it always sits at the far-right edge on every page.
-            let isHovered = hoveredTarget == .search
-            let affordanceForeground = PopupThemeModel.restForeground(for: effectiveTheme)
-            Button {
-                let frame = hoverFrames[.search]
-                onEnterSearch(frame)
-            } label: {
-                Image(systemName: "command")
-                    .font(.system(size: 13 * scale, weight: .regular))
-                    .foregroundColor(isHovered ? .white : affordanceForeground)
-                    .frame(width: buttonWidth, height: barButtonHeight)
-                    .background(isHovered ? Color.accentColor : Color.clear)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Search all actions")
-            .popupHoverTarget(.search)
-            .onHover { isHovering in
-                useLocalHoverFallback(for: .search, isHovering: isHovering)
+            if showSearchAllActions {
+                let isHovered = hoveredTarget == .search
+                let affordanceForeground = PopupThemeModel.restForeground(for: effectiveTheme)
+                Button {
+                    let frame = hoverFrames[.search]
+                    onEnterSearch(frame)
+                } label: {
+                    Image(systemName: "command")
+                        .font(.system(size: 13 * scale, weight: .regular))
+                        .foregroundColor(isHovered ? .white : affordanceForeground)
+                        .frame(width: buttonWidth, height: barButtonHeight)
+                        .background(isHovered ? Color.accentColor : Color.clear)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Search all actions")
+                .popupHoverTarget(.search)
+                .onHover { isHovering in
+                    useLocalHoverFallback(for: .search, isHovering: isHovering)
+                }
             }
         }
         .fixedSize()

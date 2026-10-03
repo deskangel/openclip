@@ -135,6 +135,10 @@ When an action produces text output (e.g. transformations, dictionary definition
 
 ## Popup Appearance & Theme
 
+Under **Customize → Behavior**, turn off **Show Search All Actions** to hide the ⌘ search
+button at the end of the popup bar. The search keyboard shortcut (⌥⌘C by default) still works.
+**Reset** restores the button.
+
 The **Appearance** page shows a static preview of the floating popup bar and lets you style it. The preview is a fixed visual mock of the canonical action set (Search, Copy, Cut, Paste plus the AI Tools action) — it does **not** reflect your configured actions, ordering, or overrides, and hovering it never affects the real popup.
 
 ### Popup Theme

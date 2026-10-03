@@ -141,6 +141,16 @@ final class SettingsSnapshotTests: XCTestCase {
         XCTAssertEqual(decoded.appVersion, "test")
     }
 
+    func testSearchButtonVisibilitySurvivesExportAndImport() {
+        let source = MemorySettingsStore()
+        XCTAssertTrue(source.get(.showSearchAllActions))
+        source.set(.showSearchAllActions, value: false)
+        let snapshot = SettingsSnapshotter.capture(store: source, keys: SettingsCatalog.coreKeys, appVersion: "test")
+        let destination = MemorySettingsStore()
+        SettingsSnapshotter.apply(snapshot, to: destination, keys: SettingsCatalog.coreKeys)
+        XCTAssertFalse(destination.get(.showSearchAllActions))
+    }
+
     func testCoreCatalogNamesAreUnique() {
         let names = SettingsCatalog.coreKeys.map(\.name)
         XCTAssertEqual(names.count, Set(names).count, "duplicate key names in SettingsCatalog.coreKeys")

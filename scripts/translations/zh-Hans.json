@@ -700,6 +700,8 @@
   "Zoom": "缩放",
   "Bring All to Front": "前置全部窗口",
   "Paste from Clipboard": "从剪贴板粘贴",
+  "Show Search All Actions": "显示搜索所有操作",
+  "Show the search button at the end of the popup bar.": "在弹出工具栏末尾显示搜索按钮。",
   "Show Secret": "显示密码",
   "Hide Secret": "隐藏密码",
   "Disabled": "已停用",

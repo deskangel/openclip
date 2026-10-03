@@ -95,6 +95,7 @@ public extension SettingKey where Value == [String: String] {
 }
 
 public extension SettingKey where Value == Bool {
+    static var showSearchAllActions: SettingKey<Bool> { SettingKey<Bool>("showSearchAllActions", defaultValue: true) }
     static var isAppEnabled: SettingKey<Bool> { SettingKey<Bool>("isAppEnabled", defaultValue: true) }
     static var isAIEnabled: SettingKey<Bool> { SettingKey<Bool>("aiEnabled", defaultValue: true) }
     static var isMouseHoldEnabled: SettingKey<Bool> { SettingKey<Bool>("isMouseHoldEnabled", defaultValue: true) }
