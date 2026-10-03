@@ -17,6 +17,9 @@ All notable user-facing changes to OpenClip.
 - Hardened selection and clipboard delivery across macOS apps with correlated diagnostics.
 - Enhanced search palette layout, context indicators, and row interactions.
 
+### Contributors
+Thanks to @iiHawe for their contributions to this release! ([#134](https://github.com/ganeshmshetty/openclip/pull/134), [#135](https://github.com/ganeshmshetty/openclip/pull/135))
+
 ---
 
 ## v1.7.3 - 2026-10-02
