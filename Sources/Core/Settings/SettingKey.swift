@@ -54,6 +54,15 @@ public enum UpdateChannel: String, Codable, CaseIterable, Sendable {
     case beta
 }
 
+/// Required modifier key when selecting text to trigger the popup ("none" | "option" | "shift" | "control" | "command").
+public enum SelectionModifier: String, Codable, CaseIterable, Sendable {
+    case none
+    case option
+    case shift
+    case control
+    case command
+}
+
 public extension SettingKey where Value == [String] {
     static var actionOrder: SettingKey<[String]> { SettingKey<[String]>("action.order", defaultValue: []) }
 }
@@ -147,6 +156,9 @@ public extension SettingKey where Value == String {
 
     /// Which update feed the app follows: `UpdateChannel.stable` (default) or `UpdateChannel.beta`.
     static var updateChannel: SettingKey<String> { SettingKey<String>("updates.channel", defaultValue: UpdateChannel.stable.rawValue) }
+
+    /// Required modifier key when selecting text to trigger the popup ("none" | "option" | "shift" | "control" | "command").
+    static var selectionModifier: SettingKey<String> { SettingKey<String>("selectionModifier", defaultValue: SelectionModifier.none.rawValue) }
 
     /// Per-action option value key. The key name matches the legacy `action.<id>.option.<optID>`
     /// convention so existing stored values migrate over with zero data changes.

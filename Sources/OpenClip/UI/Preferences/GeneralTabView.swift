@@ -14,6 +14,7 @@ import KeyboardShortcuts
 struct GeneralTab: View {
     /// Backed by the settings store — the single owner of `isAppEnabled`.
     @State private var isAppEnabled: Bool
+    @State private var selectionModifier: String
     @State private var showMenuBarIcon: Bool
     @State private var isMouseHoldEnabled: Bool
     @State private var fileSaveLocation: String
@@ -23,6 +24,7 @@ struct GeneralTab: View {
     /// Initializes preference state from the shared settings store.
     init() {
         _isAppEnabled = State(initialValue: DefaultSettingsStore.shared.get(.isAppEnabled))
+        _selectionModifier = State(initialValue: DefaultSettingsStore.shared.get(.selectionModifier))
         _showMenuBarIcon = State(initialValue: DefaultSettingsStore.shared.get(.showMenuBarIcon))
         _isMouseHoldEnabled = State(initialValue: DefaultSettingsStore.shared.get(.isMouseHoldEnabled))
         _fileSaveLocation = State(initialValue: DefaultSettingsStore.shared.get(.fileSaveLocation))
@@ -31,21 +33,25 @@ struct GeneralTab: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // Everything that decides how the popup is summoned sits together
-                SettingsCard("Triggers") {
-                    SettingsToggleRow(
-                        title: "Appear Automatically",
-                        subtitle: "Show the popup as soon as text is selected.",
+                // Everything that decides how the popup and palette are summoned
+                SettingsCard("Selection & Mouse") {
+                    SettingsRow(
+                        title: "Appear on Selection",
+                        subtitle: "Choose when the popup appears after selecting text.",
                         systemImage: "cursorarrow",
-                        plainIcon: true,
-                        isOn: $isAppEnabled
-                    )
-                    .onChange(of: isAppEnabled) { _, newValue in
-                        DefaultSettingsStore.shared.set(.isAppEnabled, value: newValue)
-                        NotificationCenter.default.post(name: Notification.Name("OpenClipEnabledStateChanged"), object: newValue)
-                    }
-                    .onReceive(NotificationCenter.default.publisher(for: Notification.Name("OpenClipEnabledStateChanged"))) { notification in
-                        isAppEnabled = (notification.object as? Bool) ?? DefaultSettingsStore.shared.get(.isAppEnabled)
+                        plainIcon: true
+                    ) {
+                        Picker("", selection: selectionTriggerBinding) {
+                            Text("Always").tag("always")
+                            Text("With ⌥ Option Key").tag(SelectionModifier.option.rawValue)
+                            Text("With ⇧ Shift Key").tag(SelectionModifier.shift.rawValue)
+                            Text("With ⌃ Control Key").tag(SelectionModifier.control.rawValue)
+                            Text("With ⌘ Command Key").tag(SelectionModifier.command.rawValue)
+                            Text("Off").tag("off")
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .frame(width: 160)
                     }
 
                     SettingsDivider()
@@ -60,21 +66,26 @@ struct GeneralTab: View {
                     .onChange(of: isMouseHoldEnabled) { _, newValue in
                         DefaultSettingsStore.shared.set(.isMouseHoldEnabled, value: newValue)
                     }
+                }
+                .onReceive(NotificationCenter.default.publisher(for: Notification.Name("OpenClipEnabledStateChanged"))) { notification in
+                    isAppEnabled = (notification.object as? Bool) ?? DefaultSettingsStore.shared.get(.isAppEnabled)
+                }
 
-                    SettingsDivider()
-
+                SettingsCard("Shortcuts") {
                     SettingsRow(
-                        title: "Keyboard Shortcut",
-                        subtitle: "Summon the popup for whatever is selected.",
-                        systemImage: "keyboard",
+                        title: "Command Palette",
+                        subtitle: "Open the search palette for selected text or clipboard.",
+                        systemImage: "command",
                         plainIcon: true
                     ) {
                         Shortcut(for: .togglePopup)
                     }
 
+                    SettingsDivider()
+
                     SettingsRow(
-                        title: "Capture Text Shortcut",
-                        subtitle: "Select a screen region and recognize its text.",
+                        title: "Capture Text",
+                        subtitle: "Select a screen region and extract text via OCR.",
                         systemImage: "viewfinder",
                         plainIcon: true
                     ) {
@@ -205,6 +216,38 @@ struct GeneralTab: View {
             launchManager.syncStatus()
         }
         .onDisappear { permissionManager.stopMonitoring() }
+    }
+
+    private var selectionTriggerChoice: String {
+        guard isAppEnabled else { return "off" }
+        if selectionModifier == SelectionModifier.none.rawValue {
+            return "always"
+        }
+        return selectionModifier
+    }
+
+    private func updateSelectionTriggerChoice(_ choice: String) {
+        if choice == "off" {
+            isAppEnabled = false
+            DefaultSettingsStore.shared.set(.isAppEnabled, value: false)
+            NotificationCenter.default.post(name: Notification.Name("OpenClipEnabledStateChanged"), object: false)
+        } else {
+            let modifier = (choice == "always") ? SelectionModifier.none.rawValue : choice
+            selectionModifier = modifier
+            DefaultSettingsStore.shared.set(.selectionModifier, value: modifier)
+            if !isAppEnabled {
+                isAppEnabled = true
+                DefaultSettingsStore.shared.set(.isAppEnabled, value: true)
+                NotificationCenter.default.post(name: Notification.Name("OpenClipEnabledStateChanged"), object: true)
+            }
+        }
+    }
+
+    private var selectionTriggerBinding: Binding<String> {
+        Binding(
+            get: { selectionTriggerChoice },
+            set: { updateSelectionTriggerChoice($0) }
+        )
     }
 
     private var saveLocationSubtitleText: Text {

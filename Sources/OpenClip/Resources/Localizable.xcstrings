@@ -1765,6 +1765,34 @@
         }
       }
     },
+    "Always": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "始终弹出"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一律彈出"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toujours"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "常に表示"
+          }
+        }
+      }
+    },
     "An alias jumps straight to an action when you type it in the palette. A hotkey runs it from anywhere.": {
       "localizations": {
         "zh-Hans": {
@@ -1957,6 +1985,90 @@
           "stringUnit": {
             "state": "translated",
             "value": "「自動表示」はオンです"
+          }
+        }
+      }
+    },
+    "Appear on Selection": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选中文本时显示"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選取文字時顯示"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher lors de la sélection"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "テキスト選択時に表示"
+          }
+        }
+      }
+    },
+    "Appear on Selection is off": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已关闭选中时显示"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已關閉選取時顯示"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’affichage lors de la sélection est désactivé"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「テキスト選択時に表示」はオフです"
+          }
+        }
+      }
+    },
+    "Appear on Selection is on": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已开启选中时显示"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已開啟選取時顯示"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’affichage lors de la sélection est activé"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「テキスト選択時に表示」はオンです"
           }
         }
       }
@@ -3226,25 +3338,25 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "从屏幕捕获文本"
+            "value": "屏幕文本捕获"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "從螢幕擷取文字"
+            "value": "螢幕文字擷取"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Capturer le texte à l’écran"
+            "value": "Capturer du texte"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "画面からテキストをキャプチャ"
+            "value": "テキストをキャプチャ"
           }
         }
       }
@@ -3637,6 +3749,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "アイコンを選択"
+          }
+        }
+      }
+    },
+    "Choose when the popup appears after selecting text.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择选中文本后弹窗何时显示。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選擇選取文字後彈出視窗何時顯示。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisissez quand le pop-up s’affiche après la sélection de texte."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "テキスト選択後にポップアップを表示するタイミングを選択します。"
           }
         }
       }
@@ -4085,6 +4225,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "カラーモード"
+          }
+        }
+      }
+    },
+    "Command Palette": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "命令面板"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "命令面板"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Palette de commandes"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "コマンドパレット"
           }
         }
       }
@@ -6101,6 +6269,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "ドキュメント"
+          }
+        }
+      }
+    },
+    "Don't show the popup on text selection.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选中文本时不显示弹出窗口。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選取文字時不顯示彈出視窗。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ne pas afficher le menu lors de la sélection de texte."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "テキスト選択時にポップアップを表示しません。"
           }
         }
       }
@@ -11285,6 +11481,34 @@
         }
       }
     },
+    "None (Always)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无（始终弹出）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無（一律彈出）"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucune (Toujours)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "なし（常に表示）"
+          }
+        }
+      }
+    },
     "Not supported on this Mac": {
       "localizations": {
         "zh-Hans": {
@@ -11425,6 +11649,34 @@
         }
       }
     },
+    "Off": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关闭"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "關閉"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Désactivé"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "オフ"
+          }
+        }
+      }
+    },
     "Off hides the action from the popup bar and the palette.": {
       "localizations": {
         "zh-Hans": {
@@ -11505,6 +11757,146 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ollama (ローカルLLM)"
+          }
+        }
+      }
+    },
+    "On Selection": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选中文本时"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選取文字時"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lors de la sélection"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "テキスト選択時"
+          }
+        }
+      }
+    },
+    "Only show popup when selecting text with Command (⌘) held.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅在按住 Command (⌘) 键选中文本时显示弹出窗口。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "僅在按住 Command (⌘) 鍵選取文字時顯示彈出視窗。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher le menu uniquement lors de la sélection de texte avec Commande (⌘) enfoncée."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Command (⌘) キーを押しながらテキストを選択したときのみポップアップを表示します。"
+          }
+        }
+      }
+    },
+    "Only show popup when selecting text with Control (⌃) held.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅在按住 Control (⌃) 键选中文本时显示弹出窗口。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "僅在按住 Control (⌃) 鍵選取文字時顯示彈出視窗。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher le menu uniquement lors de la sélection de texte avec Contrôle (⌃) enfoncée."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Control (⌃) キーを押しながらテキストを選択したときのみポップアップを表示します。"
+          }
+        }
+      }
+    },
+    "Only show popup when selecting text with Option (⌥) held.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅在按住 Option (⌥) 键选中文本时显示弹出窗口。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "僅在按住 Option (⌥) 鍵選取文字時顯示彈出視窗。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher le menu uniquement lors de la sélection de texte avec Option (⌥) enfoncée."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Option (⌥) キーを押しながらテキストを選択したときのみポップアップを表示します。"
+          }
+        }
+      }
+    },
+    "Only show popup when selecting text with Shift (⇧) held.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅在按住 Shift (⇧) 键选中文本时显示弹出窗口。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "僅在按住 Shift (⇧) 鍵選取文字時顯示彈出視窗。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher le menu uniquement lors de la sélection de texte avec Maj (⇧) enfoncée."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shift (⇧) キーを押しながらテキストを選択したときのみポップアップを表示します。"
           }
         }
       }
@@ -11897,6 +12289,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "AGPL-3.0 ライセンスのオープンソース"
+          }
+        }
+      }
+    },
+    "Open the search palette for selected text or clipboard.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开选中文本或剪贴板内容的搜索面板。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開啟選取文字或剪貼簿內容的搜尋面板。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrir la palette de recherche pour le texte sélectionné ou le presse-papiers."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選択したテキストやクリップボード用の検索パレットを開きます。"
           }
         }
       }
@@ -15961,6 +16381,34 @@
         }
       }
     },
+    "Select a screen region and extract text via OCR.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "框选屏幕区域并通过 OCR 识别提取文本。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "框選螢幕區域並透過 OCR 辨識擷取文字。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sélectionner une zone de l'écran et extraire le texte par ROC."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "画面の領域を選択してOCRでテキストを抽出します。"
+          }
+        }
+      }
+    },
     "Select a screen region and recognize its text.": {
       "localizations": {
         "zh-Hans": {
@@ -16185,6 +16633,62 @@
         }
       }
     },
+    "Selection & Mouse": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择与鼠标"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選取與滑鼠"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sélection et souris"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選択とマウス"
+          }
+        }
+      }
+    },
+    "Selection Modifier": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择修饰键"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選取修飾鍵"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Touche de modification pour la sélection"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選択修飾キー"
+          }
+        }
+      }
+    },
     "Send follow-up": {
       "localizations": {
         "zh-Hans": {
@@ -16392,7 +16896,7 @@
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "快捷鍵"
+            "value": "快速鍵"
           }
         },
         "fr": {
@@ -16745,6 +17249,34 @@
         }
       }
     },
+    "Show popup on any text selection without needing a modifier key.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选中文本时直接弹出，无需按住修饰键。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選取文字時直接彈出，無需按住修飾鍵。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher le menu lors de toute sélection de texte sans touche de modification."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "修飾キーを押さずにテキストを選択したときもポップアップを表示します。"
+          }
+        }
+      }
+    },
     "Show the plain result (⌘D)": {
       "localizations": {
         "zh-Hans": {
@@ -16769,6 +17301,146 @@
           "stringUnit": {
             "state": "translated",
             "value": "結果のみを表示 (⌘D)"
+          }
+        }
+      }
+    },
+    "Show the popup only when selecting text with Command (⌘) held.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅在按住 Command (⌘) 键选中文本时显示弹出窗口。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "僅在按住 Command (⌘) 鍵選取文字時顯示彈出視窗。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher le menu uniquement lors de la sélection de texte avec Commande (⌘) enfoncée."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Command (⌘) キーを押しながらテキストを選択したときのみポップアップを表示します。"
+          }
+        }
+      }
+    },
+    "Show the popup only when selecting text with Control (⌃) held.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅在按住 Control (⌃) 键选中文本时显示弹出窗口。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "僅在按住 Control (⌃) 鍵選取文字時顯示彈出視窗。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher le menu uniquement lors de la sélection de texte avec Contrôle (⌃) enfoncée."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Control (⌃) キーを押しながらテキストを選択したときのみポップアップを表示します。"
+          }
+        }
+      }
+    },
+    "Show the popup only when selecting text with Option (⌥) held.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅在按住 Option (⌥) 键选中文本时显示弹出窗口。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "僅在按住 Option (⌥) 鍵選取文字時顯示彈出視窗。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher le menu uniquement lors de la sélection de texte avec Option (⌥) enfoncée."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Option (⌥) キーを押しながらテキストを選択したときのみポップアップを表示します。"
+          }
+        }
+      }
+    },
+    "Show the popup only when selecting text with Shift (⇧) held.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅在按住 Shift (⇧) 键选中文本时显示弹出窗口。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "僅在按住 Shift (⇧) 鍵選取文字時顯示彈出視窗。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher le menu uniquement lors de la sélection de texte avec Maj (⇧) enfoncée."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shift (⇧) キーを押しながらテキストを選択したときのみポップアップを表示します。"
+          }
+        }
+      }
+    },
+    "Show the popup whenever text is selected.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选中文本时直接显示弹出窗口。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選取文字時直接顯示彈出視窗。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher le menu dès que du texte est sélectionné."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "テキストを選択するとポップアップを表示します。"
           }
         }
       }
@@ -19825,6 +20497,118 @@
         }
       }
     },
+    "With ⇧ Shift Key": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按住 ⇧ Shift 键"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按住 ⇧ Shift 鍵"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avec la touche ⇧ Maj"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⇧ Shift キー押下時"
+          }
+        }
+      }
+    },
+    "With ⌃ Control Key": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按住 ⌃ Control 键"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按住 ⌃ Control 鍵"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avec la touche ⌃ Contrôle"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⌃ Control キー押下時"
+          }
+        }
+      }
+    },
+    "With ⌘ Command Key": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按住 ⌘ Command 键"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按住 ⌘ Command 鍵"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avec la touche ⌘ Commande"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⌘ Command キー押下時"
+          }
+        }
+      }
+    },
+    "With ⌥ Option Key": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按住 ⌥ Option 键"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按住 ⌥ Option 鍵"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avec la touche ⌥ Option"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⌥ Option キー押下時"
+          }
+        }
+      }
+    },
     "Word Completion": {
       "localizations": {
         "zh-Hans": {
@@ -20213,6 +20997,118 @@
           "stringUnit": {
             "state": "translated",
             "value": "昨日"
+          }
+        }
+      }
+    },
+    "⇧ Shift": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⇧ Shift"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⇧ Shift"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⇧ Shift"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⇧ Shift"
+          }
+        }
+      }
+    },
+    "⌃ Control": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⌃ Control"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⌃ Control"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⌃ Control"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⌃ Control"
+          }
+        }
+      }
+    },
+    "⌘ Command": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⌘ Command"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⌘ Command"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⌘ Command"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⌘ Command"
+          }
+        }
+      }
+    },
+    "⌥ Option": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⌥ Option"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⌥ Option"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⌥ Option"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⌥ Option"
           }
         }
       }

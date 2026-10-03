@@ -1611,6 +1611,105 @@ final class MacSelectionMonitorTests: XCTestCase {
         XCTAssertTrue(deliveredSelections.isEmpty, "Cancelled task must never deliver selection to onSelection")
     }
 
+    // MARK: - Selection Modifier Tests
+
+    func testSelectionModifierOptionSuppressesPopupWhenOptionNotHeld() async {
+        let store = MemorySettingsStore()
+        store.set(.isAppEnabled, value: true)
+        store.set(.selectionModifier, value: SelectionModifier.option.rawValue)
+
+        let monitor = makeMonitor(settingsStore: store)
+        monitor.policyResolver = { _ in AppPolicyContext.default }
+        monitor.retriever = SelectionRetrievalCoordinator(
+            inspect: { Self.fixtureTarget(role: "AXTextField", selectedText: "selected without option") },
+            copyCapture: { _ in nil }
+        )
+
+        var delivered = false
+        monitor.onSelection = { _, _ in delivered = true }
+
+        monitor.handleMouseDown(at: CGPoint(x: 100, y: 100), modifierFlags: [])
+        monitor.handleMouseUp(app: MockTestApp(bundleID: "com.apple.TextEdit"), cursor: CGPoint(x: 150, y: 100), clickCount: 1, modifierFlags: [])
+        await monitor.debounceTask?.value
+
+        XCTAssertFalse(delivered, "Popup must not be delivered when required Option modifier is not held")
+        XCTAssertEqual(monitor.latestSelection?.context.text, "selected without option", "Selection must still be passively cached in latestSelection")
+    }
+
+    func testSelectionModifierOptionDeliversPopupWhenOptionHeld() async {
+        let store = MemorySettingsStore()
+        store.set(.isAppEnabled, value: true)
+        store.set(.selectionModifier, value: SelectionModifier.option.rawValue)
+
+        let monitor = makeMonitor(settingsStore: store)
+        monitor.policyResolver = { _ in AppPolicyContext.default }
+        monitor.retriever = SelectionRetrievalCoordinator(
+            inspect: { Self.fixtureTarget(role: "AXTextField", selectedText: "selected with option") },
+            copyCapture: { _ in nil }
+        )
+
+        var delivered: SelectionContext?
+        monitor.onSelection = { context, _ in delivered = context }
+
+        monitor.handleMouseDown(at: CGPoint(x: 100, y: 100), modifierFlags: [.option])
+        monitor.handleMouseUp(app: MockTestApp(bundleID: "com.apple.TextEdit"), cursor: CGPoint(x: 150, y: 100), clickCount: 1, modifierFlags: [.option])
+        await monitor.debounceTask?.value
+
+        XCTAssertNotNil(delivered, "Popup must be delivered when required Option modifier is held")
+        XCTAssertEqual(delivered?.text, "selected with option")
+        XCTAssertEqual(monitor.latestSelection?.context.text, "selected with option")
+    }
+
+    func testSelectionModifierNoneDeliversPopupWithoutModifier() async {
+        let store = MemorySettingsStore()
+        store.set(.isAppEnabled, value: true)
+        store.set(.selectionModifier, value: SelectionModifier.none.rawValue)
+
+        let monitor = makeMonitor(settingsStore: store)
+        monitor.policyResolver = { _ in AppPolicyContext.default }
+        monitor.retriever = SelectionRetrievalCoordinator(
+            inspect: { Self.fixtureTarget(role: "AXTextField", selectedText: "normal selection") },
+            copyCapture: { _ in nil }
+        )
+
+        var delivered: SelectionContext?
+        monitor.onSelection = { context, _ in delivered = context }
+
+        monitor.handleMouseDown(at: CGPoint(x: 100, y: 100), modifierFlags: [])
+        monitor.handleMouseUp(app: MockTestApp(bundleID: "com.apple.TextEdit"), cursor: CGPoint(x: 150, y: 100), clickCount: 1, modifierFlags: [])
+        await monitor.debounceTask?.value
+
+        XCTAssertNotNil(delivered, "Popup must be delivered when modifier is none")
+        XCTAssertEqual(delivered?.text, "normal selection")
+    }
+
+    func testSelectionModifierKeyboardTriggerObeysModifier() async {
+        let store = MemorySettingsStore()
+        store.set(.isAppEnabled, value: true)
+        store.set(.selectionModifier, value: SelectionModifier.option.rawValue)
+
+        let monitor = makeKeyboardMonitor(overlay: false, bundleID: "com.apple.TextEdit", role: "AXTextField", settingsStore: store)
+        monitor.policyResolver = { _ in AppPolicyContext.default }
+        monitor.retriever = SelectionRetrievalCoordinator(
+            inspect: { Self.fixtureTarget(role: "AXTextField", selectedText: "keyboard text") },
+            copyCapture: { _ in nil }
+        )
+
+        var deliveredCount = 0
+        monitor.onSelection = { _, _ in deliveredCount += 1 }
+
+        // Keyboard trigger WITHOUT option
+        monitor.handleSelectionTrigger(isSelectAll: false, flags: [.shift])
+        await monitor.debounceTask?.value
+        XCTAssertEqual(deliveredCount, 0, "Keyboard trigger without option must not deliver popup")
+        XCTAssertEqual(monitor.latestSelection?.context.text, "keyboard text")
+
+        // Keyboard trigger WITH option
+        monitor.handleSelectionTrigger(isSelectAll: false, flags: [.shift, .option])
+        await monitor.debounceTask?.value
+        XCTAssertEqual(deliveredCount, 1, "Keyboard trigger with option must deliver popup")
+    }
+
     private func makeKeyboardMonitor(overlay: Bool, bundleID: String, role: String,
                                      settingsStore: SettingsStore = MemorySettingsStore()) -> MacSelectionMonitor {
         let monitor = makeMonitor(settingsStore: settingsStore)

@@ -16,6 +16,7 @@ enum IntegrationSettings {
         [
             // Power / triggers
             SettingKey.isAppEnabled.erased,
+            SettingKey.selectionModifier.erased,
             SettingKey.isMouseHoldEnabled.erased,
             SettingKey.showMenuBarIcon.erased,
             SettingKey.startAtLogin.erased,
