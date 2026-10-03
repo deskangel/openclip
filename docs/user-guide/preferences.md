@@ -163,8 +163,10 @@ search palette, and their existing enable switches, aliases, and hotkeys keep wo
 
 Select a preset under **AI → AI Actions** to edit its icon, display name, **Icon/Text** mode,
 keyboard shortcut, search alias, and prompt. Changes save automatically. These settings follow
-the preset whether it is inside AI Tools or on the main popup bar. New custom AI actions open
-this editor after creation.
+the preset whether it is inside AI Tools or on the main popup bar. **Add Custom AI Action** also
+offers these controls before creation, with **Show as → Text** selected by default. They are saved
+when you click **Add Action**, which opens the editor for the new preset. Cancelling discards the
+draft, including its shortcut and alias.
 
 OpenClip includes an AI assistant overlay that processes text selections using local or cloud AI models.
 

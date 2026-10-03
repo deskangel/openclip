@@ -158,6 +158,9 @@ areas; stale debt notes are worse than none.
   alongside an autosaved prompt field. Appearance and aliases use the existing stores keyed by
   canonical action ID, so moving a preset into or out of AI Tools preserves its customization.
   Text remains the default; Icon mode falls back to the AI symbol when no icon has been chosen.
+  The new-preset form exposes appearance, alias and shortcut controls before creation. Its draft
+  defaults to Text and only persists these settings when Add Action succeeds, after alias
+  validation; cancelling does not register a shortcut or reserve an alias.
   AI output still streams into its result card, so the ordinary delivery picker is not shown.
 
 - **Content-driven panel growth has no controller callback.** The `NSHostingView` auto-resizes the
