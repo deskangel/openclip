@@ -224,6 +224,7 @@
   "Add Custom AI Action": "カスタムAIアクションを追加",
   "Action Title": "アクションのタイトル",
   "Prompt Instruction": "プロンプト指示",
+  "Prompt cannot be empty.": "プロンプトを空にすることはできません。",
   "e.g. Simplify": "例: 簡略化",
   "e.g. Rewrite text using simple 5th-grade vocabulary": "例: 小学生にもわかる簡単な語彙でテキストを書き直す",
   "Edit AI Action": "AIアクションを編集",

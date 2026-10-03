@@ -224,6 +224,7 @@
   "Add Custom AI Action": "添加自定义 AI 动作",
   "Action Title": "动作标题",
   "Prompt Instruction": "提示词",
+  "Prompt cannot be empty.": "提示词不能为空。",
   "e.g. Simplify": "例如：简化",
   "e.g. Rewrite text using simple 5th-grade vocabulary": "例如：用简单易懂的词汇改写文本",
   "Edit AI Action": "编辑 AI 动作",

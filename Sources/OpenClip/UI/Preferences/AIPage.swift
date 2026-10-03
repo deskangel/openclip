@@ -68,95 +68,6 @@ struct AIPage: View {
     }
 }
 
-// MARK: - One prompt
-
-/// Editing one AI prompt. This was a `.sheet` opened from inside the AI popover, so it dimmed the
-/// popover, whatever else was still floating, and the window. As a page it is just the next level.
-@MainActor
-struct AIPresetPage: View {
-    let presetID: String
-
-    @ObservedObject private var router = SettingsRouter.shared
-    @ObservedObject private var aiManager = AIServiceManager.shared
-
-    @State private var title: String = ""
-    @State private var prompt: String = ""
-    @State private var loaded = false
-    @State private var isConfirmingDelete = false
-
-    private var preset: AIActionPreset? {
-        aiManager.presets.first(where: { $0.id == presetID })
-    }
-
-    private var isCustom: Bool {
-        !AIServiceManager.defaultPresets.contains(where: { $0.id == presetID })
-    }
-
-    private var canSave: Bool {
-        !title.trimmingCharacters(in: .whitespaces).isEmpty
-            && !prompt.trimmingCharacters(in: .whitespaces).isEmpty
-    }
-
-    var body: some View {
-        if preset != nil || loaded {
-            SettingsEditorPage {
-                AIPromptFields(title: $title, prompt: $prompt)
-            } footer: {
-                HStack(spacing: 12) {
-                    if isCustom {
-                        if isConfirmingDelete {
-                            Button("Cancel") { isConfirmingDelete = false }
-                            Button("Delete", role: .destructive) {
-                                deletePreset()
-                                router.pop()
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .tint(.red)
-                        } else {
-                            Button("Delete Action…", role: .destructive) {
-                                isConfirmingDelete = true
-                            }
-                            .buttonStyle(.plain)
-                            .foregroundStyle(.red)
-                        }
-                    }
-
-                    Spacer()
-
-                    Button("Cancel") { router.pop() }
-                        .keyboardShortcut(.cancelAction)
-
-                    Button("Save") {
-                        guard var updated = preset else { return }
-                        updated.title = title.trimmingCharacters(in: .whitespaces)
-                        updated.prompt = prompt.trimmingCharacters(in: .whitespaces)
-                        aiManager.updatePreset(updated)
-                        router.pop()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(!canSave)
-                    .keyboardShortcut(.defaultAction)
-                }
-            }
-            .onAppear {
-                guard !loaded, let preset else { return }
-                title = preset.title
-                prompt = preset.prompt
-                loaded = true
-            }
-        } else {
-            // The preset went away (Reset Defaults while this page was open); go back to the list.
-            Color.clear.onAppear { router.pop() }
-        }
-    }
-
-    private func deletePreset() {
-        var list = aiManager.presets
-        list.removeAll(where: { $0.id == presetID })
-        aiManager.presets = list
-    }
-}
-
 /// Adding a prompt, as the next page rather than a sheet over everything.
 @MainActor
 struct AINewPresetPage: View {
@@ -187,8 +98,8 @@ struct AINewPresetPage: View {
                     .keyboardShortcut(.cancelAction)
 
                 Button("Add Action") {
-                    _ = aiManager.addCustomPreset(title: title, prompt: prompt)
-                    router.pop()
+                    let preset = aiManager.addCustomPreset(title: title, prompt: prompt)
+                    router.show(path: [.ai, .aiPreset(id: preset.id)])
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(!canAdd)

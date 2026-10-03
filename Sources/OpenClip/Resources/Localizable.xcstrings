@@ -13917,6 +13917,34 @@
         }
       }
     },
+    "Prompt cannot be empty.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "提示词不能为空。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "提示詞不能為空。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’invite ne peut pas être vide."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "プロンプトを空にすることはできません。"
+          }
+        }
+      }
+    },
     "Prompt instruction...": {
       "localizations": {
         "zh-Hans": {

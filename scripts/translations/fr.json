@@ -224,6 +224,7 @@
   "Add Custom AI Action": "Ajouter une action d’IA personnalisée",
   "Action Title": "Titre de l’action",
   "Prompt Instruction": "Instruction de l’invite",
+  "Prompt cannot be empty.": "L’invite ne peut pas être vide.",
   "e.g. Simplify": "ex. Simplifier",
   "e.g. Rewrite text using simple 5th-grade vocabulary": "ex. Réécrire le texte avec un vocabulaire simple et accessible",
   "Edit AI Action": "Modifier l’action d’IA",

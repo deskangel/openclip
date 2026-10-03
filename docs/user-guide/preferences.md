@@ -161,6 +161,11 @@ and drag the preset between the top-level actions. Its position is saved. To ret
 group, drop it onto the **AI Tools** row. Presets moved out of the group still appear in the full
 search palette, and their existing enable switches, aliases, and hotkeys keep working.
 
+Select a preset under **AI → AI Actions** to edit its icon, display name, **Icon/Text** mode,
+keyboard shortcut, search alias, and prompt. Changes save automatically. These settings follow
+the preset whether it is inside AI Tools or on the main popup bar. New custom AI actions open
+this editor after creation.
+
 OpenClip includes an AI assistant overlay that processes text selections using local or cloud AI models.
 
 Select **AI** in the sidebar (the first row of the Extensions group) to turn AI Tools on or off and configure your provider:
