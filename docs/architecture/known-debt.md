@@ -240,6 +240,10 @@ areas; stale debt notes are worse than none.
   `SettingKey+MenuBar.swift`) because it is pure presentation. `Core/Selection/Constants.swift` keeps only
   domain/runtime constants (timeouts, key codes, env vars, manifest keys).
 
+- **The Search all actions button is optional.** `SettingKey.showSearchAllActions` defaults to
+  true and is exposed under Customize → Behavior. Hiding it removes its width reservation
+  from popup pagination and updates the Appearance preview. The search hotkey stays available.
+
 ## AI Providers
 
 - **Apple Intelligence is gated by one availability source.** `AppleIntelligenceAvailability`

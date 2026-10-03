@@ -45,6 +45,7 @@ public enum SettingsCatalog {
             SettingKey.updateChannel.erased,
 
             // Popup presentation
+            SettingKey.showSearchAllActions.erased,
             SettingKey.popupPageSize.erased,
             SettingKey.popupBarWidth.erased,
             SettingKey.popupScale.erased,

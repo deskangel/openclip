@@ -16549,6 +16549,34 @@
         }
       }
     },
+    "Show Search All Actions": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示搜索所有操作"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顯示搜尋所有動作"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher la recherche de toutes les actions"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "すべてのアクションの検索を表示"
+          }
+        }
+      }
+    },
     "Show Secret": {
       "localizations": {
         "zh-Hans": {
@@ -16769,6 +16797,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "結果のみを表示 (⌘D)"
+          }
+        }
+      }
+    },
+    "Show the search button at the end of the popup bar.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在弹出工具栏末尾显示搜索按钮。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在彈出工具列末尾顯示搜尋按鈕。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher le bouton de recherche à la fin de la barre contextuelle."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ポップアップバーの末尾に検索ボタンを表示します。"
           }
         }
       }

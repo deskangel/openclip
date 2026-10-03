@@ -701,6 +701,8 @@
   "Zoom": "Agrandir",
   "Bring All to Front": "Tout ramener au premier plan",
   "Paste from Clipboard": "Coller depuis le presse-papiers",
+  "Show Search All Actions": "Afficher la recherche de toutes les actions",
+  "Show the search button at the end of the popup bar.": "Afficher le bouton de recherche à la fin de la barre contextuelle.",
   "Show Secret": "Afficher le secret",
   "Hide Secret": "Masquer le secret",
   "Disabled": "Désactivé",

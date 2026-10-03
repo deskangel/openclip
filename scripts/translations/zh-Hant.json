@@ -701,6 +701,8 @@
   "Zoom": "縮放",
   "Bring All to Front": "將全部視窗移至最前",
   "Paste from Clipboard": "從剪貼簿貼上",
+  "Show Search All Actions": "顯示搜尋所有動作",
+  "Show the search button at the end of the popup bar.": "在彈出工具列末尾顯示搜尋按鈕。",
   "Show Secret": "顯示密碼",
   "Hide Secret": "隱藏密碼",
   "Disabled": "已停用",

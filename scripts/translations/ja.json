@@ -701,6 +701,8 @@
   "Zoom": "拡大/縮小",
   "Bring All to Front": "すべてを手前に移動",
   "Paste from Clipboard": "クリップボードからペースト",
+  "Show Search All Actions": "すべてのアクションの検索を表示",
+  "Show the search button at the end of the popup bar.": "ポップアップバーの末尾に検索ボタンを表示します。",
   "Show Secret": "シークレットを表示",
   "Hide Secret": "シークレットを非表示",
   "Disabled": "無効",
