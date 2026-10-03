@@ -10,6 +10,7 @@ All notable user-facing changes to OpenClip.
 - **Modifier-held selection triggers**: Trigger popup actions conditionally by holding modifier keys (⌘, ⌥, ⇧, ⌃, or fn) while making text selections, allowing quick contextual actions without cluttering normal text selection.
 - **Standalone AI actions on popup bar**: Place custom AI actions directly on the main popup bar alongside standard actions for instant one-click access.
 - **Command Palette toggle**: Choose whether to display the command palette (⌘) button at the end of the popup bar under **Customize → Behavior**, while retaining the keyboard shortcut (⌥⌘C).
+- **Screen text capture (OCR)**: Draw a region on screen to capture text using ScreenCaptureKit; the selected text feeds directly into the popup action bar.
 - **Direct extension bundle installation**: Support drag-and-drop and double-click installation of `.openclipext` bundles directly.
 - **UI & accessibility polish**: Refined contextual action and command palette controls in Settings, polished button styling, and unified menu bar status layout.
 
