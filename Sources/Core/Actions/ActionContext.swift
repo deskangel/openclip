@@ -16,16 +16,21 @@ public struct ActionContext: Sendable {
     /// Populated by the popup/coordinator when invoking perform for extension actions; nil for
     /// builtins and for direct perform calls that didn't go through match plumbing.
     public let match: ActionMatchInfo?
+    /// Paste destination evidence captured for this popup session; nil is unknown and only fails
+    /// actions that explicitly require a paste destination.
+    public let pasteTargetAvailable: Bool?
     
     public init(
         selection: SelectionContext,
         modifiers: ModifierFlags = [],
         isSecondaryClick: Bool = false,
-        match: ActionMatchInfo? = nil
+        match: ActionMatchInfo? = nil,
+        pasteTargetAvailable: Bool? = nil
     ) {
         self.selection = selection
         self.modifiers = modifiers
         self.isSecondaryClick = isSecondaryClick
         self.match = match
+        self.pasteTargetAvailable = pasteTargetAvailable ?? selection.pasteTargetAvailable
     }
 }

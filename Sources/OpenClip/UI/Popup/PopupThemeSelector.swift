@@ -16,6 +16,7 @@ struct PopupThemeSelector: View {
     @Setting(SettingKey.popupThemeColor) private var themeColor
     @Setting(SettingKey.popupScale) private var popupScale
     @Setting(SettingKey.popupPageSize) private var pageSize
+    @Setting(SettingKey.showSearchAllActions) private var showSearchAllActions
     @Setting(SettingKey.popupAlignment) private var popupAlignment
     @Setting(SettingKey.popupVerticalPosition) private var popupVerticalPosition
     @Setting(SettingKey.contextualActionsEnabled) private var contextualActionsEnabled
@@ -73,6 +74,7 @@ struct PopupThemeSelector: View {
         themeColor == SettingKey.popupThemeColor.defaultValue &&
         popupScale == SettingKey.popupScale.defaultValue &&
         pageSize == SettingKey.popupPageSize.defaultValue &&
+        showSearchAllActions == SettingKey.showSearchAllActions.defaultValue &&
         popupAlignment == SettingKey.popupAlignment.defaultValue &&
         popupVerticalPosition == SettingKey.popupVerticalPosition.defaultValue &&
         contextualActionsEnabled == SettingKey.contextualActionsEnabled.defaultValue &&
@@ -85,6 +87,7 @@ struct PopupThemeSelector: View {
         themeColor = SettingKey.popupThemeColor.defaultValue
         popupScale = SettingKey.popupScale.defaultValue
         pageSize = SettingKey.popupPageSize.defaultValue
+        showSearchAllActions = SettingKey.showSearchAllActions.defaultValue
         popupAlignment = SettingKey.popupAlignment.defaultValue
         popupVerticalPosition = SettingKey.popupVerticalPosition.defaultValue
         contextualActionsEnabled = SettingKey.contextualActionsEnabled.defaultValue
@@ -196,8 +199,16 @@ struct PopupThemeSelector: View {
             }
 
             SettingsCard("Behavior") {
+                SettingsToggleRow(
+                    title: "Show Command Palette",
+                    subtitle: "Show the command palette button at the end of the popup bar.",
+                    isOn: $showSearchAllActions
+                )
+
+                SettingsDivider()
+
                 SettingsRow(
-                    title: "Contextual Actions",
+                    title: "Show Contextual Actions",
                     subtitle: "Show relevant actions first based on what you select."
                 ) {
                     HStack(spacing: 8) {
@@ -221,7 +232,6 @@ struct PopupThemeSelector: View {
                         Toggle("", isOn: $contextualActionsEnabled)
                             .labelsHidden()
                             .toggleStyle(.switch)
-                            .controlSize(.small)
                             .accessibilityLabel(String(localized: "Enable Contextual Actions"))
                     }
                 }

@@ -2,6 +2,18 @@ import XCTest
 @testable import Core
 
 final class SettingsSnapshotTests: XCTestCase {
+    func testStandaloneAIPreferencesSurviveExportAndImport() {
+        let source = MemorySettingsStore()
+        XCTAssertTrue(source.get(.standaloneAIActionIDs).isEmpty)
+        source.set(.standaloneAIActionIDs, value: ["ai.preset.rewrite"])
+        source.set(.actionOrder, value: ["ai.preset.rewrite", "builtin.copy", "builtin.aiTools"])
+        let snapshot = SettingsSnapshotter.capture(store: source, keys: SettingsCatalog.coreKeys, appVersion: "test")
+        let destination = MemorySettingsStore()
+        SettingsSnapshotter.apply(snapshot, to: destination, keys: SettingsCatalog.coreKeys)
+        XCTAssertEqual(destination.get(.standaloneAIActionIDs), ["ai.preset.rewrite"])
+        XCTAssertEqual(destination.get(.actionOrder), source.get(.actionOrder))
+    }
+
     private let nameKey = SettingKey<String>("test.snapshot.name", defaultValue: "")
     private let countKey = SettingKey<Int>("test.snapshot.count", defaultValue: 0)
     private let setKey = SettingKey<Set<String>>("test.snapshot.set", defaultValue: [])
@@ -127,6 +139,16 @@ final class SettingsSnapshotTests: XCTestCase {
 
         XCTAssertEqual(decoded.values, snapshot.values)
         XCTAssertEqual(decoded.appVersion, "test")
+    }
+
+    func testSearchButtonVisibilitySurvivesExportAndImport() {
+        let source = MemorySettingsStore()
+        XCTAssertTrue(source.get(.showSearchAllActions))
+        source.set(.showSearchAllActions, value: false)
+        let snapshot = SettingsSnapshotter.capture(store: source, keys: SettingsCatalog.coreKeys, appVersion: "test")
+        let destination = MemorySettingsStore()
+        SettingsSnapshotter.apply(snapshot, to: destination, keys: SettingsCatalog.coreKeys)
+        XCTAssertFalse(destination.get(.showSearchAllActions))
     }
 
     func testCoreCatalogNamesAreUnique() {

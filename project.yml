@@ -30,6 +30,22 @@ targets:
             CFBundleURLSchemes:
               - openclip
               - openclip-dev
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: OpenClip Extension
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Owner
+            LSItemContentTypes:
+              - com.openclip.extension
+            LSTypeIsPackage: true
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: com.openclip.extension
+            UTTypeDescription: OpenClip Extension
+            UTTypeConformsTo:
+              - com.apple.package
+              - public.composite-content
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - openclipext
         LSUIElement: true
         NSHumanReadableCopyright: "Copyright © 2026 Ganesh M and OpenClip Contributors. AGPL-3.0 licensed."
         NSAppleEventsUsageDescription: "OpenClip needs to control other apps to run your AppleScript actions and to paste results back into the app you were using."
@@ -47,8 +63,8 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
-        MARKETING_VERSION: "1.7.3"
-        CURRENT_PROJECT_VERSION: "19"
+        MARKETING_VERSION: "1.8.0-beta.1"
+        CURRENT_PROJECT_VERSION: "20"
         INFOPLIST_KEY_CFBundleShortVersionString: $(MARKETING_VERSION)
         INFOPLIST_KEY_CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

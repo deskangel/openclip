@@ -383,7 +383,10 @@ public struct PreferencesView: View {
             }
             return customizationManager.presented(action, surface: .table).title
         case .aiPreset(let id):
-            return aiManager.presets.first(where: { $0.id == id })?.title ?? String(localized: "Edit AI Action")
+            guard let preset = aiManager.presets.first(where: { $0.id == id }) else {
+                return String(localized: "Edit AI Action")
+            }
+            return customizationManager.displayTitle(for: AIAction(presetID: id, title: preset.title))
         default:
             return page.id
         }
@@ -902,7 +905,15 @@ public struct PreferencesView: View {
         case .iconPicker:
             IconPickerPage()
         case .aiPreset(let id):
-            AIPresetPage(presetID: id)
+            if let preset = aiManager.presets.first(where: { $0.id == id }) {
+                ActionEditorPage(
+                    action: AIAction(presetID: id, title: preset.title),
+                    disabledActionIDs: $disabledActionIDs,
+                    disabledPackages: $disabledPackages
+                )
+            } else {
+                Color.clear.onAppear { router.pop() }
+            }
         case .aiNewPreset:
             AINewPresetPage()
         case .addApplication:

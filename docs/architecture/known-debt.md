@@ -107,7 +107,7 @@ areas; stale debt notes are worse than none.
   (`builtin.copy`, `com.user.ext.action`). `ActionRegistry` dynamically materializes `CustomGroupAction`
   (`Sources/Core/Actions/CustomGroupAction.swift`, conforming to `Action` and `SubActionProviding`)
   group rows, injecting them contiguously before their member actions in `actions`, while `SettingKey.actionOrder`
-  strictly stores real, canonical IDs (excluding synthetic group headers and AI presets). `ActionCoordinator`
+  strictly stores real, canonical IDs (excluding synthetic group headers and grouped AI presets). `ActionCoordinator`
   manages the full group lifecycle (`createGroup`, `updateGroup`, `ungroup`, `removeFromGroup`, `loadGroupDefs`,
   `pruneOrphans`), automatically enforcing the strict $\ge 2$ member invariant: when members are uninstalled
   or removed, any group dropping below 2 members is immediately dissolved. Availability resolution in
@@ -146,6 +146,22 @@ areas; stale debt notes are worse than none.
   id-string switches in presentation.
 
 ## Action-Search Palette & Popup Growth
+
+- **AI presets can leave AI Tools.** `SettingKey.standaloneAIActionIDs` records presets dragged
+  to the Actions list's root. Their canonical IDs participate in `action.order`, survive preset
+  reconciliation, and appear directly in the popup. AI Tools excludes those presets from its
+  sub-bar and scoped search. Dropping a preset onto AI Tools removes its explicit order and
+  returns it to the group. Bar and palette clicks share the controller's AI execution path;
+  the global AI switch and individual preset enablement still apply.
+- **AI presets share the standard action editor.** Their AI settings pages expose the same icon
+  picker, Icon/Text display mode, search alias and per-action shortcut as other leaf actions,
+  alongside an autosaved prompt field. Appearance and aliases use the existing stores keyed by
+  canonical action ID, so moving a preset into or out of AI Tools preserves its customization.
+  Text remains the default; Icon mode falls back to the AI symbol when no icon has been chosen.
+  The new-preset form exposes appearance, alias and shortcut controls before creation. Its draft
+  defaults to Text and only persists these settings when Add Action succeeds, after alias
+  validation; cancelling does not register a shortcut or reserve an alias.
+  AI output still streams into its result card, so the ordinary delivery picker is not shown.
 
 - **Content-driven panel growth has no controller callback.** The `NSHostingView` auto-resizes the
   panel window top-anchored when its SwiftUI content grows (e.g. entering search mode);
@@ -240,6 +256,10 @@ areas; stale debt notes are worse than none.
   `SettingKey+MenuBar.swift`) because it is pure presentation. `Core/Selection/Constants.swift` keeps only
   domain/runtime constants (timeouts, key codes, env vars, manifest keys).
 
+- **The Search all actions button is optional.** `SettingKey.showSearchAllActions` defaults to
+  true and is exposed under Customize → Behavior. Hiding it removes its width reservation
+  from popup pagination and updates the Appearance preview. The search hotkey stays available.
+
 ## AI Providers
 
 - **Apple Intelligence is gated by one availability source.** `AppleIntelligenceAvailability`
@@ -272,6 +292,33 @@ areas; stale debt notes are worse than none.
   (`#if canImport(FoundationModels)` is already true on 26.x, so a symbol reference breaks the
   build rather than failing at runtime). Adding Private Cloud Compute and the model-abstraction
   refactor is deferred until the toolchain is upgraded.
+
+## Screen text capture
+
+The menu bar and the dedicated ⌥⌘O shortcut start a one-shot ScreenCaptureKit capture after a
+per-screen crosshair drag. Vision performs recognition locally; captured text opens the ordinary
+action bar beside the selector's mouse-release point using the standard popup gap and
+`SelectionSource.ocr`. If the pointer moves more than eight points while recognition runs, the
+popup follows its current location and drops the stale drag-direction hint; the original capture
+region remains in `selectionBounds`. The selector closes synchronously on a valid release so the
+screen returns to normal before capture and recognition begin. A one-second arrival grace avoids
+distance-dismissal from cursor movement during recognition. Switching to another app cancels the
+pending OCR delivery.
+OCR sessions permit Copy and other actions that accept text. Extension `requirements.input` now
+separates optional input, nonblank text, a live selection, and a confirmed editable selection;
+legacy `requiresSelection` maps to `text`/`optional`. OCR satisfies `text`, while selection-bound
+requirements reject OCR and clipboard sources. `requiresPasteTarget` describes destination support
+independently from input source. At the result-delivery boundary, OCR cut/paste effects are converted
+to Copy and simulated paste is dropped, including direct and loading action paths. Actions that
+require a live or editable selection recheck the captured selection generation and target before
+their effects run. This check does not sandbox scripts or prevent arbitrary side effects authored
+inside them. Catalog manifests using the new fields must wait for the first app release that enforces
+them; the current source version (1.7.3) is not a confirmed compatibility floor. The OCR flow writes
+nothing to the pasteboard until the user chooses Copy. Screen Recording access is
+requested by the system on
+first capture; capture errors show System Settings guidance. Selection monitoring is suppressed
+and pending OCR is cancelled through the capture request token, so stale OCR results cannot
+replace a newer popup.
 
 ## Unused / Latent
 

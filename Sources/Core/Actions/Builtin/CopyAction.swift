@@ -7,7 +7,7 @@
 // own secondary), and the resolver's default toast already says "Copied" — nothing to add.
 import Foundation
 
-public struct CopyAction: ConfigurableAction {
+public struct CopyAction: ConfigurableAction, OCRInputAction {
     public let id = "builtin.copy"
     public var title: String { String(localized: "Copy") }
     public let preferenceIconName = "doc.on.doc"
@@ -21,7 +21,7 @@ public struct CopyAction: ConfigurableAction {
     
     @MainActor
     public func isEnabled(for context: ActionContext) -> Bool {
-        return !context.selection.text.isEmpty
+        return !context.selection.isClipboardFallback && !context.selection.text.isEmpty
     }
     
     @MainActor
@@ -39,4 +39,3 @@ public struct CopyAction: ConfigurableAction {
         return .copy(context.selection.text)
     }
 }
-

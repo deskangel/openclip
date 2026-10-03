@@ -65,6 +65,7 @@ public struct ActionEditorPage: View {
     @State private var customJavaScript: String = "function action(text) {\n    return text.toUpperCase();\n}"
     @State private var customJSIsAsync: Bool = false
     @State private var replaceSelection: Bool = true
+    @State private var aiPrompt: String = ""
 
     // Manifest-backed state: the target action lives in an extension manifest package.
     @State private var manifestState: LocatedManifest?
@@ -115,6 +116,20 @@ public struct ActionEditorPage: View {
         SettingsDestination.isCustomAction(action)
     }
 
+    private var isAIPreset: Bool {
+        ActionIdentity.isAIPreset(action)
+    }
+
+    private var aiPreset: AIActionPreset? {
+        guard isAIPreset else { return nil }
+        return AIServiceManager.shared.preset(forActionID: action.id)
+    }
+
+    private var isCustomAIPreset: Bool {
+        guard let aiPreset else { return false }
+        return !AIServiceManager.defaultPresets.contains(where: { $0.id == aiPreset.id })
+    }
+
     private var canDuplicate: Bool {
         ActionIdentity.canDuplicate(action)
     }
@@ -123,6 +138,7 @@ public struct ActionEditorPage: View {
     private var isCurrent: Bool {
         switch router.currentPage {
         case .action(let id), .builtinAction(let id): return id == action.id
+        case .aiPreset(let id): return id == aiPreset?.id
         case .extensionPackage(let id):
             return ActionIdentity.extensionPackageID(of: action) == id
         default: return false
@@ -204,6 +220,9 @@ public struct ActionEditorPage: View {
     }
 
     private var canProduceTextOutput: Bool {
+        // AI presets stream into the result card through the controller's AI flow, which does
+        // not use the ordinary action delivery preference.
+        if isAIPreset { return false }
         if action.chrome.outputKind == .text || action.chrome.outputKind == .dynamic {
             return true
         }
@@ -211,7 +230,7 @@ public struct ActionEditorPage: View {
             return false
         }
         if isBuiltin { return false }
-        if ActionIdentity.isAIPreset(action) || action.chrome.launchesAI { return true }
+        if action.chrome.launchesAI { return true }
         if action is CustomAction {
             return editKind != .openURL
         }
@@ -519,7 +538,7 @@ public struct ActionEditorPage: View {
                         }
                         .fixedSize(horizontal: true, vertical: false)
                     }
-                } else if isCustomAction {
+                } else if isCustomAction || isCustomAIPreset {
                     Divider()
                         .opacity(0.3)
                         .padding(.vertical, 10)
@@ -705,6 +724,29 @@ public struct ActionEditorPage: View {
                     }
                 }
 
+                if isAIPreset {
+                    SettingsCard("Prompt Instruction") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            TextField("Prompt instruction...", text: $aiPrompt, axis: .vertical)
+                                .lineLimit(4...12)
+                                .textFieldStyle(.roundedBorder)
+                                .accessibilityLabel(String(localized: "Prompt Instruction"))
+
+                            if aiPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                Text("Prompt cannot be empty.")
+                                    .font(.caption)
+                                    .foregroundStyle(.red)
+                            }
+
+                            Text("The selected text is appended to the instruction when the action runs.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.horizontal, SettingsDesignTokens.sectionCardPaddingH)
+                        .padding(.vertical, SettingsDesignTokens.sectionCardPaddingV)
+                    }
+                }
+
                 if !action.actionOptions.isEmpty {
                     SettingsCard("Options") {
                         VStack(spacing: 0) {
@@ -872,6 +914,12 @@ public struct ActionEditorPage: View {
             guard !Task.isCancelled, !isDeleting else { return }
             autoSave()
         }
+        .task(id: aiPrompt) {
+            guard isLoaded, !isDeleting else { return }
+            try? await Task.sleep(for: .milliseconds(350))
+            guard !Task.isCancelled, !isDeleting else { return }
+            autoSave()
+        }
         .onChange(of: displayMode) { _, _ in
             guard isLoaded, !isDeleting else { return }
             autoSave()
@@ -1016,7 +1064,7 @@ public struct ActionEditorPage: View {
     /// Asks first, in the banner that floats over the page, the way every destructive step in this
     /// window does.
     private func confirmDelete() {
-        guard isCustomAction else { return }
+        guard isCustomAction || isCustomAIPreset else { return }
         router.confirmDestructive(
             title: String(localized: "Delete?"),
             message: "",
@@ -1031,6 +1079,14 @@ public struct ActionEditorPage: View {
         isLoaded = false
         let id = action.id
         KeyboardShortcuts.reset(.actionHotkey(id))
+        if let preset = aiPreset {
+            ActionBindingStore.shared.setAlias(nil, for: id)
+            ActionCustomizationManager.shared.resetOverride(for: id)
+            coordinator.setAIActionPlacement(actionIDs: [id], standalone: false)
+            AIServiceManager.shared.presets.removeAll(where: { $0.id == preset.id })
+            router.pop()
+            return
+        }
         ActionCoordinator.shared.deleteCustomAction(actionID: id)
         ActionCustomizationManager.shared.resetOverride(for: id)
         router.clearConfigurationRequest(for: id)
@@ -1156,7 +1212,11 @@ public struct ActionEditorPage: View {
         } else {
             deliveryPrefString = Self.defaultDeliveryPrefString(for: action)
         }
-        initialStoredSymbol = Self.sanitizedStoredSymbol(override?.customIconSymbol, actionIcon: action.icon)
+        // AI presets only gained this editor after the legacy placeholder bug was fixed.
+        // A saved "star" on an AI preset is a deliberate icon choice.
+        initialStoredSymbol = isAIPreset
+            ? override?.customIconSymbol
+            : Self.sanitizedStoredSymbol(override?.customIconSymbol, actionIcon: action.icon)
         // The editor always previews the icon that will return if the user switches back to
         // Show Icon. A Show Text popup override must not replace that baseline with title text.
         seedBaseline(from: ActionCustomizationManager.shared.tableIcon(for: action))
@@ -1169,10 +1229,11 @@ public struct ActionEditorPage: View {
             return
         }
 
-        if isBuiltin {
+        if isBuiltin || isAIPreset {
             manifestState = nil
             logicEditable = false
             manifestMissing = false
+            aiPrompt = aiPreset?.prompt ?? ""
             return
         }
 
@@ -1273,7 +1334,7 @@ public struct ActionEditorPage: View {
         aliasError = nil
         if let customAction = action as? CustomAction {
             _ = saveCustomActionChanges(customAction)
-        } else if !isBuiltin {
+        } else if !isBuiltin && !isAIPreset {
             Task {
                 _ = await saveManifestChanges()
             }
@@ -1313,6 +1374,14 @@ public struct ActionEditorPage: View {
         }
         if let customAction = action as? CustomAction {
             _ = saveCustomActionChanges(customAction)
+            return
+        }
+        if isAIPreset {
+            let prompt = aiPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !prompt.isEmpty, var preset = aiPreset, prompt != preset.prompt {
+                preset.prompt = prompt
+                AIServiceManager.shared.updatePreset(preset)
+            }
             return
         }
         if !isBuiltin {
@@ -1388,10 +1457,11 @@ public struct ActionEditorPage: View {
         return 0
     }
 
-    /// The symbol Show Icon mode resolves to for builtin actions whose own icon is a text glyph
-    /// (Copy/Cut/Paste), driving the honest icon-mode preview before any replacement is picked.
+    /// The symbol Show Icon mode resolves to for text-based builtins and AI presets, driving
+    /// the icon-mode preview before any replacement is picked.
     static func iconModeFallbackSymbol(for action: any Action) -> String? {
-        guard case .text = action.icon, ActionIdentity.isBuiltin(action) else { return nil }
+        guard case .text = action.icon,
+              ActionIdentity.isBuiltin(action) || ActionIdentity.isAIPreset(action) else { return nil }
         return (action as? any ConfigurableAction)?.preferenceIconName
     }
 

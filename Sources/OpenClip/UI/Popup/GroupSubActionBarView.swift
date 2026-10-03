@@ -14,7 +14,7 @@ public struct GroupSubActionBarView: View {
     public let onResult: @MainActor (ActionResult) -> Void
     public let onRunAI: @MainActor (String) -> Void
     public let onRunLoadingAction: @MainActor (any Action, ActionResultDelivery.ClickIntent) -> Void
-    public let onWillPerformAction: @MainActor (any Action, ActionResultDelivery.ClickIntent) -> Void
+    public let onWillPerformAction: @MainActor (any Action, ActionResultDelivery.ClickIntent) -> Bool
     public let onActionPerformed: @MainActor (String) -> Void
     public let onClickIntent: @MainActor () -> ActionResultDelivery.ClickIntent
     public let onHoverTarget: @MainActor (PopupHoverTarget, Bool) -> Void
@@ -46,7 +46,7 @@ public struct GroupSubActionBarView: View {
         onResult: @escaping @MainActor (ActionResult) -> Void,
         onRunAI: @escaping @MainActor (String) -> Void,
         onRunLoadingAction: @escaping @MainActor (any Action, ActionResultDelivery.ClickIntent) -> Void,
-        onWillPerformAction: @escaping @MainActor (any Action, ActionResultDelivery.ClickIntent) -> Void,
+        onWillPerformAction: @escaping @MainActor (any Action, ActionResultDelivery.ClickIntent) -> Bool,
         onActionPerformed: @escaping @MainActor (String) -> Void,
         onClickIntent: @escaping @MainActor () -> ActionResultDelivery.ClickIntent,
         onHoverTarget: @escaping @MainActor (PopupHoverTarget, Bool) -> Void = { _, _ in },
@@ -225,6 +225,7 @@ public struct GroupSubActionBarView: View {
         .contentShape(Rectangle())
 
         Button {
+            guard action.isEnabled(for: context) else { return }
             // Capture the intent once, synchronously, so the perform context and the delivery
             // snapshot agree and neither reads live state after an await.
             let clickIntent = onClickIntent()
@@ -238,7 +239,7 @@ public struct GroupSubActionBarView: View {
             }
             // An already-computed inline result is delivered directly instead of re-running the action.
             if action.chrome.isInlineResult, let resolved = modeStore.inlineResults[action.id] {
-                onWillPerformAction(action, clickIntent)
+                guard onWillPerformAction(action, clickIntent) else { return }
                 onActionPerformed(action.id)
                 onResult(.text(resolved))
                 return
@@ -247,7 +248,7 @@ public struct GroupSubActionBarView: View {
             // rather than re-run, mirroring the main bar; an empty result falls back to perform.
             if action.chrome.isInlineResult, let inFlight = InlineResultEvaluator.shared.runningTask(for: action.id) {
                 Task {
-                    onWillPerformAction(action, clickIntent)
+                    guard onWillPerformAction(action, clickIntent) else { return }
                     onActionPerformed(action.id)
                     do {
                         if let text = await inFlight.value, !text.isEmpty {
@@ -272,7 +273,7 @@ public struct GroupSubActionBarView: View {
             }
             Task {
                 do {
-                    onWillPerformAction(action, clickIntent)
+                    guard onWillPerformAction(action, clickIntent) else { return }
                     onActionPerformed(action.id)
                     let match = action.matchInfo(for: context)
                     let performContext = ActionContext(

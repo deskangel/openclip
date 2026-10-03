@@ -3,6 +3,18 @@ import XCTest
 @testable import OpenClip
 
 final class IntegrationSettingsBridgeTests: XCTestCase {
+    @MainActor
+    func testSearchButtonVisibilityCanBeChangedAndReset() {
+        let store = MemorySettingsStore()
+        let result = IntegrationSettingsBridge.write(
+            values: ["showSearchAllActions": "false"], keys: IntegrationSettings.curatedKeys, store: store
+        )
+        XCTAssertEqual(result.applied, 1)
+        XCTAssertFalse(store.get(.showSearchAllActions))
+        IntegrationSettings.resetAppearance(store: store)
+        XCTAssertTrue(store.get(.showSearchAllActions))
+    }
+
     private var store: MemorySettingsStore!
 
     override func setUp() {

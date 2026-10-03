@@ -11,6 +11,9 @@ import SwiftUI
 import AppKit
 
 public enum PopupMetrics {
+    /// Brief arrival grace for OCR popups: recognition can take long enough that the cursor has
+    /// moved away from the original release point before the popup appears.
+    static let ocrArrivalDismissalGrace: TimeInterval = 1.0
     /// Standard width and height of an action button in the popup bar and sub-bar (normalized baseline at 1.0 scale).
     public static let actionButtonWidth: CGFloat = 34.0
     public static let barButtonHeight: CGFloat = 29.0
@@ -53,11 +56,11 @@ public enum PopupMetrics {
     /// Corner radius for popup action bars and sub-bars (normalized baseline).
     public static let popupCornerRadius: CGFloat = 12.0
     /// Corner radius for modal result cards and the action-search palette.
-    public static let cardCornerRadius: CGFloat = 16.0
+    public static let cardCornerRadius: CGFloat = 22.0
     /// Corner radius for the action-search palette, reduced by 2 pt from the shared card radius.
-    public static let searchCornerRadius: CGFloat = 12.0
+    public static let searchCornerRadius: CGFloat = 20.0
     /// Corner radius for individual search palette result rows.
-    public static let searchRowCornerRadius: CGFloat = 8.0
+    public static let searchRowCornerRadius: CGFloat = 10.0
     /// Shared radius for footer controls in the search palette and result card.
     public static let footerButtonCornerRadius: CGFloat = 10.0
     /// Corner radius for floating toast bubbles.

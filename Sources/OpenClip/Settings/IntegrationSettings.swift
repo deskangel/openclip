@@ -16,12 +16,14 @@ enum IntegrationSettings {
         [
             // Power / triggers
             SettingKey.isAppEnabled.erased,
+            SettingKey.selectionModifier.erased,
             SettingKey.isMouseHoldEnabled.erased,
             SettingKey.showMenuBarIcon.erased,
             SettingKey.startAtLogin.erased,
             // AI on/off only — provider, model and the API key stay in the app.
             SettingKey.isAIEnabled.erased,
             // Appearance
+            SettingKey.showSearchAllActions.erased,
             SettingKey.popupTheme.erased,
             SettingKey.popupThemeColor.erased,
             SettingKey.popupAlignment.erased,
@@ -48,6 +50,7 @@ enum IntegrationSettings {
 
     /// Restores the popup appearance settings the integration can write to their defaults.
     static func resetAppearance(store: SettingsStore = DefaultSettingsStore.shared) {
+        store.set(.showSearchAllActions, value: SettingKey.showSearchAllActions.defaultValue)
         store.set(.popupTheme, value: SettingKey.popupTheme.defaultValue)
         store.set(.popupThemeColor, value: SettingKey.popupThemeColor.defaultValue)
         store.set(.popupAlignment, value: SettingKey.popupAlignment.defaultValue)

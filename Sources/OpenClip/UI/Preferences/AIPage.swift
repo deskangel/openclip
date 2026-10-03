@@ -12,6 +12,7 @@
 
 import SwiftUI
 import Core
+import KeyboardShortcuts
 
 @MainActor
 struct AIPage: View {
@@ -68,117 +69,132 @@ struct AIPage: View {
     }
 }
 
-// MARK: - One prompt
-
-/// Editing one AI prompt. This was a `.sheet` opened from inside the AI popover, so it dimmed the
-/// popover, whatever else was still floating, and the window. As a page it is just the next level.
+/// Creation fields stay local until Add Action, including the unregistered shortcut.
 @MainActor
-struct AIPresetPage: View {
-    let presetID: String
+struct AIPresetDraft {
+    var title = ""
+    var prompt = ""
+    var iconSymbol = Constants.defaultAIIconSymbol
+    var displayMode = 1 // Text is the default, even after choosing an icon.
+    var alias = ""
+    var shortcut: KeyboardShortcuts.Shortcut?
 
-    @ObservedObject private var router = SettingsRouter.shared
-    @ObservedObject private var aiManager = AIServiceManager.shared
-
-    @State private var title: String = ""
-    @State private var prompt: String = ""
-    @State private var loaded = false
-    @State private var isConfirmingDelete = false
-
-    private var preset: AIActionPreset? {
-        aiManager.presets.first(where: { $0.id == presetID })
-    }
-
-    private var isCustom: Bool {
-        !AIServiceManager.defaultPresets.contains(where: { $0.id == presetID })
-    }
-
-    private var canSave: Bool {
-        !title.trimmingCharacters(in: .whitespaces).isEmpty
-            && !prompt.trimmingCharacters(in: .whitespaces).isEmpty
-    }
-
-    var body: some View {
-        if preset != nil || loaded {
-            SettingsEditorPage {
-                AIPromptFields(title: $title, prompt: $prompt)
-            } footer: {
-                HStack(spacing: 12) {
-                    if isCustom {
-                        if isConfirmingDelete {
-                            Button("Cancel") { isConfirmingDelete = false }
-                            Button("Delete", role: .destructive) {
-                                deletePreset()
-                                router.pop()
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .tint(.red)
-                        } else {
-                            Button("Delete Action…", role: .destructive) {
-                                isConfirmingDelete = true
-                            }
-                            .buttonStyle(.plain)
-                            .foregroundStyle(.red)
-                        }
-                    }
-
-                    Spacer()
-
-                    Button("Cancel") { router.pop() }
-                        .keyboardShortcut(.cancelAction)
-
-                    Button("Save") {
-                        guard var updated = preset else { return }
-                        updated.title = title.trimmingCharacters(in: .whitespaces)
-                        updated.prompt = prompt.trimmingCharacters(in: .whitespaces)
-                        aiManager.updatePreset(updated)
-                        router.pop()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(!canSave)
-                    .keyboardShortcut(.defaultAction)
-                }
-            }
-            .onAppear {
-                guard !loaded, let preset else { return }
-                title = preset.title
-                prompt = preset.prompt
-                loaded = true
-            }
-        } else {
-            // The preset went away (Reset Defaults while this page was open); go back to the list.
-            Color.clear.onAppear { router.pop() }
+    func aliasError(in bindings: ActionBindingStore) -> String? {
+        let normalized = ActionBindingStore.normalize(alias)
+        guard !normalized.isEmpty else { return nil }
+        guard ActionBindingStore.isValid(normalized) else {
+            return String(localized: "Letters, numbers, and hyphens only")
         }
+        if bindings.actionID(forAlias: normalized) != nil {
+            return String(localized: "Alias already in use")
+        }
+        return nil
     }
 
-    private func deletePreset() {
-        var list = aiManager.presets
-        list.removeAll(where: { $0.id == presetID })
-        aiManager.presets = list
+    func canCreate(using bindings: ActionBindingStore) -> Bool {
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && aliasError(in: bindings) == nil
+    }
+
+    func createPreset(
+        bindings: ActionBindingStore,
+        customizations: ActionCustomizationManager,
+        saveShortcut: (KeyboardShortcuts.Shortcut, KeyboardShortcuts.Name) -> Void,
+        savePreset: (AIActionPreset) -> Void
+    ) -> AIActionPreset? {
+        guard canCreate(using: bindings) else { return nil }
+        let preset = AIServiceManager.makeCustomPreset(title: title, prompt: prompt)
+        let action = AIAction(presetID: preset.id, title: preset.title)
+        switch bindings.setAlias(alias, for: action.id) {
+        case .accepted, .cleared: break
+        case .invalid, .collision: return nil
+        }
+        let symbol = iconSymbol.trimmingCharacters(in: .whitespacesAndNewlines)
+        customizations.setOverride(
+            for: action.id, title: nil,
+            symbol: symbol.isEmpty ? Constants.defaultAIIconSymbol : symbol,
+            text: displayMode == 1 ? preset.title : nil
+        )
+        if let shortcut {
+            saveShortcut(shortcut, .actionHotkey(action.id))
+        }
+        // Register only after appearance and triggers are ready for the new action's ID.
+        savePreset(preset)
+        return preset
     }
 }
 
-/// Adding a prompt, as the next page rather than a sheet over everything.
+/// Creating an AI action with the same appearance and trigger controls as its editor.
 @MainActor
 struct AINewPresetPage: View {
     @ObservedObject private var router = SettingsRouter.shared
     @ObservedObject private var aiManager = AIServiceManager.shared
-
-    @State private var title: String = ""
-    @State private var prompt: String = ""
-
-    private var canAdd: Bool {
-        !title.trimmingCharacters(in: .whitespaces).isEmpty
-            && !prompt.trimmingCharacters(in: .whitespaces).isEmpty
-    }
+    @ObservedObject private var bindings = ActionBindingStore.shared
+    @State private var draft = AIPresetDraft()
 
     var body: some View {
         SettingsEditorPage {
-            AIPromptFields(
-                title: $title,
-                prompt: $prompt,
-                titlePlaceholder: String(localized: "e.g. Simplify"),
-                promptPlaceholder: String(localized: "e.g. Rewrite text using simple 5th-grade vocabulary")
-            )
+            VStack(alignment: .leading, spacing: 18) {
+                SettingsCard("Appearance") {
+                    ActionAppearanceFields(
+                        title: $draft.title,
+                        displayTextFallback: String(localized: "Custom Action"),
+                        iconSymbol: $draft.iconSymbol,
+                        initialIconSymbol: Constants.defaultAIIconSymbol,
+                        baseIcon: nil,
+                        displayMode: $draft.displayMode
+                    )
+                }
+
+                SettingsCard("Triggers") {
+                    SettingsRow(
+                        title: "Keyboard Shortcut",
+                        subtitle: "Global hotkey to run this action directly.",
+                        systemImage: "keyboard",
+                        plainIcon: true,
+                        descriptionOnHover: true
+                    ) {
+                        Shortcut(shortcut: $draft.shortcut)
+                    }
+
+                    SettingsDivider()
+
+                    SettingsRow(
+                        title: "Search Alias",
+                        subtitle: "Keyword to jump to this action in the search palette.",
+                        systemImage: "text.magnifyingglass",
+                        plainIcon: true,
+                        descriptionOnHover: true
+                    ) {
+                        VStack(alignment: .trailing, spacing: 4) {
+                            TextField("Alias", text: $draft.alias, prompt: Text("e.g. tr"))
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 140)
+                                .accessibilityLabel(String(localized: "Search Alias"))
+                            if let error = draft.aliasError(in: bindings) {
+                                Text(error)
+                                    .font(.caption2)
+                                    .foregroundStyle(.red)
+                            }
+                        }
+                    }
+                }
+
+                SettingsCard("Prompt Instruction") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        TextField("e.g. Rewrite text using simple 5th-grade vocabulary", text: $draft.prompt, axis: .vertical)
+                            .lineLimit(4...12)
+                            .textFieldStyle(.roundedBorder)
+                            .accessibilityLabel(String(localized: "Prompt Instruction"))
+                        Text("The selected text is appended to the instruction when the action runs.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, SettingsDesignTokens.sectionCardPaddingH)
+                    .padding(.vertical, SettingsDesignTokens.sectionCardPaddingV)
+                }
+            }
         } footer: {
             HStack(spacing: 12) {
                 Spacer()
@@ -187,58 +203,18 @@ struct AINewPresetPage: View {
                     .keyboardShortcut(.cancelAction)
 
                 Button("Add Action") {
-                    _ = aiManager.addCustomPreset(title: title, prompt: prompt)
-                    router.pop()
+                    guard let preset = draft.createPreset(
+                        bindings: bindings,
+                        customizations: .shared,
+                        saveShortcut: { KeyboardShortcuts.setShortcut($0, for: $1) },
+                        savePreset: aiManager.updatePreset
+                    ) else { return }
+                    router.show(path: [.ai, .aiPreset(id: preset.id)])
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(!canAdd)
+                .disabled(!draft.canCreate(using: bindings))
                 .keyboardShortcut(.defaultAction)
             }
-        }
-    }
-}
-
-/// The two fields a prompt has, in one card.
-private struct AIPromptFields: View {
-    @Binding var title: String
-    @Binding var prompt: String
-    var titlePlaceholder: String = String(localized: "Title")
-    var promptPlaceholder: String = String(localized: "Prompt instruction...")
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            InsetGroupCard {
-                VStack(alignment: .leading, spacing: 0) {
-                    HStack(spacing: 12) {
-                        Text("Action Title")
-                            .font(.subheadline)
-                        Spacer()
-                        TextField(titlePlaceholder, text: $title)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(maxWidth: 260)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-
-                    Divider()
-                        .padding(.horizontal, 12)
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Prompt Instruction")
-                            .font(.subheadline)
-                        TextField(promptPlaceholder, text: $prompt, axis: .vertical)
-                            .lineLimit(4...12)
-                            .textFieldStyle(.roundedBorder)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                }
-            }
-
-            Text("The selected text is appended to the instruction when the action runs.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.leading, 4)
         }
     }
 }

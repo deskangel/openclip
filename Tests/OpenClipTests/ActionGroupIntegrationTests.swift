@@ -504,6 +504,7 @@ final class ActionsOutlineDropTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
+        TestIsolation.reset()
         settingsStore = MemorySettingsStore()
         registry = ActionRegistry(settingsStore: settingsStore)
         coordinator = ActionCoordinator(registry: registry, settingsStore: settingsStore)
@@ -528,6 +529,92 @@ final class ActionsOutlineDropTests: XCTestCase {
 
     private func standalone(_ id: String) -> OutlineNode {
         OutlineNode(id: id, kind: .standaloneAction(action(id)))
+    }
+
+    private func registerAIPresets() {
+        coordinator.register(action: AIToolsAction(settingsStore: settingsStore))
+        for id in ["ai.preset.rewrite", "ai.preset.summarize"] {
+            coordinator.register(action: DummyAction(id: id, title: id, chrome: ActionChrome(source: .ai)))
+        }
+        outlineCoordinator.rebuildTree()
+    }
+
+    func testDraggingAIPresetToRootPersistsPlacementAndOrder() throws {
+        registerAIPresets()
+        let id = "ai.preset.rewrite"
+        let outline = NSOutlineView()
+        let drag = MockDraggingInfo(actionID: id)
+        XCTAssertEqual(outlineCoordinator.outlineView(outline, validateDrop: drag, proposedItem: nil, proposedChildIndex: 0), .move)
+        XCTAssertTrue(outlineCoordinator.outlineView(outline, acceptDrop: drag, item: nil, childIndex: 0))
+
+        XCTAssertEqual(outlineCoordinator.rootNodes.first?.id, id)
+        XCTAssertEqual(settingsStore.get(.standaloneAIActionIDs), [id])
+        XCTAssertEqual(settingsStore.get(.actionOrder).first, id)
+        let group = try XCTUnwrap(outlineCoordinator.rootNodes.first { $0.id == "builtin.aiTools" })
+        XCTAssertEqual(group.children.map(\.id), ["ai.preset.summarize"])
+
+        // A fresh registry restores the same layout from the saved settings.
+        let restored = ActionRegistry(settingsStore: settingsStore)
+        restored.register(builtIns: Array(coordinator.actions.reversed()))
+        XCTAssertEqual(restored.actions.map(\.id), coordinator.actions.map(\.id))
+        let context = ActionContext(selection: SelectionContext(
+            text: "Example", sourceApp: AppIdentity(bundleIdentifier: "com.test", localizedName: "Test"),
+            cursorPosition: .zero, timestamp: Date(), appPolicy: .default
+        ))
+        XCTAssertTrue(restored.availableActions(for: context).contains { $0.id == id })
+        XCTAssertFalse(restored.availableActions(for: context).contains { $0.id == "ai.preset.summarize" })
+        settingsStore.set(.disabledActionIDs, value: [id])
+        XCTAssertFalse(restored.availableActions(for: context).contains { $0.id == id })
+    }
+
+    func testDraggingAIPresetBackToToolsRemovesStandaloneOrder() throws {
+        registerAIPresets()
+        let id = "ai.preset.rewrite"
+        let outline = NSOutlineView()
+        let drag = MockDraggingInfo(actionID: id)
+        XCTAssertTrue(outlineCoordinator.outlineView(outline, acceptDrop: drag, item: nil, childIndex: 0))
+        let group = try XCTUnwrap(outlineCoordinator.rootNodes.first { $0.id == "builtin.aiTools" })
+        XCTAssertEqual(outlineCoordinator.outlineView(outline, validateDrop: drag, proposedItem: group, proposedChildIndex: NSOutlineViewDropOnItemIndex), .move)
+        XCTAssertTrue(outlineCoordinator.outlineView(outline, acceptDrop: drag, item: group, childIndex: NSOutlineViewDropOnItemIndex))
+        XCTAssertTrue(settingsStore.get(.standaloneAIActionIDs).isEmpty)
+        XCTAssertFalse(settingsStore.get(.actionOrder).contains(id))
+        XCTAssertFalse(outlineCoordinator.rootNodes.contains { $0.id == id })
+        let updatedGroup = try XCTUnwrap(outlineCoordinator.rootNodes.first { $0.id == group.id })
+        XCTAssertEqual(updatedGroup.children.map(\.id), [id, "ai.preset.summarize"])
+    }
+
+    func testDetachedPresetKeepsPositionWhenPresetsReloadAndLauncherMoves() throws {
+        registerAIPresets()
+        let id = "ai.preset.rewrite"
+        let outline = NSOutlineView()
+        XCTAssertTrue(outlineCoordinator.outlineView(outline, acceptDrop: MockDraggingInfo(actionID: id), item: nil, childIndex: 0))
+        coordinator.replaceActions(matching: { ActionIdentity.isAIPreset($0) }, with: [
+            DummyAction(id: "ai.preset.summarize", title: "Summarize", chrome: ActionChrome(source: .ai)),
+            DummyAction(id: id, title: "Renamed", chrome: ActionChrome(source: .ai))
+        ])
+        outlineCoordinator.rebuildTree()
+        let rootCount = outlineCoordinator.rootNodes.count
+        XCTAssertTrue(outlineCoordinator.outlineView(outline, acceptDrop: MockDraggingInfo(actionID: "builtin.aiTools"), item: nil, childIndex: rootCount))
+        XCTAssertEqual(outlineCoordinator.rootNodes.first?.id, id)
+        XCTAssertEqual(outlineCoordinator.rootNodes.first?.action?.title, "Renamed")
+        XCTAssertEqual(outlineCoordinator.rootNodes.last?.children.map(\.id), ["ai.preset.summarize"])
+    }
+
+    func testDraggingMultipleAIPresetsToRootMovesEachOnlyOnce() {
+        registerAIPresets()
+        let ids = ["ai.preset.rewrite", "ai.preset.summarize"]
+        XCTAssertTrue(outlineCoordinator.outlineView(NSOutlineView(), acceptDrop: MockDraggingInfo(actionIDs: ids), item: nil, childIndex: 0))
+        XCTAssertEqual(Array(outlineCoordinator.rootNodes.prefix(2).map(\.id)), ids)
+        XCTAssertEqual(settingsStore.get(.standaloneAIActionIDs), Set(ids))
+        XCTAssertTrue(outlineCoordinator.rootNodes.first { $0.id == "builtin.aiTools" }?.children.isEmpty == true)
+    }
+
+    func testNonAIActionsCannotBePlacedInsideAITools() throws {
+        registerAIPresets()
+        let group = try XCTUnwrap(outlineCoordinator.rootNodes.first { $0.id == "builtin.aiTools" })
+        XCTAssertFalse(outlineCoordinator.outlineView(NSOutlineView(), acceptDrop: MockDraggingInfo(actionID: "action.1"), item: group, childIndex: NSOutlineViewDropOnItemIndex))
+        coordinator.setAIActionPlacement(actionIDs: ["action.1", "missing"], standalone: true)
+        XCTAssertTrue(settingsStore.get(.standaloneAIActionIDs).isEmpty)
     }
 
     // MARK: - Reordering inside an extension's group
@@ -892,11 +979,19 @@ private final class MockDraggingInfo: NSObject, NSDraggingInfo {
     let draggingPasteboard: NSPasteboard
 
     @MainActor
-    init(actionID: String) {
+    convenience init(actionID: String) {
+        self.init(actionIDs: [actionID])
+    }
+
+    @MainActor
+    init(actionIDs: [String]) {
         let pb = NSPasteboard.withUniqueName()
-        let item = NSPasteboardItem()
-        item.setString(actionID, forType: NSPasteboard.PasteboardType("com.openclip.action-id"))
-        pb.writeObjects([item])
+        let items = actionIDs.map { id in
+            let item = NSPasteboardItem()
+            item.setString(id, forType: NSPasteboard.PasteboardType("com.openclip.action-id"))
+            return item
+        }
+        pb.writeObjects(items)
         self.draggingPasteboard = pb
     }
 

@@ -11,11 +11,11 @@ public enum ActionVisibility {
     /// Pure function — no UserDefaults, no AppKit, no Keychain reads.
     ///
     /// Evaluation order (per plan §3):
-    /// 1. `requiresSelection` (default `true` for extension actions) — empty text disables,
-    ///    except actions that explicitly set `requiresSelection: false`.
-    /// 2. App allow/deny list vs `context.selection.sourceApp.bundleIdentifier`.
-    /// 3. Regex match / negated match; on success build `ActionMatchInfo`.
-    /// 4. Computed visibility via the `expression` DSL (`ValidateExpression`), evaluated with the
+    /// 1. Input requirement: optional, nonblank text, live selection, or editable selection.
+    /// 2. Required paste destination, when requested.
+    /// 3. App allow/deny list vs `context.selection.sourceApp.bundleIdentifier`.
+    /// 4. Regex match / negated match; on success build `ActionMatchInfo`.
+    /// 5. Computed visibility via the `expression` DSL (`ValidateExpression`), evaluated with the
     ///    regex pass's `ActionMatchInfo`; a runtime eval error disables (fail-closed).
     ///
     /// A malformed regex enables the action (defensive stance matching legacy URL behavior,
@@ -33,13 +33,30 @@ public enum ActionVisibility {
         let sourceBundleID = context.selection.sourceApp.bundleIdentifier
         let noMatch = ActionMatchInfo(text: text, matchedText: text, captures: [], sourceBundleID: sourceBundleID)
 
-        // 1. requiresSelection (default true for extension actions).
-        let requiresSelection = requirements?.requiresSelection ?? true
-        if requiresSelection && trimmed.isEmpty {
+        // 1. Input and destination requirements are independent. Unknown capability evidence only
+        // fails closed when the action explicitly requires that capability.
+        let inputRequirement = requirements?.input ?? .text
+        let hasText = !trimmed.isEmpty
+        let isLiveSelection = context.selection.source == .selection
+        let inputSatisfied: Bool
+        switch inputRequirement {
+        case .optional:
+            inputSatisfied = true
+        case .text:
+            inputSatisfied = hasText
+        case .liveSelection:
+            inputSatisfied = hasText && isLiveSelection
+        case .editableSelection:
+            inputSatisfied = hasText && isLiveSelection && context.selection.isEditable == true
+        }
+        if !inputSatisfied {
+            return (false, noMatch)
+        }
+        if requirements?.requiresPasteTarget == true && context.pasteTargetAvailable != true {
             return (false, noMatch)
         }
 
-        // 2. App allow/deny list vs the source app bundle identifier.
+        // 3. App allow/deny list vs the source app bundle identifier.
         if let apps = requirements?.apps, !apps.isEmpty {
             switch requirements?.appsMode ?? .allow {
             case .allow:
@@ -53,7 +70,7 @@ public enum ActionVisibility {
             }
         }
 
-        // 3. Regex match / negated match (unchanged). The regex is the fast first pass: a missing
+        // 4. Regex match / negated match (unchanged). The regex is the fast first pass: a missing
         //    or failed regex gate returns before the DSL expression ever evaluates.
         let pattern = requirements?.regex ?? legacyRegex
         var matched = noMatch
@@ -91,7 +108,7 @@ public enum ActionVisibility {
             return (false, matched)
         }
 
-        // 4. Computed visibility via the expression DSL (pure Swift, parse-once-eval-many).
+        // 5. Computed visibility via the expression DSL (pure Swift, parse-once-eval-many).
         if let expression {
             switch expression.evaluate(context, match: matched) {
             case .success(true):

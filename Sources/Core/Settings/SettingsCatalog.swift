@@ -15,6 +15,7 @@ public enum SettingsCatalog {
         [
             // Action ordering / enablement
             SettingKey.actionOrder.erased,
+            SettingKey.standaloneAIActionIDs.erased,
             SettingKey.disabledActionIDs.erased,
             SettingKey.disabledPackages.erased,
             SettingKey.disabledContextualActionIDs.erased,
@@ -32,6 +33,7 @@ public enum SettingsCatalog {
 
             // App / behavior toggles
             SettingKey.isAppEnabled.erased,
+            SettingKey.selectionModifier.erased,
             SettingKey.isAIEnabled.erased,
             SettingKey.isMouseHoldEnabled.erased,
             SettingKey.hasCompletedOnboarding.erased,
@@ -46,6 +48,7 @@ public enum SettingsCatalog {
             SettingKey.updateChannel.erased,
 
             // Popup presentation
+            SettingKey.showSearchAllActions.erased,
             SettingKey.popupPageSize.erased,
             SettingKey.popupBarWidth.erased,
             SettingKey.popupScale.erased,

@@ -64,7 +64,7 @@ public struct PopupView: View {
     /// Called right before an action performs (before `onResult` can fire), so the controller can
     /// snapshot the action's declared delivery for the paste-vs-copy decision. The intent is
     /// carried explicitly so the delivery snapshot matches the perform context.
-    public let onWillPerformAction: (@MainActor (any Action, ActionResultDelivery.ClickIntent) -> Void)?
+    public let onWillPerformAction: (@MainActor (any Action, ActionResultDelivery.ClickIntent) -> Bool)?
     /// Called when a `showsLoading` bar action is clicked: the controller early-closes the popup
     /// and runs the action via the loading toast flow instead of the inline perform path. Carries
     /// the same explicit intent as `onWillPerformAction`.
@@ -102,6 +102,7 @@ public struct PopupView: View {
     @Setting(SettingKey.popupThemeColor) private var themeColor
     @Setting(SettingKey.popupScale) private var popupScale
     @Setting(SettingKey.popupPageSize) private var pageSize
+    @Setting(SettingKey.showSearchAllActions) private var showSearchAllActions
     @Setting(SettingKey.contextualActionsEnabled) private var contextualActionsEnabled
     @Setting(SettingKey.disabledContextualActionIDs) private var disabledContextualIDs
     @Setting(SettingKey.contextualPillPosition) private var contextualPillPosition
@@ -204,7 +205,7 @@ public struct PopupView: View {
         onEnteredScopedSearch: (@MainActor (any Action, CGRect?) -> Void)? = nil,
         onPaginationAnchor: (@MainActor (PopupPanel.HorizontalAnchor) -> Void)? = nil,
         onActionPerformed: (@MainActor (String) -> Void)? = nil,
-        onWillPerformAction: (@MainActor (any Action, ActionResultDelivery.ClickIntent) -> Void)? = nil,
+        onWillPerformAction: (@MainActor (any Action, ActionResultDelivery.ClickIntent) -> Bool)? = nil,
         onRunLoadingAction: (@MainActor (any Action, ActionResultDelivery.ClickIntent) -> Void)? = nil,
         onRunAI: (@MainActor (String) -> Void)? = nil,
         onRunAIPrompt: (@MainActor (String, Bool, Bool) -> Void)? = nil,
@@ -332,7 +333,7 @@ public struct PopupView: View {
 
     private var pages: [[any Action]] {
         let leadingWidth = hasCompletions ? (chevronWidth) : 0
-        let trailingWidth = buttonWidth // search button
+        let trailingWidth = showSearchAllActions ? buttonWidth : 0
         // Reads `inlineResults` so a preview arriving re-packs the page at the button's real width
         // instead of overflowing the budget (the published dictionary already drives a re-render).
         return PopupPageLayout.computePages(
@@ -570,22 +571,7 @@ public struct PopupView: View {
                 onExitSearch()
             },
             onRunAI: { actionID in
-                onActionPerformed?(actionID)
-                if let onRunAI {
-                    // Run first: the controller's AI flow snapshots the selection and dismisses
-                    // the popup itself. Exiting search beforehand dismissed it *for* a palette
-                    // opened straight from the hotkey (`openedDirectlyInSearch` → `hide()`),
-                    // which cleared `currentActionContext` — so the preset never ran and only
-                    // logged "Cannot run AI preset". From the bar the same exit merely returned
-                    // to the bar, which is why AI worked there and nowhere else.
-                    onRunAI(actionID)
-                } else {
-                    // Preview/static fallback: no controller flow to dismiss anything, so the
-                    // palette closes itself before streaming into the card.
-                    onExitSearch()
-                    guard let preset = aiManager.preset(forActionID: actionID) else { return }
-                    runAIPreset(prompt: aiManager.promptForPreset(preset), title: preset.title)
-                }
+                runAIAction(actionID)
             },
             onRunAIPrompt: { instruction, replace, includeContext in
                 if let onRunAIPrompt {
@@ -635,6 +621,19 @@ public struct PopupView: View {
     }
 
     // MARK: - AI Helpers
+
+    /// Shared by standalone bar buttons and palette rows. The controller must snapshot the
+    /// selection before dismissing the popup, including when search was opened by a hotkey.
+    func runAIAction(_ actionID: String) {
+        onActionPerformed?(actionID)
+        if let onRunAI {
+            onRunAI(actionID)
+        } else {
+            if modeStore.mode == .search { onExitSearch() }
+            guard let preset = aiManager.preset(forActionID: actionID) else { return }
+            runAIPreset(prompt: aiManager.promptForPreset(preset), title: preset.title)
+        }
+    }
 
     private func runAIPreset(prompt: String, title: String, onGeneratedTitle: ((String) -> Void)? = nil) {
         cancelAITask()
@@ -793,23 +792,25 @@ public struct PopupView: View {
 
             // Action-search affordance: command glyph. Kept outside
             // the paged actions so it always sits at the far-right edge on every page.
-            let isHovered = hoveredTarget == .search
-            let affordanceForeground = PopupThemeModel.restForeground(for: effectiveTheme)
-            Button {
-                let frame = hoverFrames[.search]
-                onEnterSearch(frame)
-            } label: {
-                Image(systemName: "command")
-                    .font(.system(size: 13 * scale, weight: .regular))
-                    .foregroundColor(isHovered ? .white : affordanceForeground)
-                    .frame(width: buttonWidth, height: barButtonHeight)
-                    .background(isHovered ? Color.accentColor : Color.clear)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Search all actions")
-            .popupHoverTarget(.search)
-            .onHover { isHovering in
-                useLocalHoverFallback(for: .search, isHovering: isHovering)
+            if showSearchAllActions {
+                let isHovered = hoveredTarget == .search
+                let affordanceForeground = PopupThemeModel.restForeground(for: effectiveTheme)
+                Button {
+                    let frame = hoverFrames[.search]
+                    onEnterSearch(frame)
+                } label: {
+                    Image(systemName: "command")
+                        .font(.system(size: 13 * scale, weight: .regular))
+                        .foregroundColor(isHovered ? .white : affordanceForeground)
+                        .frame(width: buttonWidth, height: barButtonHeight)
+                        .background(isHovered ? Color.accentColor : Color.clear)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Search all actions")
+                .popupHoverTarget(.search)
+                .onHover { isHovering in
+                    useLocalHoverFallback(for: .search, isHovering: isHovering)
+                }
             }
         }
         .fixedSize()
@@ -937,6 +938,7 @@ public struct PopupView: View {
                 if action.chrome.launchesAI {
                     // AI Tools launcher opens scoped search palette on click; sub-bar opens on hover dwell
                     Button {
+                        guard action.isEnabled(for: context) else { return }
                         onCancelSubBarDwell?()
                         let frame = hoverFrames[.action(index)]
                         onEnteredScopedSearch?(action, frame)
@@ -956,9 +958,13 @@ public struct PopupView: View {
                         }
                     }
                 } else {
-                    // Existing perform button unchanged
+                    // Leaf actions use their existing execution flow.
                     Button {
                         onCancelSubBarDwell?()
+                        if ActionIdentity.isAIPreset(action) {
+                            runAIAction(action.id)
+                            return
+                        }
                         // Capture the click intent once, synchronously, so the perform context and
                         // the delivery snapshot agree and neither reads live state after an await.
                         let clickIntent = onClickIntent()
@@ -966,7 +972,7 @@ public struct PopupView: View {
                             onRunLoadingAction?(action, clickIntent)
                             return
                         }
-                        onWillPerformAction?(action, clickIntent)
+                        guard onWillPerformAction?(action, clickIntent) ?? true else { return }
                         onActionPerformed?(action.id)
                         if action.chrome.isInlineResult {
                             if let resolved = modeStore.inlineResults[action.id] {

@@ -72,11 +72,22 @@ public enum UpdateChannel: String, Codable, CaseIterable, Sendable {
     case beta
 }
 
+/// Required modifier key when selecting text to trigger the popup ("none" | "option" | "shift" | "control" | "command").
+public enum SelectionModifier: String, Codable, CaseIterable, Sendable {
+    case none
+    case option
+    case shift
+    case control
+    case command
+}
+
 public extension SettingKey where Value == [String] {
     static var actionOrder: SettingKey<[String]> { SettingKey<[String]>("action.order", defaultValue: []) }
 }
 
 public extension SettingKey where Value == Set<String> {
+    /// AI presets moved out of AI Tools and into the main popup bar.
+    static var standaloneAIActionIDs: SettingKey<Set<String>> { SettingKey<Set<String>>("standaloneAIActionIDs", defaultValue: []) }
     static var disabledActionIDs: SettingKey<Set<String>> { SettingKey<Set<String>>("disabledActionIDs", defaultValue: []) }
     static var disabledPackages: SettingKey<Set<String>> { SettingKey<Set<String>>("disabledPackages", defaultValue: []) }
     static var disabledContextualActionIDs: SettingKey<Set<String>> { SettingKey<Set<String>>("disabledContextualActionIDs", defaultValue: []) }
@@ -102,6 +113,7 @@ public extension SettingKey where Value == [String: String] {
 }
 
 public extension SettingKey where Value == Bool {
+    static var showSearchAllActions: SettingKey<Bool> { SettingKey<Bool>("showSearchAllActions", defaultValue: true) }
     static var isAppEnabled: SettingKey<Bool> { SettingKey<Bool>("isAppEnabled", defaultValue: true) }
     static var isAIEnabled: SettingKey<Bool> { SettingKey<Bool>("aiEnabled", defaultValue: true) }
     static var isMouseHoldEnabled: SettingKey<Bool> { SettingKey<Bool>("isMouseHoldEnabled", defaultValue: true) }
@@ -167,6 +179,9 @@ public extension SettingKey where Value == String {
 
     /// Which update feed the app follows: `UpdateChannel.stable` (default) or `UpdateChannel.beta`.
     static var updateChannel: SettingKey<String> { SettingKey<String>("updates.channel", defaultValue: UpdateChannel.stable.rawValue) }
+
+    /// Required modifier key when selecting text to trigger the popup ("none" | "option" | "shift" | "control" | "command").
+    static var selectionModifier: SettingKey<String> { SettingKey<String>("selectionModifier", defaultValue: SelectionModifier.none.rawValue) }
 
     /// Per-action option value key. The key name matches the legacy `action.<id>.option.<optID>`
     /// convention so existing stored values migrate over with zero data changes.

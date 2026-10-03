@@ -8,6 +8,7 @@ import AppKit
 import SwiftUI
 import Combine
 import Core
+import KeyboardShortcuts
 
 /// Manages the menu bar status icon for OpenClip.
 @MainActor
@@ -17,14 +18,27 @@ class StatusBarController: NSObject, NSMenuDelegate {
     private var statusItem: NSStatusItem?
     private var preferencesWindow: NSWindow?
     private var preferencesToolbarController: PreferencesToolbarController?
-    private var rootMenu: NSMenu?
+    internal var rootMenu: NSMenu?
+    internal var captureTextMenuItem: NSMenuItem?
+    internal var settingsMenuItem: NSMenuItem?
+    internal var actionsMenuItem: NSMenuItem?
     internal var resumeItem: NSMenuItem?
     internal var toggleEnabledItem: NSMenuItem?
+    internal var appearOnSelectionSubmenu: NSMenu?
+    internal var appearAlwaysItem: NSMenuItem?
+    internal var appearOptionItem: NSMenuItem?
+    internal var appearShiftItem: NSMenuItem?
+    internal var appearControlItem: NSMenuItem?
+    internal var appearCommandItem: NSMenuItem?
+    internal var appearOffItem: NSMenuItem?
     internal var pauseAppItem: NSMenuItem?
+    internal var pauseAppSeparatorItem: NSMenuItem?
     internal var pauseSubmenu: NSMenu?
+    internal var pauseParentMenuItem: NSMenuItem?
     internal var updateMenuItem: NSMenuItem?
     internal var actionsSubmenu: NSMenu?
     internal var targetAppOverride: NSRunningApplication?
+    var onCaptureText: ((NSRunningApplication?) -> Void)?
     private var lastActiveApp: NSRunningApplication?
     internal var currentTargetApp: NSRunningApplication? {
         get { targetAppOverride ?? resolveFrontmostApp() }
@@ -123,17 +137,87 @@ class StatusBarController: NSObject, NSMenuDelegate {
         menu.addItem(resume)
         self.resumeItem = resume
         
-        // Section 1: Core State Toggle
+        // Section 1: Core State & Trigger Modes
         let isEnabled = settingsStore.get(.isAppEnabled)
+
+        let appearMenu = NSMenu(title: String(localized: "Appear on Selection"))
+
+        let alwaysItem = NSMenuItem(
+            title: String(localized: "Always"),
+            action: #selector(selectAppearOnSelectionMode(_:)),
+            keyEquivalent: ""
+        )
+        alwaysItem.target = self
+        alwaysItem.representedObject = "always"
+        appearMenu.addItem(alwaysItem)
+        self.appearAlwaysItem = alwaysItem
+
+        let optionItem = NSMenuItem(
+            title: String(localized: "With ⌥ Option Key"),
+            action: #selector(selectAppearOnSelectionMode(_:)),
+            keyEquivalent: ""
+        )
+        optionItem.target = self
+        optionItem.representedObject = SelectionModifier.option.rawValue
+        appearMenu.addItem(optionItem)
+        self.appearOptionItem = optionItem
+
+        let shiftItem = NSMenuItem(
+            title: String(localized: "With ⇧ Shift Key"),
+            action: #selector(selectAppearOnSelectionMode(_:)),
+            keyEquivalent: ""
+        )
+        shiftItem.target = self
+        shiftItem.representedObject = SelectionModifier.shift.rawValue
+        appearMenu.addItem(shiftItem)
+        self.appearShiftItem = shiftItem
+
+        let controlItem = NSMenuItem(
+            title: String(localized: "With ⌃ Control Key"),
+            action: #selector(selectAppearOnSelectionMode(_:)),
+            keyEquivalent: ""
+        )
+        controlItem.target = self
+        controlItem.representedObject = SelectionModifier.control.rawValue
+        appearMenu.addItem(controlItem)
+        self.appearControlItem = controlItem
+
+        let commandItem = NSMenuItem(
+            title: String(localized: "With ⌘ Command Key"),
+            action: #selector(selectAppearOnSelectionMode(_:)),
+            keyEquivalent: ""
+        )
+        commandItem.target = self
+        commandItem.representedObject = SelectionModifier.command.rawValue
+        appearMenu.addItem(commandItem)
+        self.appearCommandItem = commandItem
+
+        appearMenu.addItem(NSMenuItem.separator())
+
+        let offItem = NSMenuItem(
+            title: String(localized: "Off"),
+            action: #selector(selectAppearOnSelectionMode(_:)),
+            keyEquivalent: ""
+        )
+        offItem.target = self
+        offItem.representedObject = "off"
+        appearMenu.addItem(offItem)
+        self.appearOffItem = offItem
+
+        self.appearOnSelectionSubmenu = appearMenu
+
         let toggleItem = NSMenuItem(
-            title: String(localized: "Appear Automatically"),
+            title: String(localized: "Appear on Selection"),
             action: #selector(toggleEnabled),
             keyEquivalent: ""
         )
         toggleItem.target = self
-        toggleItem.state = isEnabled ? .on : .off
+        toggleItem.submenu = appearMenu
         menu.addItem(toggleItem)
         self.toggleEnabledItem = toggleItem
+
+        // Pause Submenu (App-specific & Snooze)
+        let pauseMenu = NSMenu(title: String(localized: "Pause"))
 
         // Dynamic Pause in <Current App>
         let pauseApp = NSMenuItem(
@@ -143,11 +227,14 @@ class StatusBarController: NSObject, NSMenuDelegate {
         )
         pauseApp.target = self
         pauseApp.isHidden = true
-        menu.addItem(pauseApp)
+        pauseMenu.addItem(pauseApp)
         self.pauseAppItem = pauseApp
 
-        // Pause Submenu (Snooze)
-        let pauseMenu = NSMenu(title: String(localized: "Pause"))
+        let pauseAppSep = NSMenuItem.separator()
+        pauseAppSep.isHidden = true
+        pauseMenu.addItem(pauseAppSep)
+        self.pauseAppSeparatorItem = pauseAppSep
+
         let pause30 = menuItem(title: String(localized: "Pause for 30 Minutes"), action: #selector(pause30Minutes))
         let pause60 = menuItem(title: String(localized: "Pause for 1 Hour"), action: #selector(pause1Hour))
         let pauseDay = menuItem(title: String(localized: "Pause Until Tomorrow"), action: #selector(pauseUntilTomorrow))
@@ -159,21 +246,30 @@ class StatusBarController: NSObject, NSMenuDelegate {
         let pauseParent = NSMenuItem(title: String(localized: "Pause"), action: nil, keyEquivalent: "")
         pauseParent.submenu = pauseMenu
         menu.addItem(pauseParent)
+        self.pauseParentMenuItem = pauseParent
+
+        updateAppearOnSelectionSubmenu()
         
         menu.addItem(NSMenuItem.separator())
 
         // Section 2: Core App Navigation
-        let prefsItem = menuItem(title: String(localized: "Settings…"), action: #selector(showPreferences as () -> Void), keyEquivalent: ",")
-        menu.addItem(prefsItem)
+        let captureItem = menuItem(title: String(localized: "Capture Text"), action: #selector(captureText))
+        captureItem.setShortcut(for: .captureText)
+        self.captureTextMenuItem = captureItem
+        menu.addItem(captureItem)
 
         let actionsMenu = NSMenu(title: String(localized: "Actions"))
         actionsMenu.delegate = self
         self.actionsSubmenu = actionsMenu
-        
+
         let actionsItem = NSMenuItem(title: String(localized: "Actions"), action: nil, keyEquivalent: "")
         actionsItem.submenu = actionsMenu
+        self.actionsMenuItem = actionsItem
         menu.addItem(actionsItem)
-        
+
+        let prefsItem = menuItem(title: String(localized: "Settings…"), action: #selector(showPreferences as () -> Void), keyEquivalent: ",")
+        self.settingsMenuItem = prefsItem
+        menu.addItem(prefsItem)
         menu.addItem(NSMenuItem.separator())
 
         // Section 3: Updates & Support
@@ -231,7 +327,7 @@ class StatusBarController: NSObject, NSMenuDelegate {
         return item
     }
 
-    @objc private func toggleEnabled() {
+    @objc internal func toggleEnabled() {
         let current = settingsStore.get(.isAppEnabled)
         let newStatus = !current
         settingsStore.set(.isAppEnabled, value: newStatus)
@@ -239,11 +335,63 @@ class StatusBarController: NSObject, NSMenuDelegate {
         notificationCenter.post(name: .openClipEnabledStateChanged, object: newStatus)
     }
 
+    @objc private func selectAppearOnSelectionMode(_ sender: NSMenuItem) {
+        guard let choice = sender.representedObject as? String else { return }
+        if choice == "off" {
+            settingsStore.set(.isAppEnabled, value: false)
+            updateStatusItem(isEnabled: false)
+            notificationCenter.post(name: .openClipEnabledStateChanged, object: false)
+        } else {
+            let modifier = (choice == "always") ? SelectionModifier.none.rawValue : choice
+            settingsStore.set(.selectionModifier, value: modifier)
+            if !settingsStore.get(.isAppEnabled) {
+                settingsStore.set(.isAppEnabled, value: true)
+            }
+            updateStatusItem(isEnabled: true)
+            notificationCenter.post(name: .openClipEnabledStateChanged, object: true)
+        }
+    }
+
+    internal func updateAppearOnSelectionSubmenu() {
+        let isEnabled = settingsStore.get(.isAppEnabled)
+        let modifier = settingsStore.get(.selectionModifier)
+
+        toggleEnabledItem?.state = isEnabled ? .on : .off
+
+        if !isEnabled {
+            appearAlwaysItem?.state = .off
+            appearOptionItem?.state = .off
+            appearShiftItem?.state = .off
+            appearControlItem?.state = .off
+            appearCommandItem?.state = .off
+            appearOffItem?.state = .on
+        } else {
+            appearAlwaysItem?.state = (modifier == SelectionModifier.none.rawValue) ? .on : .off
+            appearOptionItem?.state = (modifier == SelectionModifier.option.rawValue) ? .on : .off
+            appearShiftItem?.state = (modifier == SelectionModifier.shift.rawValue) ? .on : .off
+            appearControlItem?.state = (modifier == SelectionModifier.control.rawValue) ? .on : .off
+            appearCommandItem?.state = (modifier == SelectionModifier.command.rawValue) ? .on : .off
+            appearOffItem?.state = .off
+        }
+    }
+
+    @objc private func captureText() {
+        let app = currentTargetApp
+        DispatchQueue.main.async { [weak self] in self?.onCaptureText?(app) }
+    }
+
     // MARK: - NSMenuDelegate
 
     func menuWillOpen(_ menu: NSMenu) {
         if menu === rootMenu {
+            KeyboardShortcuts.disable(.captureText)
             updateRootMenuDynamicItems()
+        }
+    }
+
+    func menuDidClose(_ menu: NSMenu) {
+        if menu === rootMenu {
+            KeyboardShortcuts.enable(.captureText)
         }
     }
 
@@ -332,8 +480,9 @@ class StatusBarController: NSObject, NSMenuDelegate {
     }
 
     internal func updateRootMenuDynamicItems() {
+        updateAppearOnSelectionSubmenu()
+
         let isEnabled = settingsStore.get(.isAppEnabled)
-        toggleEnabledItem?.state = isEnabled ? .on : .off
 
         let pauseUntil = settingsStore.get(.pauseUntilTimestamp)
         let isPaused = pauseUntil > Date().timeIntervalSince1970
@@ -353,6 +502,7 @@ class StatusBarController: NSObject, NSMenuDelegate {
             let isAppDisabled = policy.disabled
 
             pauseAppItem?.isHidden = false
+            pauseAppSeparatorItem?.isHidden = false
             if isAppDisabled {
                 pauseAppItem?.title = String(localized: "Paused in \(appName)")
                 pauseAppItem?.state = .on
@@ -363,6 +513,7 @@ class StatusBarController: NSObject, NSMenuDelegate {
             pauseAppItem?.image = nil
         } else {
             pauseAppItem?.isHidden = true
+            pauseAppSeparatorItem?.isHidden = true
         }
 
         updateStatusIcon(isEnabled: isEnabled)
@@ -545,7 +696,7 @@ class StatusBarController: NSObject, NSMenuDelegate {
     }
     
     public func updateStatusItem(isEnabled: Bool) {
-        toggleEnabledItem?.state = isEnabled ? .on : .off
+        updateAppearOnSelectionSubmenu()
         updateStatusIcon(isEnabled: isEnabled)
     }
 
@@ -567,7 +718,7 @@ class StatusBarController: NSObject, NSMenuDelegate {
             if isPaused {
                 button.setAccessibilityValue(String(localized: "OpenClip is paused"))
             } else {
-                button.setAccessibilityValue(isEnabled ? String(localized: "Appear Automatically is on") : String(localized: "Appear Automatically is off"))
+                button.setAccessibilityValue(isEnabled ? String(localized: "Appear on Selection is on") : String(localized: "Appear on Selection is off"))
             }
         }
     }
@@ -581,9 +732,18 @@ class StatusBarController: NSObject, NSMenuDelegate {
             NSStatusBar.system.removeStatusItem(statusItem)
             self.statusItem = nil
             toggleEnabledItem = nil
+            appearOnSelectionSubmenu = nil
+            appearAlwaysItem = nil
+            appearOptionItem = nil
+            appearShiftItem = nil
+            appearControlItem = nil
+            appearCommandItem = nil
+            appearOffItem = nil
             resumeItem = nil
             pauseAppItem = nil
+            pauseAppSeparatorItem = nil
             pauseSubmenu = nil
+            pauseParentMenuItem = nil
             rootMenu = nil
             actionsSubmenu = nil
         }

@@ -256,7 +256,7 @@ public final class DefaultActionFactory: ActionFactory, Sendable {
         let options = mergedOptions(manifestOptions: manifest.options, actionOptions: metadata.options)
         
         // Declarative visibility rules applied to every extension action this factory creates:
-        // requirements (regex, app allow/deny, requiresSelection) + legacy manifest `regex`.
+        // requirements (input/destination, regex, app allow/deny) + legacy manifest `regex`.
         let rules = ExtensionActionRules(
             requirements: metadata.requirements,
             legacyRegex: metadata.regex,
@@ -320,6 +320,8 @@ public final class DefaultActionFactory: ActionFactory, Sendable {
             rowStyle: .standard,
             popupBehavior: .perform,
             source: .extensionPkg(packageID: manifest.identifier),
+            requiresLiveSelection: metadata.requirements?.input == .liveSelection
+                || metadata.requirements?.input == .editableSelection,
             showsLoading: metadata.loading ?? false,
             loadingMessage: metadata.loadingMessage,
             isInlineResult: metadata.inline == true,

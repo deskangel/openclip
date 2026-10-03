@@ -117,7 +117,7 @@ final class GroupSubActionBarViewTests: XCTestCase {
             onResult: { _ in },
             onRunAI: { _ in },
             onRunLoadingAction: { _, _ in },
-            onWillPerformAction: { _, _ in },
+            onWillPerformAction: { _, _ in true },
             onActionPerformed: { _ in },
             onClickIntent: { .primary },
             context: ActionContext(selection: SelectionContext(text: "test", sourceApp: AppIdentity(bundleIdentifier: "com.test", localizedName: "Test"), cursorPosition: .zero, timestamp: Date(), appPolicy: .default)),

@@ -7,6 +7,13 @@ import CoreGraphics
 import Core
 import AppKit
 
+enum PopupDismissalGrace {
+    static func isActive(now: TimeInterval, deadline: TimeInterval?) -> Bool {
+        guard let deadline else { return false }
+        return now < deadline
+    }
+}
+
 public struct PopupPositioner: Sendable {
 
     // How far the popup sits from the release point (points)

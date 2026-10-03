@@ -135,6 +135,10 @@ When an action produces text output (e.g. transformations, dictionary definition
 
 ## Popup Appearance & Theme
 
+Under **Customize → Behavior**, turn off **Show Command Palette** to hide the ⌘ search
+button at the end of the popup bar. The search keyboard shortcut (⌥⌘C by default) still works.
+**Reset** restores the button.
+
 The **Appearance** page shows a static preview of the floating popup bar and lets you style it. The preview is a fixed visual mock of the canonical action set (Search, Copy, Cut, Paste plus the AI Tools action) — it does **not** reflect your configured actions, ordering, or overrides, and hovering it never affects the real popup.
 
 ### Popup Theme
@@ -151,6 +155,18 @@ The preview always reflects the active combination, and a pinned appearance forc
 ---
 
 ## AI Provider Setup
+
+To put a frequently used AI preset directly on the popup bar, open **Actions**, expand **AI Tools**,
+and drag the preset between the top-level actions. Its position is saved. To return it to the
+group, drop it onto the **AI Tools** row. Presets moved out of the group still appear in the full
+search palette, and their existing enable switches, aliases, and hotkeys keep working.
+
+Select a preset under **AI → AI Actions** to edit its icon, display name, **Icon/Text** mode,
+keyboard shortcut, search alias, and prompt. Changes save automatically. These settings follow
+the preset whether it is inside AI Tools or on the main popup bar. **Add Custom AI Action** also
+offers these controls before creation, with **Show as → Text** selected by default. They are saved
+when you click **Add Action**, which opens the editor for the new preset. Cancelling discards the
+draft, including its shortcut and alias.
 
 OpenClip includes an AI assistant overlay that processes text selections using local or cloud AI models.
 

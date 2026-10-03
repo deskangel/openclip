@@ -5,6 +5,10 @@
 import Foundation
 import CoreGraphics
 
+public enum SelectionSource: Sendable {
+    case selection, clipboard, ocr
+}
+
 public struct SelectionContext: Sendable {
     /// Generation of observed selection/focus gestures; nil for untracked contexts.
     public let selectionGeneration: UInt64?
@@ -17,6 +21,13 @@ public struct SelectionContext: Sendable {
     public let appPolicy: AppPolicyContext
     /// True when the text came from the clipboard (shortcut triggered with no selection), not from a live selection.
     public let isClipboardFallback: Bool
+    public let source: SelectionSource
+    /// Whether the source selection was confirmed editable by the selection reader. Nil means the
+    /// reader did not establish editability. Clipboard and OCR input are never editable selections.
+    public let isEditable: Bool?
+    /// Whether the current destination was confirmed to accept paste. This is destination
+    /// evidence, independent of where `text` came from.
+    public let pasteTargetAvailable: Bool?
     public let html: String?
     public let rtf: String?
     /// Raw pasteboard representations captured alongside the text, including app-private types.
@@ -34,7 +45,10 @@ public struct SelectionContext: Sendable {
         html: String? = nil,
         rtf: String? = nil,
         flavors: [RichPasteboardFlavor] = [],
-        selectionGeneration: UInt64? = nil
+        selectionGeneration: UInt64? = nil,
+        source: SelectionSource? = nil,
+        isEditable: Bool? = nil,
+        pasteTargetAvailable: Bool? = nil
     ) {
         self.selectionGeneration = selectionGeneration
         self.text = text
@@ -44,7 +58,10 @@ public struct SelectionContext: Sendable {
         self.selectionBounds = selectionBounds
         self.timestamp = timestamp
         self.appPolicy = appPolicy
-        self.isClipboardFallback = isClipboardFallback
+        self.source = source ?? (isClipboardFallback ? .clipboard : .selection)
+        self.isClipboardFallback = self.source == .clipboard
+        self.isEditable = self.source == .selection ? isEditable : false
+        self.pasteTargetAvailable = pasteTargetAvailable
         self.html = html
         self.rtf = rtf
         self.flavors = flavors
@@ -63,7 +80,30 @@ public struct SelectionContext: Sendable {
             html: html,
             rtf: rtf,
             flavors: flavors,
-            selectionGeneration: selectionGeneration
+            selectionGeneration: selectionGeneration,
+            source: source,
+            isEditable: isEditable,
+            pasteTargetAvailable: pasteTargetAvailable
+        )
+    }
+
+    public func with(isEditable: Bool? = nil, pasteTargetAvailable: Bool? = nil) -> SelectionContext {
+        SelectionContext(
+            text: text,
+            sourceApp: sourceApp,
+            cursorPosition: cursorPosition,
+            mouseDownLocation: mouseDownLocation,
+            selectionBounds: selectionBounds,
+            timestamp: timestamp,
+            appPolicy: appPolicy,
+            isClipboardFallback: isClipboardFallback,
+            html: html,
+            rtf: rtf,
+            flavors: flavors,
+            selectionGeneration: selectionGeneration,
+            source: source,
+            isEditable: self.isEditable ?? isEditable,
+            pasteTargetAvailable: pasteTargetAvailable ?? self.pasteTargetAvailable
         )
     }
 }

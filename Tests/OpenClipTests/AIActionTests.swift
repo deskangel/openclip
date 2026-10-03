@@ -7,6 +7,25 @@ import XCTest
 
 @MainActor
 final class AIActionTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        TestIsolation.reset()
+    }
+
+    func testStandaloneAIUsesControllerFlowWithoutDismissingItsSelection() {
+        var events: [String] = []
+        let view = PopupView(
+            actions: [AIAction(presetID: "rewrite", title: "Rewrite")],
+            context: makeContext(text: "Example"),
+            onExitSearch: { events.append("exit") },
+            onResult: { _ in events.append("ordinary result") },
+            onActionPerformed: { events.append("record:\($0)") },
+            onRunAI: { events.append("run:\($0)") }
+        )
+        view.runAIAction("ai.preset.rewrite")
+        XCTAssertEqual(events, ["record:ai.preset.rewrite", "run:ai.preset.rewrite"])
+    }
+
     private func makeContext(text: String) -> ActionContext {
         let selection = SelectionContext(
             text: text,
@@ -32,6 +51,28 @@ final class AIActionTests: XCTestCase {
     func testAIActionIconDefaultMatchesPresetIcon() {
         let action = AIAction(presetID: "proofread", title: "Proofread")
         XCTAssertEqual(action.icon, .text("Proofread"))
+    }
+
+    func testAISettingsSurviveMovingBetweenGroupAndMainBar() throws {
+        let store = MemorySettingsStore()
+        let presenter = ActionCustomizationManager(settingsStore: store)
+        let bindings = ActionBindingStore(settingsStore: store)
+        let registry = ActionRegistry(settingsStore: store)
+        let coordinator = ActionCoordinator(registry: registry, settingsStore: store)
+        let action = AIAction(presetID: "rewrite", title: "Rewrite")
+        coordinator.register(action: action)
+        presenter.setOverride(for: action.id, title: "Polish", symbol: "pencil", text: nil)
+        XCTAssertTrue(ActionIdentity.isBindable(action))
+        XCTAssertEqual(bindings.setAlias("polish", for: action.id), .accepted)
+
+        coordinator.setAIActionPlacement(actionIDs: [action.id], standalone: true)
+        coordinator.setAIActionPlacement(actionIDs: [action.id], standalone: false)
+        let grouped = AIToolsAction(settingsStore: store).subActions(in: coordinator.actions)
+        XCTAssertEqual(grouped.map(\.id), [action.id])
+        let groupedAction = try XCTUnwrap(grouped.first)
+        XCTAssertEqual(presenter.presented(groupedAction, surface: .popup),
+                       ActionPresentationModel(title: "Polish", icon: .symbol("pencil")))
+        XCTAssertEqual(ActionBindingStore(settingsStore: store).actionID(forAlias: "polish"), action.id)
     }
 
     // MARK: - Preset ordering (drag to reorder in Preferences → AI → Actions)

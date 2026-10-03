@@ -2,13 +2,14 @@ import XCTest
 @testable import Core
 
 private extension ActionContext {
-    init(selectedText: String, bundleID: String? = "com.test.app") {
+    init(selectedText: String, bundleID: String? = "com.test.app", source: SelectionSource = .selection) {
         let selection = SelectionContext(
             text: selectedText,
             sourceApp: AppIdentity(bundleIdentifier: bundleID, localizedName: "TestApp"),
             cursorPosition: .zero,
             timestamp: Date(),
-            appPolicy: .default
+            appPolicy: .default,
+            source: source
         )
         self.init(selection: selection, modifiers: [])
     }
@@ -84,6 +85,114 @@ final class ActionVisibilityTests: XCTestCase {
         let context = ActionContext(selectedText: "")
         let result = ActionVisibility.isEnabled(requirements: requirements, legacyRegex: nil, context: context)
         XCTAssertTrue(result.enabled)
+    }
+
+    func testRequiresSelectionTreatsOCRAsNonblankInputAndKeepsSourceAppGates() {
+        let ocrContext = ActionContext(selectedText: "recognized text", bundleID: "com.test.app", source: .ocr)
+        let inputRequired = ActionVisibility.isEnabled(
+            requirements: ActionRequirements(regex: "^recognized", apps: ["com.test.app"], requiresSelection: true),
+            legacyRegex: nil,
+            context: ocrContext
+        )
+        let wrongSourceApp = ActionVisibility.isEnabled(
+            requirements: ActionRequirements(apps: ["com.other.app"], requiresSelection: true),
+            legacyRegex: nil,
+            context: ocrContext
+        )
+        let whitespaceOCR = ActionContext(selectedText: " \n ", source: .ocr)
+        let emptyInputRequired = ActionVisibility.isEnabled(
+            requirements: ActionRequirements(requiresSelection: true),
+            legacyRegex: nil,
+            context: whitespaceOCR
+        )
+        let emptyInputAllowed = ActionVisibility.isEnabled(
+            requirements: ActionRequirements(requiresSelection: false),
+            legacyRegex: nil,
+            context: whitespaceOCR
+        )
+
+        XCTAssertTrue(inputRequired.enabled)
+        XCTAssertFalse(wrongSourceApp.enabled)
+        XCTAssertFalse(emptyInputRequired.enabled)
+        XCTAssertTrue(emptyInputAllowed.enabled)
+    }
+
+    func testInputRequirementMatrixAcrossSourceAndEditability() {
+        let cases: [(String, SelectionSource, Bool?, Bool)] = [
+            ("", .selection, true, false),
+            ("text", .selection, true, true),
+            ("text", .selection, false, true),
+            ("text", .selection, nil, true),
+            ("text", .clipboard, false, true),
+            ("text", .ocr, false, true)
+        ]
+        func context(_ item: (String, SelectionSource, Bool?, Bool)) -> ActionContext {
+            ActionContext(selection: SelectionContext(
+                text: item.0,
+                source: item.1,
+                isEditable: item.2,
+                pasteTargetAvailable: true
+            ))
+        }
+
+        for item in cases {
+            XCTAssertTrue(ActionVisibility.isEnabled(
+                requirements: ActionRequirements(input: .optional), legacyRegex: nil, context: context(item)
+            ).enabled, "optional should allow \(item)")
+            XCTAssertEqual(ActionVisibility.isEnabled(
+                requirements: ActionRequirements(input: .text), legacyRegex: nil, context: context(item)
+            ).enabled, item.3, "text requirement for \(item)")
+            XCTAssertEqual(ActionVisibility.isEnabled(
+                requirements: ActionRequirements(input: .liveSelection), legacyRegex: nil, context: context(item)
+            ).enabled, item.1 == .selection && item.3, "liveSelection requirement for \(item)")
+            XCTAssertEqual(ActionVisibility.isEnabled(
+                requirements: ActionRequirements(input: .editableSelection), legacyRegex: nil, context: context(item)
+            ).enabled, item.1 == .selection && item.2 == true && item.3, "editableSelection requirement for \(item)")
+        }
+    }
+
+    func testRequiresPasteTargetFailsClosedOnlyWhenRequested() {
+        for availability in [true, false, nil] as [Bool?] {
+            let context = ActionContext(selection: SelectionContext(
+                text: "input", source: .clipboard, isEditable: false, pasteTargetAvailable: availability
+            ))
+            XCTAssertTrue(ActionVisibility.isEnabled(
+                requirements: ActionRequirements(input: .optional), legacyRegex: nil, context: context
+            ).enabled)
+            XCTAssertEqual(ActionVisibility.isEnabled(
+                requirements: ActionRequirements(input: .optional, requiresPasteTarget: true),
+                legacyRegex: nil,
+                context: context
+            ).enabled, availability == true)
+        }
+    }
+
+    func testSelectionContextClonePreservesSourceCapabilities() {
+        let selection = SelectionContext(
+            text: "editable",
+            source: .selection,
+            isEditable: true,
+            pasteTargetAvailable: true
+        )
+        let moved = selection.with(cursorPosition: CGPoint(x: 10, y: 20))
+        XCTAssertEqual(moved.source, .selection)
+        XCTAssertEqual(moved.isEditable, true)
+        XCTAssertEqual(moved.pasteTargetAvailable, true)
+    }
+
+    func testInputDecodingMapsLegacyAliasesAndRejectsConflictsOrUnknownValues() throws {
+        let oldTrue = try JSONDecoder().decode(ActionRequirements.self, from: #"{"requiresSelection":true}"#.data(using: .utf8)!)
+        let oldFalse = try JSONDecoder().decode(ActionRequirements.self, from: #"{"requires-selection":false}"#.data(using: .utf8)!)
+        XCTAssertEqual(oldTrue.input, .text)
+        XCTAssertEqual(oldFalse.input, .optional)
+        XCTAssertEqual(try JSONDecoder().decode(ActionRequirements.self, from: #"{}"#.data(using: .utf8)!).input, .text)
+        XCTAssertThrowsError(try JSONDecoder().decode(ActionRequirements.self, from: #"{"input":"editableSelection","requiresSelection":true}"#.data(using: .utf8)!))
+        XCTAssertThrowsError(try JSONDecoder().decode(ActionRequirements.self, from: #"{"input":"surprise"}"#.data(using: .utf8)!))
+        XCTAssertThrowsError(try JSONDecoder().decode(ActionRequirements.self, from: #"{"input":true}"#.data(using: .utf8)!))
+        XCTAssertThrowsError(try JSONDecoder().decode(ActionRequirements.self, from: #"{"input":null}"#.data(using: .utf8)!))
+        XCTAssertThrowsError(try JSONDecoder().decode(ActionRequirements.self, from: #"{"input":null,"requiresSelection":true}"#.data(using: .utf8)!))
+        XCTAssertThrowsError(try JSONDecoder().decode(ActionRequirements.self, from: #"{"requiresPasteTarget":null}"#.data(using: .utf8)!))
+        XCTAssertThrowsError(try JSONDecoder().decode(ActionRequirements.self, from: #"{"requiresSelection":true,"requires-selection":false}"#.data(using: .utf8)!))
     }
 
     func testDecodedRequirementsExpressionSurvivesRoundTrip() throws {
