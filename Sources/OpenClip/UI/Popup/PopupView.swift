@@ -555,22 +555,7 @@ public struct PopupView: View {
                 onExitSearch()
             },
             onRunAI: { actionID in
-                onActionPerformed?(actionID)
-                if let onRunAI {
-                    // Run first: the controller's AI flow snapshots the selection and dismisses
-                    // the popup itself. Exiting search beforehand dismissed it *for* a palette
-                    // opened straight from the hotkey (`openedDirectlyInSearch` → `hide()`),
-                    // which cleared `currentActionContext` — so the preset never ran and only
-                    // logged "Cannot run AI preset". From the bar the same exit merely returned
-                    // to the bar, which is why AI worked there and nowhere else.
-                    onRunAI(actionID)
-                } else {
-                    // Preview/static fallback: no controller flow to dismiss anything, so the
-                    // palette closes itself before streaming into the card.
-                    onExitSearch()
-                    guard let preset = aiManager.preset(forActionID: actionID) else { return }
-                    runAIPreset(prompt: aiManager.promptForPreset(preset), title: preset.title)
-                }
+                runAIAction(actionID)
             },
             onRunAIPrompt: { instruction, replace, includeContext in
                 if let onRunAIPrompt {
@@ -620,6 +605,19 @@ public struct PopupView: View {
     }
 
     // MARK: - AI Helpers
+
+    /// Shared by standalone bar buttons and palette rows. The controller must snapshot the
+    /// selection before dismissing the popup, including when search was opened by a hotkey.
+    func runAIAction(_ actionID: String) {
+        onActionPerformed?(actionID)
+        if let onRunAI {
+            onRunAI(actionID)
+        } else {
+            if modeStore.mode == .search { onExitSearch() }
+            guard let preset = aiManager.preset(forActionID: actionID) else { return }
+            runAIPreset(prompt: aiManager.promptForPreset(preset), title: preset.title)
+        }
+    }
 
     private func runAIPreset(prompt: String, title: String, onGeneratedTitle: ((String) -> Void)? = nil) {
         cancelAITask()
@@ -941,9 +939,13 @@ public struct PopupView: View {
                         }
                     }
                 } else {
-                    // Existing perform button unchanged
+                    // Leaf actions use their existing execution flow.
                     Button {
                         onCancelSubBarDwell?()
+                        if ActionIdentity.isAIPreset(action) {
+                            runAIAction(action.id)
+                            return
+                        }
                         // Capture the click intent once, synchronously, so the perform context and
                         // the delivery snapshot agree and neither reads live state after an await.
                         let clickIntent = onClickIntent()

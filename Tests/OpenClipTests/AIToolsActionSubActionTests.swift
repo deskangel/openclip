@@ -16,11 +16,27 @@ private struct FakeAIAction: Action {
     @MainActor func perform(_ context: ActionContext) async throws -> ActionResult { .success }
 }
 
+@MainActor
 final class AIToolsActionSubActionTests: XCTestCase {
+
+    override func setUp() {
+        super.setUp()
+        TestIsolation.reset()
+    }
+
+    func testStandalonePresetsAreNotDuplicatedInAITools() {
+        let store = MemorySettingsStore()
+        let tools = AIToolsAction(settingsStore: store)
+        let presets = [FakeAIAction(id: "ai.preset.1"), FakeAIAction(id: "ai.preset.2")]
+        store.set(.standaloneAIActionIDs, value: ["ai.preset.1"])
+        XCTAssertEqual(tools.subActions(in: presets).map(\.id), ["ai.preset.2"])
+        store.set(.standaloneAIActionIDs, value: Set(presets.map(\.id)))
+        XCTAssertTrue(tools.subActions(in: presets).isEmpty, "An empty group must not resurrect presets via the fallback.")
+    }
 
     @MainActor
     func testAIToolsResolvesAIPresets() {
-        let tools = AIToolsAction()
+        let tools = AIToolsAction(settingsStore: MemorySettingsStore())
         let preset1 = FakeAIAction(id: "ai.preset.1")
         let preset2 = FakeAIAction(id: "ai.preset.2")
         let other = FakeAIAction(id: "builtin.copy", source: .builtin)
@@ -30,7 +46,7 @@ final class AIToolsActionSubActionTests: XCTestCase {
 
     @MainActor
     func testAIToolsResolvesFromAIServiceManagerWhenCatalogLacksPresets() {
-        let tools = AIToolsAction()
+        let tools = AIToolsAction(settingsStore: MemorySettingsStore())
         let other = FakeAIAction(id: "builtin.copy", source: .builtin)
         let subActions = tools.subActions(in: [other])
         XCTAssertFalse(subActions.isEmpty)

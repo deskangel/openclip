@@ -107,7 +107,7 @@ areas; stale debt notes are worse than none.
   (`builtin.copy`, `com.user.ext.action`). `ActionRegistry` dynamically materializes `CustomGroupAction`
   (`Sources/Core/Actions/CustomGroupAction.swift`, conforming to `Action` and `SubActionProviding`)
   group rows, injecting them contiguously before their member actions in `actions`, while `SettingKey.actionOrder`
-  strictly stores real, canonical IDs (excluding synthetic group headers and AI presets). `ActionCoordinator`
+  strictly stores real, canonical IDs (excluding synthetic group headers and grouped AI presets). `ActionCoordinator`
   manages the full group lifecycle (`createGroup`, `updateGroup`, `ungroup`, `removeFromGroup`, `loadGroupDefs`,
   `pruneOrphans`), automatically enforcing the strict $\ge 2$ member invariant: when members are uninstalled
   or removed, any group dropping below 2 members is immediately dissolved. Availability resolution in
@@ -146,6 +146,13 @@ areas; stale debt notes are worse than none.
   id-string switches in presentation.
 
 ## Action-Search Palette & Popup Growth
+
+- **AI presets can leave AI Tools.** `SettingKey.standaloneAIActionIDs` records presets dragged
+  to the Actions list's root. Their canonical IDs participate in `action.order`, survive preset
+  reconciliation, and appear directly in the popup. AI Tools excludes those presets from its
+  sub-bar and scoped search. Dropping a preset onto AI Tools removes its explicit order and
+  returns it to the group. Bar and palette clicks share the controller's AI execution path;
+  the global AI switch and individual preset enablement still apply.
 
 - **Content-driven panel growth has no controller callback.** The `NSHostingView` auto-resizes the
   panel window top-anchored when its SwiftUI content grows (e.g. entering search mode);

@@ -97,6 +97,26 @@ public final class ActionCoordinator: ObservableObject, Sendable {
         syncGroupMemberOrder()
     }
 
+    public var standaloneAIActionIDs: Set<String> {
+        settingsStore.get(.standaloneAIActionIDs)
+    }
+
+    /// Changes AI preset placement without changing the preset's identity or enablement.
+    public func setAIActionPlacement(actionIDs: [String], standalone: Bool) {
+        let presetIDs = Set(actions.filter { actionIDs.contains($0.id) && ActionIdentity.isAIPreset($0) }.map(\.id))
+        guard !presetIDs.isEmpty else { return }
+        var standaloneIDs = standaloneAIActionIDs
+        if standalone {
+            standaloneIDs.formUnion(presetIDs)
+        } else {
+            standaloneIDs.subtract(presetIDs)
+            // Returned presets inherit the launcher's position again.
+            settingsStore.set(.actionOrder, value: settingsStore.get(.actionOrder).filter { !presetIDs.contains($0) })
+        }
+        settingsStore.set(.standaloneAIActionIDs, value: standaloneIDs)
+        registry.sortActions()
+    }
+
     public func setExtensionGroupMemberOrder(groupID: String, memberIDs: [String]) {
         registry.setExtensionGroupMemberOrder(groupID: groupID, memberIDs: memberIDs)
         self.actions = registry.actions

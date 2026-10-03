@@ -545,7 +545,6 @@
   "Shown in the popup bar; its actions open in a second row.": "顯示在彈出列中；其操作會在第二列展開。",
   "The extension's actions open behind this icon in the popup bar.": "擴充功能的操作會在彈出列中此圖示下展開。",
   "The selected text is appended to the instruction when the action runs.": "操作執行時，選取的文字會附加到指令之後。",
-  "These appear inside the AI Tools group in the popup bar. Drag to reorder.": "這些會顯示在彈出列的「AI 工具」群組中。拖曳可重新排序。",
   "Turn an action off to hide it from the popup bar. Open one to change its name, icon, shortcut and options.": "關閉操作可將其從彈出列隱藏。打開操作可更改其名稱、圖示、快捷鍵和選項。",
   "Ungroup? The actions return to the list.": "要取消群組嗎？操作將返回列表。",
   "Ungroup…": "取消群組…",
@@ -722,5 +721,6 @@
   "Allow Screen Recording for OpenClip in System Settings, then reopen OpenClip.": "請在系統設定中允許 OpenClip 進行螢幕錄製，然後重新開啟 OpenClip。",
   "Capture Text": "從螢幕擷取文字",
   "No text found": "找不到文字",
-  "Select a larger area": "請選取較大的區域"
+  "Select a larger area": "請選取較大的區域",
+  "Drag to reorder. To move a preset onto the main popup bar, drag it out of AI Tools in the Actions list.": "拖曳以重新排序。若要將預設移至主彈出工具列，請在動作列表中將其拖出 AI 工具。"
 }

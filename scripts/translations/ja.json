@@ -545,7 +545,6 @@
   "Shown in the popup bar; its actions open in a second row.": "ポップアップバーに表示され、そのアクションは 2 段目に開きます。",
   "The extension's actions open behind this icon in the popup bar.": "拡張機能のアクションは、ポップアップバーのこのアイコンの中に開きます。",
   "The selected text is appended to the instruction when the action runs.": "アクションの実行時、選択したテキストが指示の後に追加されます。",
-  "These appear inside the AI Tools group in the popup bar. Drag to reorder.": "ポップアップバーの「AI ツール」グループに表示されます。ドラッグして並べ替えられます。",
   "Turn an action off to hide it from the popup bar. Open one to change its name, icon, shortcut and options.": "アクションをオフにするとポップアップバーから隠れます。開くと名前、アイコン、ショートカット、オプションを変更できます。",
   "Ungroup? The actions return to the list.": "グループを解除しますか? アクションはリストに戻ります。",
   "Ungroup…": "グループを解除…",
@@ -722,5 +721,6 @@
   "Allow Screen Recording for OpenClip in System Settings, then reopen OpenClip.": "システム設定で OpenClip の画面収録を許可してから、OpenClip を再度開いてください。",
   "Capture Text": "画面からテキストをキャプチャ",
   "No text found": "テキストが見つかりません",
-  "Select a larger area": "より広い範囲を選択してください"
+  "Select a larger area": "より広い範囲を選択してください",
+  "Drag to reorder. To move a preset onto the main popup bar, drag it out of AI Tools in the Actions list.": "ドラッグして並べ替えます。プリセットをメインのポップアップバーに移動するには、アクション一覧の AI ツールから外へドラッグしてください。"
 }

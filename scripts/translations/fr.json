@@ -545,7 +545,6 @@
   "Shown in the popup bar; its actions open in a second row.": "Affiché dans la barre contextuelle ; ses actions s'ouvrent sur une seconde ligne.",
   "The extension's actions open behind this icon in the popup bar.": "Les actions de l'extension s'ouvrent derrière cette icône dans la barre contextuelle.",
   "The selected text is appended to the instruction when the action runs.": "Le texte sélectionné est ajouté à l'instruction lorsque l'action s'exécute.",
-  "These appear inside the AI Tools group in the popup bar. Drag to reorder.": "Elles apparaissent dans le groupe Outils IA de la barre contextuelle. Faites glisser pour réordonner.",
   "Turn an action off to hide it from the popup bar. Open one to change its name, icon, shortcut and options.": "Désactivez une action pour la masquer de la barre contextuelle. Ouvrez-en une pour modifier son nom, son icône, son raccourci et ses options.",
   "Ungroup? The actions return to the list.": "Dissocier ? Les actions retournent dans la liste.",
   "Ungroup…": "Dissocier…",
@@ -722,5 +721,6 @@
   "Allow Screen Recording for OpenClip in System Settings, then reopen OpenClip.": "Autorisez l’enregistrement de l’écran pour OpenClip dans Réglages Système, puis rouvrez OpenClip.",
   "Capture Text": "Capturer le texte à l’écran",
   "No text found": "Aucun texte trouvé",
-  "Select a larger area": "Sélectionnez une zone plus grande"
+  "Select a larger area": "Sélectionnez une zone plus grande",
+  "Drag to reorder. To move a preset onto the main popup bar, drag it out of AI Tools in the Actions list.": "Faites glisser pour réorganiser. Pour placer un préréglage sur la barre contextuelle principale, faites-le glisser hors des outils IA dans la liste des actions."
 }
