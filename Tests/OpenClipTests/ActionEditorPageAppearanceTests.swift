@@ -67,6 +67,47 @@ final class ActionEditorPageAppearanceTests: XCTestCase {
 
     // MARK: - iconModeFallbackSymbol
 
+    func testAIIconModePersistsAcrossReloadWithoutPickingAnIcon() {
+        let action = AIAction(presetID: "rewrite", title: "Rewrite")
+        let store = MemorySettingsStore()
+        let manager = ActionCustomizationManager(settingsStore: store)
+        XCTAssertEqual(manager.popupIcon(for: action), .text("Rewrite"))
+
+        let symbol = ActionEditorPage.resolvedIconModeSymbolOverride(
+            displayMode: 0, current: Constants.defaultAIIconSymbol,
+            initial: Constants.defaultAIIconSymbol, stored: nil, action: action
+        )
+        manager.setOverride(for: action.id, title: nil, symbol: symbol, text: nil)
+
+        let reloaded = ActionCustomizationManager(settingsStore: store)
+        XCTAssertEqual(reloaded.popupIcon(for: action), .symbol(Constants.defaultAIIconSymbol))
+        XCTAssertEqual(
+            ActionEditorPage.initialDisplayMode(override: reloaded.override(for: action.id), actionIcon: action.icon),
+            0
+        )
+    }
+
+    func testAIPickedIconSurvivesTextModeAndPresetRefresh() {
+        let action = AIAction(presetID: "rewrite", title: "Rewrite")
+        let store = MemorySettingsStore()
+        let manager = ActionCustomizationManager(settingsStore: store)
+        manager.setOverride(for: action.id, title: "Polish", symbol: "pencil", text: "Polish")
+
+        let refreshed = AIAction(presetID: action.presetID, title: "Updated preset title")
+        let reloaded = ActionCustomizationManager(settingsStore: store)
+        XCTAssertEqual(reloaded.popupIcon(for: refreshed), .text("Polish"))
+        XCTAssertEqual(reloaded.tableIcon(for: refreshed), .symbol("pencil"))
+        XCTAssertEqual(reloaded.displayTitle(for: refreshed), "Polish")
+
+        let stored = reloaded.override(for: action.id)
+        let symbol = ActionEditorPage.resolvedIconModeSymbolOverride(
+            displayMode: 0, current: "pencil", initial: "pencil",
+            stored: stored?.customIconSymbol, action: refreshed
+        )
+        reloaded.setOverride(for: action.id, title: stored?.customTitle, symbol: symbol, text: nil)
+        XCTAssertEqual(reloaded.popupIcon(for: refreshed), .symbol("pencil"))
+    }
+
     func testIconModeFallbackSymbolForTextGlyphBuiltins() {
         XCTAssertEqual(ActionEditorPage.iconModeFallbackSymbol(for: CopyAction()), "doc.on.doc")
         XCTAssertEqual(ActionEditorPage.iconModeFallbackSymbol(for: CutAction()), "scissors")

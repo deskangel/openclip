@@ -53,6 +53,28 @@ final class AIActionTests: XCTestCase {
         XCTAssertEqual(action.icon, .text("Proofread"))
     }
 
+    func testAISettingsSurviveMovingBetweenGroupAndMainBar() throws {
+        let store = MemorySettingsStore()
+        let presenter = ActionCustomizationManager(settingsStore: store)
+        let bindings = ActionBindingStore(settingsStore: store)
+        let registry = ActionRegistry(settingsStore: store)
+        let coordinator = ActionCoordinator(registry: registry, settingsStore: store)
+        let action = AIAction(presetID: "rewrite", title: "Rewrite")
+        coordinator.register(action: action)
+        presenter.setOverride(for: action.id, title: "Polish", symbol: "pencil", text: nil)
+        XCTAssertTrue(ActionIdentity.isBindable(action))
+        XCTAssertEqual(bindings.setAlias("polish", for: action.id), .accepted)
+
+        coordinator.setAIActionPlacement(actionIDs: [action.id], standalone: true)
+        coordinator.setAIActionPlacement(actionIDs: [action.id], standalone: false)
+        let grouped = AIToolsAction(settingsStore: store).subActions(in: coordinator.actions)
+        XCTAssertEqual(grouped.map(\.id), [action.id])
+        let groupedAction = try XCTUnwrap(grouped.first)
+        XCTAssertEqual(presenter.presented(groupedAction, surface: .popup),
+                       ActionPresentationModel(title: "Polish", icon: .symbol("pencil")))
+        XCTAssertEqual(ActionBindingStore(settingsStore: store).actionID(forAlias: "polish"), action.id)
+    }
+
     // MARK: - Preset ordering (drag to reorder in Preferences → AI → Actions)
 
     private var sample: [AIActionPreset] {

@@ -7,11 +7,13 @@
 // three layers, to change two text fields.
 
 import SwiftUI
+import Core
 
 @MainActor
 public struct AIActionsSection: View {
     @ObservedObject private var aiManager = AIServiceManager.shared
     @ObservedObject private var router = SettingsRouter.shared
+    @ObservedObject private var customizationManager = ActionCustomizationManager.shared
 
     public init() {}
 
@@ -56,6 +58,8 @@ public struct AIActionsSection: View {
 
     @ViewBuilder
     private func row(_ preset: AIActionPreset) -> some View {
+        let action = AIAction(presetID: preset.id, title: preset.title)
+        let presentation = customizationManager.presented(action, surface: .table)
         HStack(alignment: .center, spacing: 12) {
             // The title drills into the prompt: the row is the control, the way a System
             // Settings list row is. The enable switch sits after it, just before the chevron.
@@ -63,8 +67,10 @@ public struct AIActionsSection: View {
                 router.push(.aiPreset(id: preset.id))
             } label: {
                 HStack(spacing: 8) {
+                    ActionIconView(icon: presentation.icon, size: 16)
+                        .frame(width: 22, height: 22)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(preset.title)
+                        Text(presentation.title)
                             .font(.system(size: 13, weight: .medium))
                         Text(preset.prompt)
                             .font(.caption)

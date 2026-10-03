@@ -12,11 +12,12 @@ import Core
 
 /// Registry action for one AI preset. Bar and palette selections route through the popup's AI
 /// flow rather than `perform`, sharing the same result card as the AI Tools sub-bar.
-public struct AIAction: Action {
+public struct AIAction: ConfigurableAction {
     public let presetID: String
 
     public var id: String { "ai.preset.\(presetID)" }
     public let title: String
+    public var preferenceIconName: String { Constants.defaultAIIconSymbol }
     public var icon: ActionIcon { Self.iconForPreset(presetID: presetID, title: title) }
 
     public static func iconForPreset(presetID: String, title: String? = nil) -> ActionIcon {
