@@ -152,6 +152,11 @@ The preview always reflects the active combination, and a pinned appearance forc
 
 ## AI Provider Setup
 
+To put a frequently used AI preset directly on the popup bar, open **Actions**, expand **AI Tools**,
+and drag the preset between the top-level actions. Its position is saved. To return it to the
+group, drop it onto the **AI Tools** row. Presets moved out of the group still appear in the full
+search palette, and their existing enable switches, aliases, and hotkeys keep working.
+
 OpenClip includes an AI assistant overlay that processes text selections using local or cloud AI models.
 
 Select **AI** in the sidebar (the first row of the Extensions group) to turn AI Tools on or off and configure your provider:

@@ -10,7 +10,11 @@ import Foundation
 import Core
 
 public struct AIToolsAction: Action, SubActionProviding {
-    public init() {}
+    private let settingsStore: any SettingsStore
+
+    public init(settingsStore: any SettingsStore = DefaultSettingsStore.shared) {
+        self.settingsStore = settingsStore
+    }
 
     public var id: String { "builtin.aiTools" }
     public var title: String { String(localized: "AI Tools") }
@@ -34,14 +38,15 @@ public struct AIToolsAction: Action, SubActionProviding {
     // The AI Tools launcher's sub-actions are the registered AI presets (chrome source `.ai`).
     @MainActor
     public func subActions(in catalog: [any Action]) -> [any Action] {
+        let standaloneIDs = settingsStore.get(.standaloneAIActionIDs)
         let presets = catalog.filter { action in
             ActionIdentity.isAIPreset(action)
         }
         if !presets.isEmpty {
-            return presets
+            return presets.filter { !standaloneIDs.contains($0.id) }
         }
         return AIServiceManager.shared.enabledPresets.map { preset in
             AIAction(presetID: preset.id, title: preset.title)
-        }
+        }.filter { !standaloneIDs.contains($0.id) }
     }
 }

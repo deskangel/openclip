@@ -34,8 +34,7 @@ public enum ActionIdentity {
         Set(actions.compactMap { extensionPackageID(of: $0) })
     }
 
-    /// True for AI-preset actions (`.ai` source) — reachable via the palette and Preferences,
-    /// never a popup bar row.
+    /// True for AI-preset actions (`.ai` source), grouped under AI Tools by default.
     public static func isAIPreset(_ action: any Action) -> Bool {
         if case .ai = action.chrome.source { return true }
         return false

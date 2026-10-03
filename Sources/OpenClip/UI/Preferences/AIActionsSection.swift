@@ -45,7 +45,7 @@ public struct AIActionsSection: View {
                 .foregroundStyle(Color.accentColor)
             }
         } footer: {
-            Text("These appear inside the AI Tools group in the popup bar. Drag to reorder.")
+            Text("Drag to reorder. To move a preset onto the main popup bar, drag it out of AI Tools in the Actions list.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

@@ -2,18 +2,16 @@
 // OpenClip
 //
 // Bridges an `AIActionPreset` into the Action registry so each AI preset surfaces as an
-// individual action in the action-search palette and Preferences → Actions, while staying out
-// of the popup bar (the reorderable `builtin.aiTools` action is the bar's entry point).
+// individual action in the action-search palette and Preferences → Actions. Presets live under
+// AI Tools by default and can be moved into the main popup bar.
 // `AIActionSync` keeps these
 // in step with AIServiceManager's preset list: the title is snapshotted at registration time,
 // while the runnable state and prompt are read live from AIServiceManager at invoke time.
 import Foundation
 import Core
 
-/// Registry action for one AI preset. Never a popup bar row (`chrome.source == .ai` is excluded
-/// in `ActionRegistry.availableActions`); the search palette routes `.ai` selections through the
-/// popup's AI flow (`runAIPreset`) rather than `perform`, so results render in the native AI
-/// result card just like clicking the preset in the AI Tools bar.
+/// Registry action for one AI preset. Bar and palette selections route through the popup's AI
+/// flow rather than `perform`, sharing the same result card as the AI Tools sub-bar.
 public struct AIAction: Action {
     public let presetID: String
 

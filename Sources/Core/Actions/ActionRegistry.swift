@@ -49,10 +49,12 @@ public final class ActionRegistry: ObservableObject, Sendable {
     /// single-valued. One level only: a child never re-parents through another child.
     private func subActionParents(explicitlyOrderedIDs: [String: Int]) -> [String: String] {
         let resolver = SubActionResolver()
+        let standaloneAIIDs = settingsStore.get(.standaloneAIActionIDs)
         var parents: [String: String] = [:]
         for parent in registeredActions where parent is any SubActionProviding {
             for child in resolver.subActions(of: parent, in: registeredActions) {
                 guard child.id != parent.id, parents[child.id] == nil else { continue }
+                if ActionIdentity.isAIPreset(child), standaloneAIIDs.contains(child.id) { continue }
                 if !(parent is GroupAction), explicitlyOrderedIDs[child.id] != nil {
                     continue
                 }
@@ -214,8 +216,12 @@ public final class ActionRegistry: ObservableObject, Sendable {
                 .flatMap { resolver.subActions(of: $0, in: registeredActions).map(\.id) }
         )
 
+        let standaloneAIIDs = settingsStore.get(.standaloneAIActionIDs)
         let newOrder = newActions
-            .filter { !ActionIdentity.isAIPreset($0) && !($0 is CustomGroupAction) && !subActionIDs.contains($0.id) }
+            .filter {
+                if ActionIdentity.isAIPreset($0) { return standaloneAIIDs.contains($0.id) }
+                return !($0 is CustomGroupAction) && !subActionIDs.contains($0.id)
+            }
             .map { $0.id }
         settingsStore.set(.actionOrder, value: newOrder)
 
@@ -354,12 +360,11 @@ public final class ActionRegistry: ObservableObject, Sendable {
     public func availableActions(for context: ActionContext) -> [any Action] {
         let disabledIDs = settingsStore.get(.disabledActionIDs)
         let disabledPackages = settingsStore.get(.disabledPackages)
+        let standaloneAIIDs = settingsStore.get(.standaloneAIActionIDs)
 
         func passes(_ action: any Action) -> Bool {
-            // AI preset actions are never bar rows: the reorderable `builtin.aiTools` action
-            // (chrome.launchesAI) is the popup's AI entry, so presets must not flood the
-            // paginated bar even when enabled.
-            if ActionIdentity.isAIPreset(action) {
+            // Presets stay in AI Tools until explicitly moved into the main bar.
+            if ActionIdentity.isAIPreset(action), !standaloneAIIDs.contains(action.id) {
                 return false
             }
             if action is GatedExtensionAction {

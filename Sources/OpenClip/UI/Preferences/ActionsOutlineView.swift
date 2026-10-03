@@ -524,6 +524,7 @@ final class ActionsOutlineCoordinator: NSObject, NSOutlineViewDataSource, NSOutl
     func rebuildTree() -> Bool {
         let actions = parent.coordinator.actions
         let groupDefs = parent.coordinator.actionGroupDefs
+        let standaloneAIIDs = parent.coordinator.standaloneAIActionIDs
 
         let needle = parent.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         func matchesAction(_ action: any Action) -> Bool {
@@ -554,7 +555,7 @@ final class ActionsOutlineCoordinator: NSObject, NSOutlineViewDataSource, NSOutl
         var seenPackages = Set<String>()
 
         for action in actions {
-            if ActionIdentity.isAIPreset(action) { continue }
+            if ActionIdentity.isAIPreset(action), !standaloneAIIDs.contains(action.id) { continue }
 
             // Custom Group parent
             if let def = groupDefs.first(where: { $0.id == action.id }) {
@@ -654,6 +655,7 @@ final class ActionsOutlineCoordinator: NSObject, NSOutlineViewDataSource, NSOutl
                         AIAction(presetID: preset.id, title: preset.title)
                     }
                 }
+                aiPresets.removeAll { standaloneAIIDs.contains($0.id) }
                 let groupMatches = needle.isEmpty || matchesAction(action)
                 let subActionNodes: [OutlineNode] = aiPresets.compactMap { preset in
                     if !needle.isEmpty && !groupMatches && !matchesAction(preset) { return nil }
@@ -902,6 +904,15 @@ final class ActionsOutlineCoordinator: NSObject, NSOutlineViewDataSource, NSOutl
             return []
         }
         let draggedIDs = draggedActionIDs(from: info)
+
+        // AI presets can return to their launcher. Other actions cannot join AI Tools.
+        if let targetNode = item as? OutlineNode, targetNode.action?.chrome.launchesAI == true,
+           index == NSOutlineViewDropOnItemIndex {
+            let allPresets = draggedIDs.allSatisfy { id in
+                parent.coordinator.actions.contains { $0.id == id && ActionIdentity.isAIPreset($0) }
+            }
+            if !draggedIDs.isEmpty && allPresets { return .move }
+        }
         let extensionOwners = Set(draggedIDs.compactMap { extensionGroupID(ofSubActionWithID: $0) })
         let dragIsAllExtensionCommands = !draggedIDs.isEmpty && extensionOwners.count > 0
             && draggedIDs.allSatisfy { extensionGroupID(ofSubActionWithID: $0) != nil }
@@ -988,6 +999,22 @@ final class ActionsOutlineCoordinator: NSObject, NSOutlineViewDataSource, NSOutl
             return false
         }
 
+        if let targetNode = item as? OutlineNode, targetNode.action?.chrome.launchesAI == true,
+           index == NSOutlineViewDropOnItemIndex {
+            let ids = draggedActionIDs(from: info)
+            guard !ids.isEmpty, ids.allSatisfy({ id in
+                parent.coordinator.actions.contains { $0.id == id && ActionIdentity.isAIPreset($0) }
+            }) else { return false }
+            parent.coordinator.setAIActionPlacement(actionIDs: ids, standalone: false)
+            expandedNodeIDs.insert(targetNode.id)
+            rebuildTree()
+            outlineView.reloadData()
+            if let updated = rootNodes.first(where: { $0.id == targetNode.id }) {
+                outlineView.expandItem(updated)
+            }
+            return true
+        }
+
         // Reordered inside its own extension group
         if let owningGroupID = extensionGroupID(ofSubActionWithID: draggedID),
            let targetNode = item as? OutlineNode,
@@ -1065,6 +1092,8 @@ final class ActionsOutlineCoordinator: NSObject, NSOutlineViewDataSource, NSOutl
             let draggedIDs = draggedActionIDs(from: info)
                 .filter { extensionGroupID(ofSubActionWithID: $0) == nil }
             guard !draggedIDs.isEmpty else { return false }
+
+            parent.coordinator.setAIActionPlacement(actionIDs: draggedIDs, standalone: true)
 
             for id in draggedIDs {
                 if let sourceGroupID = parent.coordinator.actionGroupDefs.first(where: { $0.memberActionIDs.contains(id) })?.id {

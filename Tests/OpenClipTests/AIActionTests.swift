@@ -7,6 +7,25 @@ import XCTest
 
 @MainActor
 final class AIActionTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        TestIsolation.reset()
+    }
+
+    func testStandaloneAIUsesControllerFlowWithoutDismissingItsSelection() {
+        var events: [String] = []
+        let view = PopupView(
+            actions: [AIAction(presetID: "rewrite", title: "Rewrite")],
+            context: makeContext(text: "Example"),
+            onExitSearch: { events.append("exit") },
+            onResult: { _ in events.append("ordinary result") },
+            onActionPerformed: { events.append("record:\($0)") },
+            onRunAI: { events.append("run:\($0)") }
+        )
+        view.runAIAction("ai.preset.rewrite")
+        XCTAssertEqual(events, ["record:ai.preset.rewrite", "run:ai.preset.rewrite"])
+    }
+
     private func makeContext(text: String) -> ActionContext {
         let selection = SelectionContext(
             text: text,
