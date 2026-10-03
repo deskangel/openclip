@@ -197,15 +197,15 @@ struct PopupThemeSelector: View {
 
             SettingsCard("Behavior") {
                 SettingsToggleRow(
-                    title: "Show Search All Actions",
-                    subtitle: "Show the search button at the end of the popup bar.",
+                    title: "Show Command Palette",
+                    subtitle: "Show the command palette button at the end of the popup bar.",
                     isOn: $showSearchAllActions
                 )
 
                 SettingsDivider()
 
                 SettingsRow(
-                    title: "Contextual Actions",
+                    title: "Show Contextual Actions",
                     subtitle: "Show relevant actions first based on what you select."
                 ) {
                     HStack(spacing: 8) {
@@ -229,7 +229,6 @@ struct PopupThemeSelector: View {
                         Toggle("", isOn: $contextualActionsEnabled)
                             .labelsHidden()
                             .toggleStyle(.switch)
-                            .controlSize(.small)
                             .accessibilityLabel(String(localized: "Enable Contextual Actions"))
                     }
                 }

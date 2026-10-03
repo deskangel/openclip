@@ -135,7 +135,7 @@ When an action produces text output (e.g. transformations, dictionary definition
 
 ## Popup Appearance & Theme
 
-Under **Customize → Behavior**, turn off **Show Search All Actions** to hide the ⌘ search
+Under **Customize → Behavior**, turn off **Show Command Palette** to hide the ⌘ search
 button at the end of the popup bar. The search keyboard shortcut (⌥⌘C by default) still works.
 **Reset** restores the button.
 

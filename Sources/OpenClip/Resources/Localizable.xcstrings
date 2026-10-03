@@ -16997,6 +16997,62 @@
         }
       }
     },
+    "Show Command Palette": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示命令面板"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顯示命令面板"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher la palette de commandes"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "コマンドパレットを表示"
+          }
+        }
+      }
+    },
+    "Show Contextual Actions": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示上下文操作"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顯示情境動作"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher les actions contextuelles"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "コンテキストアクションを表示"
+          }
+        }
+      }
+    },
     "Show Icon": {
       "localizations": {
         "zh-Hans": {
@@ -17329,6 +17385,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "修飾キーを押さずにテキストを選択したときもポップアップを表示します。"
+          }
+        }
+      }
+    },
+    "Show relevant actions first based on what you select.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "根据选中文本优先显示相关操作。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "根據選取文字優先顯示相關動作。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher d’abord les actions pertinentes en fonction de votre sélection."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選択したテキストに基づいて関連するアクションを優先的に表示します。"
+          }
+        }
+      }
+    },
+    "Show the command palette button at the end of the popup bar.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在弹出工具栏末尾显示命令面板按钮。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在彈出工具列末尾顯示命令面板按鈕。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher le bouton de la palette de commandes à la fin de la barre contextuelle."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ポップアップバーの末尾にコマンドパレットボタンを表示します。"
           }
         }
       }
