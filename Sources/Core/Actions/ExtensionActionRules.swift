@@ -2,7 +2,7 @@
 // OpenClip
 //
 // Holds the declarative visibility rules the factory attaches to every extension action it creates:
-// requirements (regex, app allow/deny, requiresSelection, requiredOptions) and the legacy manifest
+// requirements (input/destination, regex, app allow/deny, requiredOptions) and the legacy manifest
 // `regex`. Consumed by ActionVisibility during enablement evaluation and by perform-time match
 // plumbing.
 //

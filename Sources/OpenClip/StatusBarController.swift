@@ -8,6 +8,7 @@ import AppKit
 import SwiftUI
 import Combine
 import Core
+import KeyboardShortcuts
 
 /// Manages the menu bar status icon for OpenClip.
 @MainActor
@@ -17,7 +18,10 @@ class StatusBarController: NSObject, NSMenuDelegate {
     private var statusItem: NSStatusItem?
     private var preferencesWindow: NSWindow?
     private var preferencesToolbarController: PreferencesToolbarController?
-    private var rootMenu: NSMenu?
+    internal var rootMenu: NSMenu?
+    internal var captureTextMenuItem: NSMenuItem?
+    internal var settingsMenuItem: NSMenuItem?
+    internal var actionsMenuItem: NSMenuItem?
     internal var resumeItem: NSMenuItem?
     internal var toggleEnabledItem: NSMenuItem?
     internal var pauseAppItem: NSMenuItem?
@@ -25,6 +29,7 @@ class StatusBarController: NSObject, NSMenuDelegate {
     internal var updateMenuItem: NSMenuItem?
     internal var actionsSubmenu: NSMenu?
     internal var targetAppOverride: NSRunningApplication?
+    var onCaptureText: ((NSRunningApplication?) -> Void)?
     private var lastActiveApp: NSRunningApplication?
     internal var currentTargetApp: NSRunningApplication? {
         get { targetAppOverride ?? resolveFrontmostApp() }
@@ -163,17 +168,23 @@ class StatusBarController: NSObject, NSMenuDelegate {
         menu.addItem(NSMenuItem.separator())
 
         // Section 2: Core App Navigation
-        let prefsItem = menuItem(title: String(localized: "Settings…"), action: #selector(showPreferences as () -> Void), keyEquivalent: ",")
-        menu.addItem(prefsItem)
+        let captureItem = menuItem(title: String(localized: "Capture Text"), action: #selector(captureText))
+        captureItem.setShortcut(for: .captureText)
+        self.captureTextMenuItem = captureItem
+        menu.addItem(captureItem)
 
         let actionsMenu = NSMenu(title: String(localized: "Actions"))
         actionsMenu.delegate = self
         self.actionsSubmenu = actionsMenu
-        
+
         let actionsItem = NSMenuItem(title: String(localized: "Actions"), action: nil, keyEquivalent: "")
         actionsItem.submenu = actionsMenu
+        self.actionsMenuItem = actionsItem
         menu.addItem(actionsItem)
-        
+
+        let prefsItem = menuItem(title: String(localized: "Settings…"), action: #selector(showPreferences as () -> Void), keyEquivalent: ",")
+        self.settingsMenuItem = prefsItem
+        menu.addItem(prefsItem)
         menu.addItem(NSMenuItem.separator())
 
         // Section 3: Updates & Support
@@ -239,11 +250,23 @@ class StatusBarController: NSObject, NSMenuDelegate {
         notificationCenter.post(name: .openClipEnabledStateChanged, object: newStatus)
     }
 
+    @objc private func captureText() {
+        let app = currentTargetApp
+        DispatchQueue.main.async { [weak self] in self?.onCaptureText?(app) }
+    }
+
     // MARK: - NSMenuDelegate
 
     func menuWillOpen(_ menu: NSMenu) {
         if menu === rootMenu {
+            KeyboardShortcuts.disable(.captureText)
             updateRootMenuDynamicItems()
+        }
+    }
+
+    func menuDidClose(_ menu: NSMenu) {
+        if menu === rootMenu {
+            KeyboardShortcuts.enable(.captureText)
         }
     }
 

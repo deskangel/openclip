@@ -11,6 +11,9 @@ import SwiftUI
 import AppKit
 
 public enum PopupMetrics {
+    /// Brief arrival grace for OCR popups: recognition can take long enough that the cursor has
+    /// moved away from the original release point before the popup appears.
+    static let ocrArrivalDismissalGrace: TimeInterval = 1.0
     /// Standard width and height of an action button in the popup bar and sub-bar (normalized baseline at 1.0 scale).
     public static let actionButtonWidth: CGFloat = 34.0
     public static let barButtonHeight: CGFloat = 29.0

@@ -64,7 +64,7 @@ public struct PopupView: View {
     /// Called right before an action performs (before `onResult` can fire), so the controller can
     /// snapshot the action's declared delivery for the paste-vs-copy decision. The intent is
     /// carried explicitly so the delivery snapshot matches the perform context.
-    public let onWillPerformAction: (@MainActor (any Action, ActionResultDelivery.ClickIntent) -> Void)?
+    public let onWillPerformAction: (@MainActor (any Action, ActionResultDelivery.ClickIntent) -> Bool)?
     /// Called when a `showsLoading` bar action is clicked: the controller early-closes the popup
     /// and runs the action via the loading toast flow instead of the inline perform path. Carries
     /// the same explicit intent as `onWillPerformAction`.
@@ -202,7 +202,7 @@ public struct PopupView: View {
         onEnteredScopedSearch: (@MainActor (any Action, CGRect?) -> Void)? = nil,
         onPaginationAnchor: (@MainActor (PopupPanel.HorizontalAnchor) -> Void)? = nil,
         onActionPerformed: (@MainActor (String) -> Void)? = nil,
-        onWillPerformAction: (@MainActor (any Action, ActionResultDelivery.ClickIntent) -> Void)? = nil,
+        onWillPerformAction: (@MainActor (any Action, ActionResultDelivery.ClickIntent) -> Bool)? = nil,
         onRunLoadingAction: (@MainActor (any Action, ActionResultDelivery.ClickIntent) -> Void)? = nil,
         onRunAI: (@MainActor (String) -> Void)? = nil,
         onRunAIPrompt: (@MainActor (String, Bool, Bool) -> Void)? = nil,
@@ -921,6 +921,7 @@ public struct PopupView: View {
                 if action.chrome.launchesAI {
                     // AI Tools launcher opens scoped search palette on click; sub-bar opens on hover dwell
                     Button {
+                        guard action.isEnabled(for: context) else { return }
                         onCancelSubBarDwell?()
                         let frame = hoverFrames[.action(index)]
                         onEnteredScopedSearch?(action, frame)
@@ -950,7 +951,7 @@ public struct PopupView: View {
                             onRunLoadingAction?(action, clickIntent)
                             return
                         }
-                        onWillPerformAction?(action, clickIntent)
+                        guard onWillPerformAction?(action, clickIntent) ?? true else { return }
                         onActionPerformed?(action.id)
                         if action.chrome.isInlineResult {
                             if let resolved = modeStore.inlineResults[action.id] {

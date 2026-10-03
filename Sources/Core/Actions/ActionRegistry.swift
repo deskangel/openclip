@@ -289,14 +289,19 @@ public final class ActionRegistry: ObservableObject, Sendable {
     
     /// Context gating shared by the bar and the search palette: can this action actually perform
     /// against the current selection/app? Settings-disable state is applied separately (see
-    /// `settingsHiddenIDs`). Clipboard-fallback actions that require a live selection and
-    /// formatting actions under a deny-formatting app policy drop. An AI preset answers through
+    /// `settingsHiddenIDs`). Actions that require a live selection are excluded from clipboard/OCR
+    /// input, except explicit OCRInputAction support; OCR also excludes paste-requiring actions.
+    /// Formatting actions under a deny-formatting app policy drop. An AI preset answers through
     /// its own `isEnabled`, which reads the preset's toggle in AI settings, so a preset switched
     /// off there is not offered anywhere.
     private func canPerform(_ action: any Action, in context: ActionContext) -> Bool {
-        // Clipboard fallback is not a live selection: Copy/Cut (and any future action that
-        // reads or mutates the real selection) must not act on text that was never selected.
-        if context.selection.isClipboardFallback && action.chrome.requiresLiveSelection {
+        // Clipboard/OCR input is not an editable source selection. OCRInputAction is the explicit
+        // exception for text actions such as Copy; paste-requiring actions have no OCR target.
+        if context.selection.source == .ocr && action is any PasteRequiringAction {
+            return false
+        }
+        if context.selection.source != .selection && action.chrome.requiresLiveSelection
+            && !(context.selection.source == .ocr && action is any OCRInputAction) {
             return false
         }
         return action.isEnabled(for: context)
@@ -430,4 +435,3 @@ public final class ActionRegistry: ObservableObject, Sendable {
         }
     }
 }
-

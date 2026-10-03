@@ -16,6 +16,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     private var statusBarController: StatusBarController?
     private var selectionMonitor: (any SelectionMonitoring)?
     private var popupController: PopupWindowController?
+    private var captureTextController: CaptureTextController?
     private var aiActionSync: AIActionSync?
     private var extensionsWatcher: ExtensionsDirectoryWatcher?
 
@@ -29,6 +30,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     ) -> Bool {
         statusBarController?.showPreferences()
         return true
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        captureTextController?.cancel()
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -88,6 +93,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         DeepLinkRouter.shared.configure { [weak self] in
             self?.statusBarController?.showPreferences()
         }
+
+        LocalExtensionInstaller.shared.configure { [weak self] in
+            self?.statusBarController?.showPreferences()
+        }
         
         // Setup popup controller
         let controller = PopupWindowController()
@@ -111,6 +120,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
                 self?.popupController?.show(for: context, pasteAvailable: canPaste)
             }
         }
+        let captureController = CaptureTextController(popupController: controller)
+        captureTextController = captureController
+        macMonitor.isSuppressed = { [weak captureController] in captureController?.isCapturing ?? false }
+        statusBarController?.onCaptureText = { [weak captureController] sourceApp in
+            captureController?.toggleCapture(sourceApp: sourceApp)
+        }
         macMonitor.preparePasteProbe = { [weak self] app, policy in
             self?.popupController?.preparePasteProbe(for: app, policy: policy)
         }
@@ -124,15 +139,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         selectionMonitor = macMonitor
 
         // Setup global shortcut hotkey manager
-        HotkeyManager.shared.setup(popupController: controller, selectionMonitor: macMonitor)
+        HotkeyManager.shared.setup(popupController: controller, selectionMonitor: macMonitor, captureTextController: captureController)
+
+        let optionStore = SecretActionOptionStore()
+        ExtensionManager.shared.actionFactory = DefaultActionFactory(optionStore: optionStore)
+        ExtensionManager.shared.optionWriter = optionStore
+        ExtensionManager.shared.optionReader = optionStore
+        ExtensionManager.shared.settingsStore = DefaultSettingsStore.shared
+        CustomActionJSRunnerRegistry.runner = DefaultCustomActionJSRunner()
 
         Task {
-            let optionStore = SecretActionOptionStore()
-            ExtensionManager.shared.actionFactory = DefaultActionFactory(optionStore: optionStore)
-            ExtensionManager.shared.optionWriter = optionStore
-            ExtensionManager.shared.optionReader = optionStore
-            ExtensionManager.shared.settingsStore = DefaultSettingsStore.shared
-            CustomActionJSRunnerRegistry.runner = DefaultCustomActionJSRunner()
             await ActionCoordinator.shared.loadInitialState(
                 dictionaryLookup: DictionaryLookupFactory.systemLookup
             )
@@ -452,8 +468,20 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
 
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls {
+            if LocalExtensionInstaller.isExtensionPackageURL(url) {
+                Task { @MainActor in
+                    await LocalExtensionInstaller.shared.install(from: url)
+                }
+                continue
+            }
             DeepLinkRouter.shared.handle(url)
         }
+    }
+
+    func application(_ sender: NSApplication, openFiles filenames: [String]) {
+        let urls = filenames.map { URL(fileURLWithPath: $0) }
+        application(sender, open: urls)
+        sender.reply(toOpenOrPrint: .success)
     }
 
     // MARK: - UNUserNotificationCenterDelegate

@@ -58,7 +58,7 @@ public struct PopupSearchView: View {
     /// carried explicitly — the palette's secondary signal is `replace` (⇧⏎ / the ⇧⏎ badge), which
     /// never reaches the mouse monitor's `pendingClickIntent`, so reading live state here would
     /// deliver a keyboard secondary run as primary.
-    public let onWillPerformAction: (@MainActor (any Action, ActionResultDelivery.ClickIntent) -> Void)?
+    public let onWillPerformAction: (@MainActor (any Action, ActionResultDelivery.ClickIntent) -> Bool)?
     /// Called when a `showsLoading` palette result is selected: the controller early-closes the
     /// popup and runs the action via the loading toast flow instead of the inline perform path.
     /// Carries the same explicit intent as `onWillPerformAction`.
@@ -223,7 +223,7 @@ public struct PopupSearchView: View {
         onSaveAIPrompt: @escaping @MainActor (String, Bool) -> Void = { _, _ in },
         aiEnabled: Bool = AIServiceManager.shared.isAIEnabled,
         onActionPerformed: (@MainActor (String) -> Void)? = nil,
-        onWillPerformAction: (@MainActor (any Action, ActionResultDelivery.ClickIntent) -> Void)? = nil,
+        onWillPerformAction: (@MainActor (any Action, ActionResultDelivery.ClickIntent) -> Bool)? = nil,
         onRunLoadingAction: (@MainActor (any Action, ActionResultDelivery.ClickIntent) -> Void)? = nil,
         onClickIntent: @escaping @MainActor () -> ActionResultDelivery.ClickIntent = { .primary }
     ) {
@@ -910,6 +910,7 @@ public struct PopupSearchView: View {
         guard results.indices.contains(selectedIndex) else { return }
         let action = results[selectedIndex].action
         let activeContext = activeActionContext
+        guard action.isEnabled(for: activeContext) else { return }
         // The intent is resolved once, up front, so the perform context and the delivery snapshot
         // agree: `replace` (⇧⏎ / the ⇧⏎ badge) is the palette's own secondary signal and never
         // reaches the mouse monitor, while `onClickIntent()` carries a ⇧/right mouse-down.
@@ -927,7 +928,7 @@ public struct PopupSearchView: View {
             }
             // No loading callback wired up (e.g. a preview): fall through to the inline perform path.
         }
-        onWillPerformAction?(action, clickIntent)
+        guard onWillPerformAction?(action, clickIntent) ?? true else { return }
         onActionPerformed?(action.id)
         if action.chrome.isInlineResult {
             if let result = modeStore.inlineResults[action.id] {

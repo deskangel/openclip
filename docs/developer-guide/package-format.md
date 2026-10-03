@@ -20,6 +20,14 @@ my-extension.openclipext/
 
 ---
 
+## Installation
+
+- **Finder Double-Click**: `.openclipext` bundles are registered macOS document packages owned by OpenClip (`com.openclip.extension`). Double-clicking a `.openclipext` package (or `.openclipext.zip` archive) opens a confirmation dialog in OpenClip with package metadata, installs the package directly into `~/.openclip/extensions`, and marks it trusted.
+- **Extension Store**: Deep links (`openclip://install?id=...&url=...`) download and install verified releases.
+- **Manual / CLI**: Drop folders into `~/.openclip/extensions` or run `./Extensions/scripts/install.sh <path>`.
+
+---
+
 ## Manifest JSON Schema (`ExtensionMetadata`)
 
 OpenClip decodes extension metadata via [`ExtensionMetadata`](../../Sources/Core/Extensions/ExtensionManager.swift). To ensure backward compatibility, the decoder supports both modern camelCase keys and legacy capitalized/singular keys.
@@ -105,6 +113,16 @@ reject the package, which is then logged (category `extensions`) rather than sil
 | `secondary` | Object | Optional. Secondary-click (right-click/⇧-click) outcome: `{ "type": "copy" | "paste" | "openURL" | "toast" | "success" | "none", "value"?, "message"? }`. **Non-JS kinds only** — rejected on `javascript` (JS authors branch on `openclip.input.isSecondaryClick` in-script instead). |
 | `toast` | Object | Optional. Primary-click companion toast `{ "message": string | object, "style"?: "success" | "error" | "info" }` (default style `success`). Valid on all kinds. Message can be localized dictionary. |
 | `secondaryToast` | Object | Optional. Secondary-click companion toast (same shape as `toast`). Valid on all kinds. Dash alias: `secondary-toast`. |
+| `requirements.input` | String | Input contract: `optional`, `text` (default), `liveSelection`, or `editableSelection`. Legacy `requiresSelection`/`requires-selection` maps `true` to `text` and `false` to `optional`; do not combine legacy and new keys. |
+| `requirements.requiresPasteTarget` | Boolean | Optional destination gate. `true` requires a confirmed Paste-capable target; `false` or omission means no paste target is required, not that paste is forbidden. Dash alias: `requires-paste-target`. |
+
+`text` accepts nonblank selection, clipboard, or OCR text. `liveSelection` requires text from the
+current live selection. `editableSelection` additionally requires confirmed editability of that
+selection; unknown editability fails closed. Paste destination support is independent from input
+source, so clipboard-derived transformations can still be pasted into a confirmed destination.
+Older OpenClip releases ignore unknown manifest keys; do not publish catalog packages that rely on
+these gates until an enforcing release exists. The current source version 1.7.3 is not a confirmed
+compatibility floor, so `minOpenClipVersion` must wait for that release's version to be established.
 
 The `secondary`/`toast`/`secondaryToast` keys map onto the per-action `Action.delivery` (see
 [`Extensions/AGENTS.md` §5b](../../Extensions/AGENTS.md)); the delivery decision (Select → Probe →

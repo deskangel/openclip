@@ -1,4 +1,5 @@
 import XCTest
+@testable import Core
 @testable import OpenClip
 
 final class PopupPositionerTests: XCTestCase {
@@ -35,6 +36,68 @@ final class PopupPositionerTests: XCTestCase {
         // X: right-aligned so the last button's center sits on the release point
         XCTAssertEqual(frame.origin.x, 400 - (size.width - PopupPositioner.firstActionCenterOffset))
         XCTAssertEqual(frame.origin.y, 206)
+    }
+
+    func testOCRPopupStaysBesideTheRegionSelectionReleasePoint() {
+        let releasePoint = CGPoint(x: 620, y: 310)
+        let context = SelectionContext(
+            text: "recognized text",
+            cursorPosition: releasePoint,
+            mouseDownLocation: CGPoint(x: 560, y: 340),
+            selectionBounds: CGRect(x: 560, y: 280, width: 160, height: 90),
+            source: .ocr
+        )
+        let frame = PopupPositioner.calculateFrame(
+            for: context,
+            popupSize: CGSize(width: 180, height: 48),
+            in: CGRect(x: 0, y: 0, width: 800, height: 600),
+            alignment: .center,
+            verticalPosition: .above
+        )
+
+        XCTAssertEqual(frame.midX, releasePoint.x)
+        XCTAssertEqual(frame.minY - releasePoint.y, 6)
+        XCTAssertLessThan(frame.minY - releasePoint.y, PopupMetrics.dismissalDistance(for: screen))
+    }
+
+    func testOCRPopupUsesCurrentPointerAndNormalGapAfterRecognitionDelay() {
+        let releasePoint = CGPoint(x: 220, y: 230)
+        let currentPointer = CGPoint(x: 640, y: 390)
+        let anchor = CaptureTextPopupAnchor.resolve(
+            releasePoint: releasePoint,
+            mouseDownPoint: CGPoint(x: 180, y: 250),
+            currentPointer: currentPointer
+        )
+        let context = SelectionContext(
+            text: "recognized text",
+            cursorPosition: anchor.cursorPosition,
+            mouseDownLocation: anchor.mouseDownLocation,
+            selectionBounds: CGRect(x: 180, y: 210, width: 120, height: 80),
+            source: .ocr
+        )
+        let frame = PopupPositioner.calculateFrame(
+            for: context,
+            popupSize: CGSize(width: 180, height: 48),
+            in: screen,
+            alignment: .center,
+            verticalPosition: .above
+        )
+
+        XCTAssertEqual(anchor.cursorPosition, currentPointer)
+        XCTAssertNil(anchor.mouseDownLocation)
+        XCTAssertEqual(frame.midX, currentPointer.x)
+        XCTAssertEqual(frame.minY - currentPointer.y, 6)
+        let dx = max(0, max(frame.minX - currentPointer.x, currentPointer.x - frame.maxX))
+        let dy = max(0, max(frame.minY - currentPointer.y, currentPointer.y - frame.maxY))
+        XCTAssertEqual(hypot(dx, dy), 6)
+        XCTAssertLessThan(hypot(dx, dy), PopupMetrics.dismissalDistance(for: screen))
+    }
+
+    func testOCRArrivalGraceExpiresAndDoesNotBecomePermanent() {
+        let deadline: TimeInterval = 15
+        XCTAssertTrue(PopupDismissalGrace.isActive(now: 14.99, deadline: deadline))
+        XCTAssertFalse(PopupDismissalGrace.isActive(now: deadline, deadline: deadline))
+        XCTAssertFalse(PopupDismissalGrace.isActive(now: 30, deadline: nil))
     }
 
     // Top-to-Bottom drag: mouse released below start point -> place popup BELOW cursor to avoid covering text
@@ -237,4 +300,3 @@ final class PopupPositionerTests: XCTestCase {
         XCTAssertEqual(leftMidX, screenBounds.minX + padding + searchWidth / 2)
     }
 }
-

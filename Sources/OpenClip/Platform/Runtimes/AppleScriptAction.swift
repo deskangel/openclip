@@ -94,7 +94,9 @@ public struct AppleScriptAction: ConfigurableAction, ActionWithRules {
             appPolicy: context.selection.appPolicy,
             isClipboardFallback: context.selection.isClipboardFallback,
             html: html,
-            rtf: rtf
+            rtf: rtf,
+            isEditable: context.selection.isEditable,
+            pasteTargetAvailable: context.selection.pasteTargetAvailable
         )
 
         let escapedMatch = context.match.map { match in

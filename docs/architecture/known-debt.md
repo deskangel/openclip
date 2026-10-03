@@ -273,6 +273,33 @@ areas; stale debt notes are worse than none.
   build rather than failing at runtime). Adding Private Cloud Compute and the model-abstraction
   refactor is deferred until the toolchain is upgraded.
 
+## Screen text capture
+
+The menu bar and the dedicated ⌥⌘O shortcut start a one-shot ScreenCaptureKit capture after a
+per-screen crosshair drag. Vision performs recognition locally; captured text opens the ordinary
+action bar beside the selector's mouse-release point using the standard popup gap and
+`SelectionSource.ocr`. If the pointer moves more than eight points while recognition runs, the
+popup follows its current location and drops the stale drag-direction hint; the original capture
+region remains in `selectionBounds`. The selector closes synchronously on a valid release so the
+screen returns to normal before capture and recognition begin. A one-second arrival grace avoids
+distance-dismissal from cursor movement during recognition. Switching to another app cancels the
+pending OCR delivery.
+OCR sessions permit Copy and other actions that accept text. Extension `requirements.input` now
+separates optional input, nonblank text, a live selection, and a confirmed editable selection;
+legacy `requiresSelection` maps to `text`/`optional`. OCR satisfies `text`, while selection-bound
+requirements reject OCR and clipboard sources. `requiresPasteTarget` describes destination support
+independently from input source. At the result-delivery boundary, OCR cut/paste effects are converted
+to Copy and simulated paste is dropped, including direct and loading action paths. Actions that
+require a live or editable selection recheck the captured selection generation and target before
+their effects run. This check does not sandbox scripts or prevent arbitrary side effects authored
+inside them. Catalog manifests using the new fields must wait for the first app release that enforces
+them; the current source version (1.7.3) is not a confirmed compatibility floor. The OCR flow writes
+nothing to the pasteboard until the user chooses Copy. Screen Recording access is
+requested by the system on
+first capture; capture errors show System Settings guidance. Selection monitoring is suppressed
+and pending OCR is cancelled through the capture request token, so stale OCR results cannot
+replace a newer popup.
+
 ## Unused / Latent
 
 - **`ActionContext.modifiers` is currently unused.** No action reads it; `PopupWindowController`

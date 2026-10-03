@@ -498,7 +498,9 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
                 html: selectionHTML,
                 rtf: selectionRTF,
                 flavors: selectionFlavors,
-                selectionGeneration: self.selectionGeneration
+                selectionGeneration: self.selectionGeneration,
+                isEditable: isClipboardFallback ? false : isEditable,
+                pasteTargetAvailable: canPaste
             )
             guard !Task.isCancelled else { return }
             guard self.isSelectionSourceActive(app) else {
@@ -730,7 +732,7 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
             latestSelection = nil
             return
         }
-        let context = SelectionContext(
+        let capturedContext = SelectionContext(
             text: result.text,
             sourceApp: appIdentity,
             cursorPosition: cursor,
@@ -741,13 +743,16 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
             html: result.html,
             rtf: result.rtf,
             flavors: result.flavors,
-            selectionGeneration: selectionGeneration
+            selectionGeneration: selectionGeneration,
+            isEditable: response.isEditable,
+            pasteTargetAvailable: nil
         )
-        prewarmInlineActions(for: context)
         let canPaste = await probeTask?.value
         guard isSelectionSourceActive(app) else {
             recordRead(.init(status: Task.isCancelled ? .cancelled : .targetChanged, traceID: response.traceID)); return
         }
+        let context = capturedContext.with(pasteTargetAvailable: canPaste)
+        prewarmInlineActions(for: context)
         await InlineResultEvaluator.shared.awaitPrewarmed(timeout: 0.025)
         guard isSelectionSourceActive(app) else {
             recordRead(.init(status: Task.isCancelled ? .cancelled : .targetChanged, traceID: response.traceID)); return

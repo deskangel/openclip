@@ -1,6 +1,34 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "\"%@\" was installed successfully and is ready to use.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@”已成功安装，随时可以使用。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」已成功安裝，隨時可以使用。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "« %@ » a été installée avec succès et est prête à l’emploi."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」が正常にインストールされ、使用可能になりました。"
+          }
+        }
+      }
+    },
     "%@ (Disabled)": {
       "localizations": {
         "zh-Hans": {
@@ -1709,6 +1737,34 @@
         }
       }
     },
+    "Allow Screen Recording for OpenClip in System Settings, then reopen OpenClip.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在系统设置中允许 OpenClip 进行屏幕录制，然后重新打开 OpenClip。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "請在系統設定中允許 OpenClip 進行螢幕錄製，然後重新開啟 OpenClip。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autorisez l’enregistrement de l’écran pour OpenClip dans Réglages Système, puis rouvrez OpenClip."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "システム設定で OpenClip の画面収録を許可してから、OpenClip を再度開いてください。"
+          }
+        }
+      }
+    },
     "An alias jumps straight to an action when you type it in the palette. A hotkey runs it from anywhere.": {
       "localizations": {
         "zh-Hans": {
@@ -2265,6 +2321,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "質問する"
+          }
+        }
+      }
+    },
+    "Author: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作者：%@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作者：%@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auteur : %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作成者: %@"
           }
         }
       }
@@ -3133,6 +3217,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "タスクをキャンセル"
+          }
+        }
+      }
+    },
+    "Capture Text": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从屏幕捕获文本"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "從螢幕擷取文字"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Capturer le texte à l’écran"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "画面からテキストをキャプチャ"
+          }
+        }
+      }
+    },
+    "Capture Text Shortcut": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "捕获文本快捷键"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "擷取文字快捷鍵"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Raccourci de capture de texte"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "テキストキャプチャのショートカット"
           }
         }
       }
@@ -4565,6 +4705,62 @@
         }
       }
     },
+    "Could not capture text. Allow Screen Recording in System Settings, then try again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法捕获文本。请在系统设置中允许屏幕录制，然后重试。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法擷取文字。請在系統設定中允許螢幕錄製，然後再試一次。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de capturer le texte. Autorisez l’enregistrement de l’écran dans Réglages Système, puis réessayez."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "テキストをキャプチャできませんでした。システム設定で画面収録を許可してから、もう一度お試しください。"
+          }
+        }
+      }
+    },
+    "Could not capture this screen. Check Screen Recording access in System Settings.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法捕获此屏幕。请在系统设置中检查屏幕录制权限。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法擷取此螢幕。請在系統設定中檢查螢幕錄製權限。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de capturer cet écran. Vérifiez l’accès à l’enregistrement de l’écran dans Réglages Système."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "画面をキャプチャできませんでした。システム設定で画面収録へのアクセスを確認してください。"
+          }
+        }
+      }
+    },
     "Create": {
       "localizations": {
         "zh-Hans": {
@@ -5853,6 +6049,34 @@
         }
       }
     },
+    "Do you want to install \"%@\"?\n\n%@Extensions can run scripts and actions when you select text. Only proceed if you trust this source.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "您确定要安装“%@”吗？\n\n%@扩展可以在您选中文本时运行脚本和操作。请仅在您信任此来源时才继续。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "您確定要安裝「%@」嗎？\n\n%@擴充功能可以在您選取文字時執行指令碼與動作。請僅在您信任此來源時才繼續。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voulez-vous installer « %@ » ?\n\n%@Les extensions peuvent exécuter des scripts et des actions lorsque vous sélectionnez du texte. Ne continuez que si vous faites confiance à cette source."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」をインストールしますか？\n\n%@拡張機能は、テキストを選択したときにスクリプトやアクションを実行できます。この提供元を信頼できる場合のみ続行してください。"
+          }
+        }
+      }
+    },
     "Documentation": {
       "localizations": {
         "zh-Hans": {
@@ -6045,6 +6269,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "画像をドラッグして書き出しまたは共有"
+          }
+        }
+      }
+    },
+    "Drag to capture text · Esc to cancel": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拖动以捕获文本 · 按 Esc 取消"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拖曳以擷取文字 · 按 Esc 取消"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Faites glisser pour capturer le texte · Échap pour annuler"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ドラッグしてテキストをキャプチャ · Esc キーでキャンセル"
           }
         }
       }
@@ -7277,6 +7529,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "拡張機能のインストールに失敗しました"
+          }
+        }
+      }
+    },
+    "Extension Installed": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "扩展已安装"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "擴充功能已安裝"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Extension installée"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拡張機能がインストールされました"
+          }
+        }
+      }
+    },
+    "Extension Not Found": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未找到扩展"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找不到擴充功能"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Extension introuvable"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拡張機能が見つかりません"
           }
         }
       }
@@ -10861,6 +11169,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "応答が生成されませんでした"
+          }
+        }
+      }
+    },
+    "No text found": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未找到文本"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找不到文字"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun texte trouvé"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "テキストが見つかりません"
           }
         }
       }
@@ -15597,6 +15933,62 @@
         }
       }
     },
+    "Select a larger area": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择更大的区域"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "請選取較大的區域"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sélectionnez une zone plus grande"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "より広い範囲を選択してください"
+          }
+        }
+      }
+    },
+    "Select a screen region and recognize its text.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择屏幕区域并识别其中的文本。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選取螢幕區域並辨識其中的文字。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sélectionnez une zone de l’écran pour en reconnaître le texte."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "画面の範囲を選択してテキストを認識します。"
+          }
+        }
+      }
+    },
     "Select actions in the Actions list first to start the group with them.": {
       "localizations": {
         "zh-Hans": {
@@ -17189,6 +17581,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "アクションはポップアップバーとパレットから削除されます。"
+          }
+        }
+      }
+    },
+    "The extension package could not be found at the specified location.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在指定位置找不到扩展包。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在指定位置找不到擴充功能套件。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le paquet de l’extension est introuvable à l’emplacement indiqué."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "指定された場所に拡張機能パッケージが見つかりませんでした。"
           }
         }
       }
@@ -19069,6 +19489,34 @@
         }
       }
     },
+    "Version: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "版本：%@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "版本：%@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Version : %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "バージョン: %@"
+          }
+        }
+      }
+    },
     "Vertical Position": {
       "localizations": {
         "zh-Hans": {
@@ -19149,6 +19597,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "README を表示"
+          }
+        }
+      }
+    },
+    "View in Settings": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在设置中查看"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在設定中檢視"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher dans les Réglages"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設定で表示"
           }
         }
       }

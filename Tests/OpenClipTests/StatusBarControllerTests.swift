@@ -1,4 +1,5 @@
 import XCTest
+import KeyboardShortcuts
 @testable import Core
 @testable import OpenClip
 
@@ -31,6 +32,34 @@ final class StatusBarControllerTests: XCTestCase {
         )
 
         XCTAssertFalse(controller.isMenuBarIconVisible)
+    }
+
+    func testCaptureTextMenuItemShowsConfiguredShortcutAndIsGroupedAboveSettings() {
+        let controller = StatusBarController(
+            settingsStore: MemorySettingsStore(),
+            notificationCenter: NotificationCenter(),
+            rulesSaveURL: tempRulesURL
+        )
+        guard let captureItem = controller.captureTextMenuItem,
+              let settingsItem = controller.settingsMenuItem,
+              let actionsItem = controller.actionsMenuItem,
+              let items = controller.rootMenu?.items else {
+            return XCTFail("Expected the status menu navigation items")
+        }
+
+        XCTAssertEqual(captureItem.title, "Capture Text")
+        XCTAssertLessThan(items.firstIndex(of: captureItem)!, items.firstIndex(of: actionsItem)!)
+        XCTAssertLessThan(items.firstIndex(of: actionsItem)!, items.firstIndex(of: settingsItem)!)
+
+        let savedShortcut = KeyboardShortcuts.getShortcut(for: .captureText)
+        defer { KeyboardShortcuts.setShortcut(savedShortcut, for: .captureText) }
+
+        KeyboardShortcuts.setShortcut(.init(.x, modifiers: [.command, .option]), for: .captureText)
+        XCTAssertEqual(captureItem.keyEquivalent, "x")
+        XCTAssertEqual(captureItem.keyEquivalentModifierMask, [.command, .option])
+
+        KeyboardShortcuts.setShortcut(nil, for: .captureText)
+        XCTAssertEqual(captureItem.keyEquivalent, "")
     }
 
     func testVisibilityNotificationRemovesAndRecreatesStatusItem() {

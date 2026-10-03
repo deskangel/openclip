@@ -10,6 +10,8 @@ import Core
 
 extension KeyboardShortcuts.Name {
     public static let togglePopup = Self("togglePopup", initial: .init(.c, modifiers: [.command, .option]))
+    public static let captureText = Self("captureText", initial: .init(.o, modifiers: [.command, .option]))
+    static let cancelCaptureText = Self("cancelCaptureText", initial: .init(.escape))
 
     static func actionHotkey(_ actionID: String) -> Self {
         Self("actionHotkey.\(actionID)")
@@ -21,6 +23,7 @@ public final class HotkeyManager {
     public static let shared = HotkeyManager()
     private var lastFallbackClipboard: (changeCount: Int, text: String)?
     private weak var popupController: PopupWindowController?
+    private weak var captureTextController: CaptureTextController?
     public weak var selectionMonitor: (any SelectionMonitoring)?
     internal var retriever: SelectionRetrievalCoordinator?
     internal var frontmostPIDProvider: @MainActor @Sendable () -> pid_t? = { NSWorkspace.shared.frontmostApplication?.processIdentifier }
@@ -55,8 +58,17 @@ public final class HotkeyManager {
         popupController: PopupWindowController,
         selectionMonitor: (any SelectionMonitoring)? = nil
     ) {
+        setup(popupController: popupController, selectionMonitor: selectionMonitor, captureTextController: nil)
+    }
+
+    func setup(
+        popupController: PopupWindowController,
+        selectionMonitor: (any SelectionMonitoring)?,
+        captureTextController: CaptureTextController?
+    ) {
         self.popupController = popupController
         self.selectionMonitor = selectionMonitor
+        self.captureTextController = captureTextController
         // ⌘1…⌘9 pick a palette row. Parked until a palette opens — see PaletteRowShortcuts for why
         // they must be global hot keys rather than key equivalents on the panel.
         PaletteRowShortcuts.install { [weak popupController] row in
@@ -68,6 +80,16 @@ public final class HotkeyManager {
                 self?.handleTogglePopup()
             }
         }
+        KeyboardShortcuts.onKeyDown(for: .captureText) { [weak self] in
+            MainActor.assumeIsolated { self?.captureTextController?.toggleCapture() }
+        }
+        KeyboardShortcuts.onKeyDown(for: .cancelCaptureText) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.captureTextController?.isCapturing == true else { return }
+                self.captureTextController?.cancel()
+            }
+        }
+        KeyboardShortcuts.disable(.cancelCaptureText)
 
         ActionCoordinator.shared.$actions
             .sink { [weak self] actions in
@@ -76,6 +98,9 @@ public final class HotkeyManager {
             .store(in: &cancellables)
         registerActionHotkeys(ActionCoordinator.shared.actions)
     }
+
+    func enableCaptureCancellation() { KeyboardShortcuts.enable(.cancelCaptureText) }
+    func disableCaptureCancellation() { KeyboardShortcuts.disable(.cancelCaptureText) }
 
     public func handleTogglePopup(frontmostApp: NSRunningApplication? = NSWorkspace.shared.frontmostApplication) {
         // A second press cancels a selection read that has not presented yet.
@@ -135,7 +160,7 @@ public final class HotkeyManager {
 
     private func showSearch(for trigger: (context: SelectionContext, canPaste: Bool?)) {
         // When both the monitored selection and clipboard are empty, check whether there are any
-        // standalone actions (e.g. extensions declaring `requiresSelection: false`) available to run.
+        // standalone actions (e.g. extensions declaring `input: "optional"`) available to run.
         // If not, avoid showing an empty search palette ("No matching actions" dead end); instead,
         // surface a lightweight floating toast anchored at the mouse cursor.
         if trigger.context.text.isEmpty {
@@ -232,7 +257,8 @@ public final class HotkeyManager {
                 appPolicy: policy,
                 isClipboardFallback: isClipboardFallback,
                 html: pasteboard.string(forType: .html),
-                rtf: pasteboard.string(forType: .rtf)
+                rtf: pasteboard.string(forType: .rtf),
+                isEditable: false
             )
             return (context, nil)
         }
@@ -245,7 +271,8 @@ public final class HotkeyManager {
             selectionBounds: nil,
             timestamp: Date(),
             appPolicy: policy,
-            isClipboardFallback: false
+            isClipboardFallback: false,
+            isEditable: false
         )
         return (emptyContext, nil)
     }
@@ -439,7 +466,7 @@ public final class HotkeyManager {
             selectionFlavors = []
         }
 
-        let context = SelectionContext(
+        var context = SelectionContext(
             text: retrievedText,
             sourceApp: appIdentity,
             cursorPosition: NSEvent.mouseLocation,
@@ -450,9 +477,11 @@ public final class HotkeyManager {
             html: selectionHTML,
             rtf: selectionRTF,
             flavors: selectionFlavors,
-            selectionGeneration: generation
+            selectionGeneration: generation,
+            isEditable: isClipboardFallback ? false : read.isEditable
         )
         let canPaste = await probeTask?.value
+        context = context.with(pasteTargetAvailable: canPaste)
         guard isTriggerAuthorized() else { return denied() }
         return finish(.init(context: context, canPaste: canPaste,
             status: isClipboardFallback ? .clipboardFallback : (retrievedText.isEmpty ? .noSelection : .selection),

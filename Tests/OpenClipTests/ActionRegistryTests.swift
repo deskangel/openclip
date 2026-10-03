@@ -78,6 +78,23 @@ final class ActionRegistryTests: XCTestCase {
         XCTAssertEqual(context.selection.text, "hello")
         XCTAssertEqual(context.modifiers, .shift)
     }
+
+    @MainActor
+    func testOCRContextOffersCopyButExcludesLiveSelectionActions() {
+        let registry = ActionRegistry.shared
+        registry.register(builtIns: [CopyAction(), CutAction(), PasteAction()])
+        let selection = SelectionContext(
+            text: "recognized words",
+            sourceApp: AppIdentity(bundleIdentifier: "com.test", localizedName: "Test"),
+            source: .ocr
+        )
+        let available = registry.availableActions(for: ActionContext(selection: selection, modifiers: []))
+
+        XCTAssertTrue(available.contains { $0.id == "builtin.copy" })
+        XCTAssertFalse(available.contains { $0.id == "builtin.cut" })
+        XCTAssertFalse(available.contains { $0.id == "builtin.paste" })
+        XCTAssertEqual(selection.with(cursorPosition: CGPoint(x: 2, y: 3)).source, .ocr)
+    }
     
     @MainActor
     func testDisabledActionsAreFiltered() {
@@ -789,4 +806,3 @@ final class ActionRegistryTests: XCTestCase {
         _ = cancellable
     }
 }
-

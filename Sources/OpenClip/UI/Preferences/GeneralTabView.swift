@@ -71,6 +71,15 @@ struct GeneralTab: View {
                     ) {
                         Shortcut(for: .togglePopup)
                     }
+
+                    SettingsRow(
+                        title: "Capture Text Shortcut",
+                        subtitle: "Select a screen region and recognize its text.",
+                        systemImage: "viewfinder",
+                        plainIcon: true
+                    ) {
+                        Shortcut(for: .captureText)
+                    }
                 }
 
                 SettingsCard("Files") {

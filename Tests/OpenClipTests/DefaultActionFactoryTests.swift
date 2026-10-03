@@ -313,6 +313,34 @@ final class DefaultActionFactoryTests: XCTestCase {
     }
 
     @MainActor
+    func testFactoryAppliesInputAndPasteTargetRequirementsToExtensionActions() async {
+        let factory = DefaultActionFactory()
+        let actionMeta = ExtensionActionMetadata(
+            title: "Editable URL",
+            url: "https://example.com",
+            requirements: ActionRequirements(input: .editableSelection, requiresPasteTarget: true)
+        )
+        let manifest = ExtensionMetadata(identifier: "com.test.capabilities", name: "Capabilities", actions: [actionMeta], options: nil)
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        guard let action = await factory.createAction(metadata: actionMeta, manifest: manifest, directoryURL: tempDir, index: 0) as? URLTemplateAction else {
+            XCTFail("Expected URLTemplateAction")
+            return
+        }
+        XCTAssertTrue(action.chrome.requiresLiveSelection)
+        let editable = ActionContext(selection: SelectionContext(text: "word", source: .selection, isEditable: true, pasteTargetAvailable: true))
+        let readOnly = ActionContext(selection: SelectionContext(text: "word", source: .selection, isEditable: false, pasteTargetAvailable: true))
+        let clipboard = ActionContext(selection: SelectionContext(text: "word", source: .clipboard, pasteTargetAvailable: true))
+        let noPasteTarget = ActionContext(selection: SelectionContext(text: "word", source: .selection, isEditable: true, pasteTargetAvailable: false))
+        XCTAssertTrue(action.isEnabled(for: editable))
+        XCTAssertFalse(action.isEnabled(for: readOnly))
+        XCTAssertFalse(action.isEnabled(for: clipboard))
+        XCTAssertFalse(action.isEnabled(for: noPasteTarget))
+    }
+
+    @MainActor
     func testFactoryAttachesRulesToScriptFileAction() async {
         let factory = DefaultActionFactory()
         let actionMeta = ExtensionActionMetadata(
