@@ -33,8 +33,8 @@ final class SettingsStoreTests: XCTestCase {
     }
 
     @MainActor
-    func testContextualPillPositionDefaultsToLeft() {
-        XCTAssertEqual(store.get(.contextualPillPosition), "left")
+    func testContextualPillPositionDefaultsToAuto() {
+        XCTAssertEqual(store.get(.contextualPillPosition), "auto")
         store.set(.contextualPillPosition, value: "right")
         XCTAssertEqual(store.get(.contextualPillPosition), "right")
     }

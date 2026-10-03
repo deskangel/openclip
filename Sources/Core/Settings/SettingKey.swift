@@ -143,7 +143,7 @@ public extension SettingKey where Value == Data? {
 
 public extension SettingKey where Value == String {
     /// Which side of the main bar the contextual actions island sits on; see `ContextualPillPosition`.
-    static var contextualPillPosition: SettingKey<String> { SettingKey<String>("contextualPillPosition", defaultValue: ContextualPillPosition.left.rawValue) }
+    static var contextualPillPosition: SettingKey<String> { SettingKey<String>("contextualPillPosition", defaultValue: ContextualPillPosition.auto.rawValue) }
     static var calendarProvider: SettingKey<String> { SettingKey<String>("action.calendar.provider", defaultValue: "native") }
     static var searchURL: SettingKey<String> { SettingKey<String>("action.search.url", defaultValue: "https://www.google.com/search?q={query}") }
 

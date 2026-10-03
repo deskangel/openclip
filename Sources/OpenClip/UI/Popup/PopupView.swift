@@ -361,7 +361,7 @@ public struct PopupView: View {
 
     /// True when the contextual island is drawn after (to the right of) the standard island.
     private var contextualIslandTrailing: Bool {
-        let position = ContextualPillPosition(rawValue: contextualPillPosition) ?? .left
+        let position = ContextualPillPosition(rawValue: contextualPillPosition) ?? .auto
         return position.isTrailing(for: PopupBarAlignment(rawValue: popupAlignment) ?? .left)
     }
 
