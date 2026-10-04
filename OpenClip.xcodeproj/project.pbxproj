@@ -2530,8 +2530,8 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/ganeshmshetty/OpenSelection.git";
 			requirement = {
-				kind = revision;
-				revision = 918a1cae87b3a80bf7abf76e76373eb56c6c3610;
+				kind = exactVersion;
+				version = 2.15.2;
 			};
 		};
 		6F6B418BC685195C47AA367E /* XCRemoteSwiftPackageReference "SDWebImageSVGCoder" */ = {

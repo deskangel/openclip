@@ -110,7 +110,7 @@ targets:
 packages:
   OpenSelection:
     url: https://github.com/ganeshmshetty/OpenSelection.git
-    revision: 918a1cae87b3a80bf7abf76e76373eb56c6c3610
+    exactVersion: 2.15.2
   KeyboardShortcuts:
     url: https://github.com/sindresorhus/KeyboardShortcuts
     from: 3.1.0
