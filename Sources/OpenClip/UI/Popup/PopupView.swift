@@ -164,6 +164,8 @@ public struct PopupView: View {
     @State private var tooltipPresenter = TooltipPresenter()
 
     private var scale: CGFloat { PopupMetrics.scaleMultiplier(for: popupScale) }
+    @Namespace private var hoverHighlightNamespace
+
     private var buttonWidth: CGFloat { PopupMetrics.actionButtonWidth * scale }
     private var chevronWidth: CGFloat { 29 * scale }
     private var barButtonHeight: CGFloat { PopupMetrics.barButtonHeight * scale }
@@ -732,6 +734,7 @@ public struct PopupView: View {
                 completionButton(word: word, index: index, isHovered: isHovered)
             }
         }
+        .animation(.spring(response: 0.16, dampingFraction: 0.88), value: hoveredTarget)
         .fixedSize()
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     }
@@ -744,9 +747,10 @@ public struct PopupView: View {
                 let index = contextualIslandTrailing ? pagedStandardActions.count + offset : offset
                 let isDirectlyHovered = hoveredTarget == .action(index)
                 let isActiveParent = modeStore.activeSubGroupID == action.id && !isDirectlyHovered
-                actionButton(action: action, index: index, isHovered: isDirectlyHovered, isActiveParent: isActiveParent)
+                actionButton(action: action, index: index, isHovered: isDirectlyHovered, isActiveParent: isActiveParent, leadingEdge: index == 0, trailingEdge: index == contextualActions.count - 1)
             }
         }
+        .animation(.spring(response: 0.16, dampingFraction: 0.88), value: hoveredTarget)
         .fixedSize()
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .popupCardChrome(
@@ -771,7 +775,7 @@ public struct PopupView: View {
                 let index = contextualIslandTrailing ? offset : contextualActions.count + offset
                 let isDirectlyHovered = hoveredTarget == .action(index)
                 let isActiveParent = modeStore.activeSubGroupID == action.id && !isDirectlyHovered
-                actionButton(action: action, index: index, isHovered: isDirectlyHovered, isActiveParent: isActiveParent)
+                actionButton(action: action, index: index, isHovered: isDirectlyHovered, isActiveParent: isActiveParent, leadingEdge: offset == 0 && !hasCompletions, trailingEdge: offset == pagedStandardActions.count - 1 && !hasLeftChevron && !hasRightChevron && !showSearchAllActions)
             }
 
             // Sparkles AI launcher is a normal action row (chrome.launchesAI); it paginates with
@@ -801,9 +805,9 @@ public struct PopupView: View {
                 } label: {
                     Image(systemName: "command")
                         .font(.system(size: 13 * scale, weight: .regular))
-                        .foregroundColor(isHovered ? .white : affordanceForeground)
+                        .foregroundColor(affordanceForeground)
                         .frame(width: buttonWidth, height: barButtonHeight)
-                        .background(isHovered ? Color.accentColor : Color.clear)
+                        .popupBarHighlight(isHovered ? PopupThemeModel.barHoverFill : .clear, scale: scale, trailingEdge: true, isHovered: isHovered, namespace: hoverHighlightNamespace)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Search all actions")
@@ -813,6 +817,7 @@ public struct PopupView: View {
                 }
             }
         }
+        .animation(.spring(response: 0.16, dampingFraction: 0.88), value: hoveredTarget)
         .fixedSize()
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .popupCardChrome(
@@ -835,11 +840,11 @@ public struct PopupView: View {
                 .font(.system(size: 13 * scale, weight: .regular))
                 .lineLimit(1)
                 .truncationMode(.tail)
-                .foregroundColor(isHovered ? .white : restForeground)
+                .foregroundColor(restForeground)
                 .frame(maxWidth: 154 * scale)
                 .padding(.horizontal, 11 * scale)
                 .frame(minWidth: buttonWidth, minHeight: barButtonHeight)
-                .background(isHovered ? Color.accentColor : Color.clear)
+                .popupBarHighlight(isHovered ? PopupThemeModel.barHoverFill : .clear, scale: scale, trailingEdge: index == cachedCompletions.count - 1, isHovered: isHovered, namespace: hoverHighlightNamespace)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -853,12 +858,12 @@ public struct PopupView: View {
     // MARK: - Unified Action Button
 
     @ViewBuilder
-    private func actionButton(action: any Action, index: Int, isHovered: Bool, isActiveParent: Bool = false) -> some View {
+    private func actionButton(action: any Action, index: Int, isHovered: Bool, isActiveParent: Bool = false, leadingEdge: Bool = false, trailingEdge: Bool = false) -> some View {
         let restForeground = PopupThemeModel.restForeground(for: effectiveTheme)
 
         let backgroundColor: Color = {
             if isHovered {
-                return Color.accentColor
+                return PopupThemeModel.barHoverFill
             } else if isActiveParent {
                 return effectiveColorScheme == .dark ? Color.white.opacity(0.14) : Color.black.opacity(0.08)
             } else {
@@ -866,7 +871,7 @@ public struct PopupView: View {
             }
         }()
 
-        let foregroundColor: Color = isHovered ? .white : restForeground
+        let foregroundColor: Color = restForeground
 
         let isGroup = action.gesturePolicy.singleClick == .openSubActions || action.chrome.launchesAI
         let subBarAbove = modeStore.subBarAbove
@@ -881,7 +886,7 @@ public struct PopupView: View {
                     .frame(maxWidth: PopupMetrics.inlineResultMaxWidth * scale)
                     .padding(.horizontal, PopupMetrics.inlineResultHorizontalPadding * scale)
                     .frame(minWidth: buttonWidth, minHeight: barButtonHeight)
-                    .background(backgroundColor)
+                    .popupBarHighlight(backgroundColor, scale: scale, leadingEdge: leadingEdge, trailingEdge: trailingEdge, isHovered: isHovered, namespace: hoverHighlightNamespace)
                     .transition(.opacity)
             } else {
                 iconView(for: action.displayIcon(using: presenter))
@@ -891,7 +896,7 @@ public struct PopupView: View {
                         return 0.0
                     }())
                     .frame(minWidth: buttonWidth, minHeight: barButtonHeight)
-                    .background(backgroundColor)
+                    .popupBarHighlight(backgroundColor, scale: scale, leadingEdge: leadingEdge, trailingEdge: trailingEdge, isHovered: isHovered, namespace: hoverHighlightNamespace)
                     .overlay(alignment: subBarAbove ? .top : .bottom) {
                         if isGroup {
                             GroupIndicatorTriangle(pointingUp: subBarAbove)
@@ -1049,9 +1054,9 @@ public struct PopupView: View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.system(size: 12 * scale, weight: .medium))
-                .foregroundColor(isHovered ? .white : PopupThemeModel.restForeground(for: effectiveTheme))
+                .foregroundColor(PopupThemeModel.restForeground(for: effectiveTheme))
                 .frame(width: chevronWidth, height: barButtonHeight)
-                .background(isHovered ? Color.accentColor : Color.clear)
+                .popupBarHighlight(isHovered ? PopupThemeModel.barHoverFill : .clear, scale: scale, leadingEdge: systemImage == "chevron.up" || systemImage == "chevron.down", trailingEdge: !showSearchAllActions && (systemImage == "chevron.right" || (systemImage == "chevron.left" && !hasRightChevron)), isHovered: isHovered, namespace: hoverHighlightNamespace)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

@@ -147,6 +147,8 @@ areas; stale debt notes are worse than none.
 
 ## Action-Search Palette & Popup Growth
 
+- **Action bar hover chrome** uses a rounded accent highlight blended 15% toward white inset by 2 scaled points horizontally for interior buttons, 3 for end buttons, and 3 vertically, shared by the main and sub-action bars. Interior corners use a 7-point radius; outer edge corners use 10 points (both scaled). Foregrounds and full button hit areas stay unchanged; The highlight slides between hovered buttons with a quick spring (0.16 s response, 0.88 damping) and an 80 ms opacity fade on entry/exit; search chrome is unchanged.
+
 - **AI presets can leave AI Tools.** `SettingKey.standaloneAIActionIDs` records presets dragged
   to the Actions list's root. Their canonical IDs participate in `action.order`, survive preset
   reconciliation, and appear directly in the popup. AI Tools excludes those presets from its

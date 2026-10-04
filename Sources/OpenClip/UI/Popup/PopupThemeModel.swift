@@ -60,6 +60,11 @@ enum PopupThemeModel {
         }
     }
 
+    /// Temporary lighter version of the original accent hover fill.
+    static var barHoverFill: Color {
+        Color(nsColor: NSColor.controlAccentColor.blended(withFraction: 0.15, of: .white) ?? .controlAccentColor)
+    }
+
     /// The secondary foreground color (hints, badges) for the given effective theme token.
     static func restSecondary(for effectiveTheme: String) -> Color {
         switch effectiveTheme {
@@ -471,5 +476,40 @@ public extension View {
         colorScheme: ColorScheme
     ) -> some View {
         modifier(PopupCardChromeModifier(cornerRadius: cornerRadius, effectiveTheme: effectiveTheme, colorScheme: colorScheme))
+    }
+}
+
+// MARK: - Action Bar Highlight
+
+extension View {
+    /// Search-style neutral highlight; inset chrome preserves the full button hit area.
+    func popupBarHighlight(
+        _ fill: Color,
+        scale: CGFloat,
+        leadingEdge: Bool = false,
+        trailingEdge: Bool = false,
+        isHovered: Bool,
+        namespace: Namespace.ID
+    ) -> some View {
+        let shape = UnevenRoundedRectangle(
+            topLeadingRadius: (leadingEdge ? 10 : 7) * scale,
+            bottomLeadingRadius: (leadingEdge ? 10 : 7) * scale,
+            bottomTrailingRadius: (trailingEdge ? 10 : 7) * scale,
+            topTrailingRadius: (trailingEdge ? 10 : 7) * scale,
+            style: .continuous
+        )
+        return background {
+            Group {
+                if isHovered {
+                    shape.fill(fill)
+                        .matchedGeometryEffect(id: "barHover", in: namespace)
+                        .transition(.opacity.animation(.easeInOut(duration: 0.08)))
+                } else {
+                    shape.fill(fill)
+                }
+            }
+            .padding(.horizontal, (leadingEdge || trailingEdge ? 3 : 2) * scale)
+            .padding(.vertical, 3 * scale)
+        }
     }
 }

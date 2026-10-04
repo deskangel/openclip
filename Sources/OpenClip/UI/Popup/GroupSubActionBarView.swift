@@ -24,6 +24,7 @@ public struct GroupSubActionBarView: View {
     public let effectiveTheme: String
     public let hoveredTarget: PopupHoverTarget?
     public let scale: CGFloat
+    @Environment(\.colorScheme) private var effectiveColorScheme
     @Binding public var currentPage: Int
     private let hoverState: SubBarHoverState
     /// Shared popup mode store: the sub-bar reads `inlineResults` from it so a child action with
@@ -31,6 +32,8 @@ public struct GroupSubActionBarView: View {
     @ObservedObject private var modeStore: PopupModeStore
 
     @Setting(SettingKey.popupPageSize) private var pageSize
+
+    @Namespace private var hoverHighlightNamespace
 
     private var buttonWidth: CGFloat { PopupMetrics.actionButtonWidth * scale }
     private var barButtonHeight: CGFloat { PopupMetrics.barButtonHeight * scale }
@@ -182,6 +185,7 @@ public struct GroupSubActionBarView: View {
                 }
             }
         }
+        .animation(.spring(response: 0.16, dampingFraction: 0.88), value: hoveredTarget)
         .fixedSize()
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .onChange(of: totalPages) { _, count in
@@ -193,8 +197,8 @@ public struct GroupSubActionBarView: View {
     @ViewBuilder
     private func subActionButton(action: any Action, index: Int, isHovered: Bool) -> some View {
         let restForeground = PopupThemeModel.restForeground(for: effectiveTheme)
-        let foregroundColor: Color = isHovered ? .white : restForeground
-        let backgroundColor: Color = isHovered ? Color.accentColor : Color.clear
+        let foregroundColor: Color = restForeground
+        let backgroundColor: Color = isHovered ? PopupThemeModel.barHoverFill : Color.clear
 
         // Mirrors the main bar: an inline-result action swaps its icon for the computed text once
         // `InlineResultEvaluator` publishes a result, truncating at the shared width cap.
@@ -208,7 +212,7 @@ public struct GroupSubActionBarView: View {
                     .frame(maxWidth: PopupMetrics.inlineResultMaxWidth * scale)
                     .padding(.horizontal, PopupMetrics.inlineResultHorizontalPadding * scale)
                     .frame(minWidth: buttonWidth, minHeight: barButtonHeight)
-                    .background(backgroundColor)
+                    .popupBarHighlight(backgroundColor, scale: scale, leadingEdge: index == 0, trailingEdge: index == pagedSubActions.count - 1 && !hasLeftChevron && !hasRightChevron, isHovered: isHovered, namespace: hoverHighlightNamespace)
                     .transition(.opacity)
             } else {
                 ActionIconView(icon: action.displayIcon(using: presenter), size: 13.5, scale: scale)
@@ -218,7 +222,7 @@ public struct GroupSubActionBarView: View {
                         return 0.0
                     }())
                     .frame(minWidth: buttonWidth, maxWidth: 130 * scale, minHeight: barButtonHeight)
-                    .background(backgroundColor)
+                    .popupBarHighlight(backgroundColor, scale: scale, leadingEdge: index == 0, trailingEdge: index == pagedSubActions.count - 1 && !hasLeftChevron && !hasRightChevron, isHovered: isHovered, namespace: hoverHighlightNamespace)
                     .transition(.opacity)
             }
         }
@@ -316,9 +320,9 @@ public struct GroupSubActionBarView: View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.system(size: 11 * scale, weight: .semibold))
-                .foregroundColor(isHovered ? .white : restForeground)
+                .foregroundColor(restForeground)
                 .frame(width: 29 * scale, height: barButtonHeight)
-                .background(isHovered ? Color.accentColor : Color.clear)
+                .popupBarHighlight(isHovered ? PopupThemeModel.barHoverFill : .clear, scale: scale, trailingEdge: systemImage == "chevron.right" || !hasRightChevron, isHovered: isHovered, namespace: hoverHighlightNamespace)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
