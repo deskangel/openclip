@@ -39,6 +39,24 @@ public enum PopupBarAlignment: String, Codable, CaseIterable, Sendable {
     case right
 }
 
+/// Which side of the main bar the contextual actions island sits on ("auto" | "left" | "right").
+/// `auto` follows the bar's horizontal alignment: a right-aligned bar puts the island on the
+/// right, a left- or center-aligned bar keeps it on the left.
+public enum ContextualPillPosition: String, Codable, CaseIterable, Sendable {
+    case auto
+    case left
+    case right
+
+    /// True when the island should be drawn after (to the right of) the standard island.
+    public func isTrailing(for alignment: PopupBarAlignment) -> Bool {
+        switch self {
+        case .left: return false
+        case .right: return true
+        case .auto: return alignment == .right
+        }
+    }
+}
+
 /// Vertical placement mode of the popup bar relative to the cursor/selection ("auto" | "above" | "below").
 public enum PopupVerticalPosition: String, Codable, CaseIterable, Sendable {
     case auto
@@ -136,6 +154,8 @@ public extension SettingKey where Value == Data? {
 }
 
 public extension SettingKey where Value == String {
+    /// Which side of the main bar the contextual actions island sits on; see `ContextualPillPosition`.
+    static var contextualPillPosition: SettingKey<String> { SettingKey<String>("contextualPillPosition", defaultValue: ContextualPillPosition.auto.rawValue) }
     static var calendarProvider: SettingKey<String> { SettingKey<String>("action.calendar.provider", defaultValue: "native") }
     static var searchURL: SettingKey<String> { SettingKey<String>("action.search.url", defaultValue: "https://www.google.com/search?q={query}") }
 

@@ -761,5 +761,8 @@
   "Appear on Selection is on": "已開啟選取時顯示",
   "Appear on Selection is off": "已關閉選取時顯示",
   "Choose when the popup appears after selecting text.": "選擇選取文字後彈出視窗何時顯示。",
-  "Drag to reorder. To move a preset onto the main popup bar, drag it out of AI Tools in the Actions list.": "拖曳以重新排序。若要將預設移至主彈出工具列，請在動作列表中將其拖出 AI 工具。"
+  "Drag to reorder. To move a preset onto the main popup bar, drag it out of AI Tools in the Actions list.": "拖曳以重新排序。若要將預設移至主彈出工具列，請在動作列表中將其拖出 AI 工具。",
+  "Contextual Pill": "情境膠囊",
+  "Show contextual actions to the left or right of the main bar. Auto follows the horizontal position.": "在主列的左側或右側顯示情境動作。「自動」會跟隨水平位置。",
+  "Contextual Pill Position": "情境膠囊位置"
 }

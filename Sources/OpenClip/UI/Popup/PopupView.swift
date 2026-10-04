@@ -105,6 +105,8 @@ public struct PopupView: View {
     @Setting(SettingKey.showSearchAllActions) private var showSearchAllActions
     @Setting(SettingKey.contextualActionsEnabled) private var contextualActionsEnabled
     @Setting(SettingKey.disabledContextualActionIDs) private var disabledContextualIDs
+    @Setting(SettingKey.contextualPillPosition) private var contextualPillPosition
+    @Setting(SettingKey.popupAlignment) private var popupAlignment
     @Environment(\.colorScheme) private var colorScheme
 
     private var themeCategory: PopupThemeModel.Category {
@@ -358,8 +360,15 @@ public struct PopupView: View {
         return p[clamped]
     }
 
+    /// True when the contextual island is drawn after (to the right of) the standard island.
+    private var contextualIslandTrailing: Bool {
+        let position = ContextualPillPosition(rawValue: contextualPillPosition) ?? .auto
+        return position.isTrailing(for: PopupBarAlignment(rawValue: popupAlignment) ?? .left)
+    }
+
+    /// Bar actions in left-to-right order; `.action(index)` hover targets index into this list.
     private var visibleBarActions: [any Action] {
-        contextualActions + pagedStandardActions
+        contextualIslandTrailing ? pagedStandardActions + contextualActions : contextualActions + pagedStandardActions
     }
 
     private var hasLeftChevron: Bool { currentPage > 0 }
@@ -496,9 +505,15 @@ public struct PopupView: View {
                 .environment(\.colorScheme, effectiveColorScheme)
         } else {
             HStack(spacing: islandGap) {
-                contextualIsland
-                standardIsland
-                    .overlay(processingGlowBorder)
+                if contextualIslandTrailing {
+                    standardIsland
+                        .overlay(processingGlowBorder)
+                    contextualIsland
+                } else {
+                    contextualIsland
+                    standardIsland
+                        .overlay(processingGlowBorder)
+                }
             }
             .environment(\.colorScheme, effectiveColorScheme)
         }
@@ -725,7 +740,8 @@ public struct PopupView: View {
 
     private var contextualIsland: some View {
         HStack(spacing: 0) {
-            ForEach(Array(contextualActions.enumerated()), id: \.element.id) { index, action in
+            ForEach(Array(contextualActions.enumerated()), id: \.element.id) { offset, action in
+                let index = contextualIslandTrailing ? pagedStandardActions.count + offset : offset
                 let isDirectlyHovered = hoveredTarget == .action(index)
                 let isActiveParent = modeStore.activeSubGroupID == action.id && !isDirectlyHovered
                 actionButton(action: action, index: index, isHovered: isDirectlyHovered, isActiveParent: isActiveParent)
@@ -752,7 +768,7 @@ public struct PopupView: View {
             }
 
             ForEach(Array(pagedStandardActions.enumerated()), id: \.element.id) { offset, action in
-                let index = contextualActions.count + offset
+                let index = contextualIslandTrailing ? offset : contextualActions.count + offset
                 let isDirectlyHovered = hoveredTarget == .action(index)
                 let isActiveParent = modeStore.activeSubGroupID == action.id && !isDirectlyHovered
                 actionButton(action: action, index: index, isHovered: isDirectlyHovered, isActiveParent: isActiveParent)

@@ -761,5 +761,8 @@
   "Appear on Selection is on": "L’affichage lors de la sélection est activé",
   "Appear on Selection is off": "L’affichage lors de la sélection est désactivé",
   "Choose when the popup appears after selecting text.": "Choisissez quand le pop-up s’affiche après la sélection de texte.",
-  "Drag to reorder. To move a preset onto the main popup bar, drag it out of AI Tools in the Actions list.": "Faites glisser pour réorganiser. Pour placer un préréglage sur la barre contextuelle principale, faites-le glisser hors des outils IA dans la liste des actions."
+  "Drag to reorder. To move a preset onto the main popup bar, drag it out of AI Tools in the Actions list.": "Faites glisser pour réorganiser. Pour placer un préréglage sur la barre contextuelle principale, faites-le glisser hors des outils IA dans la liste des actions.",
+  "Contextual Pill": "Pastille contextuelle",
+  "Show contextual actions to the left or right of the main bar. Auto follows the horizontal position.": "Afficher les actions contextuelles à gauche ou à droite de la barre principale. Auto suit la position horizontale.",
+  "Contextual Pill Position": "Position de la pastille contextuelle"
 }

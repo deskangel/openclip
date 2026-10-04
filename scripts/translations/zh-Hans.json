@@ -761,5 +761,8 @@
   "Appear on Selection is on": "已开启选中时显示",
   "Appear on Selection is off": "已关闭选中时显示",
   "Choose when the popup appears after selecting text.": "选择选中文本后弹窗何时显示。",
-  "Drag to reorder. To move a preset onto the main popup bar, drag it out of AI Tools in the Actions list.": "拖动以重新排序。要将预设移到主弹出工具栏，请在操作列表中将其拖出 AI 工具。"
+  "Drag to reorder. To move a preset onto the main popup bar, drag it out of AI Tools in the Actions list.": "拖动以重新排序。要将预设移到主弹出工具栏，请在操作列表中将其拖出 AI 工具。",
+  "Contextual Pill": "上下文胶囊",
+  "Show contextual actions to the left or right of the main bar. Auto follows the horizontal position.": "在主栏的左侧或右侧显示上下文操作。“自动”会跟随水平位置。",
+  "Contextual Pill Position": "上下文胶囊位置"
 }

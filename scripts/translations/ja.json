@@ -761,5 +761,8 @@
   "Appear on Selection is on": "「テキスト選択時に表示」はオンです",
   "Appear on Selection is off": "「テキスト選択時に表示」はオフです",
   "Choose when the popup appears after selecting text.": "テキスト選択後にポップアップを表示するタイミングを選択します。",
-  "Drag to reorder. To move a preset onto the main popup bar, drag it out of AI Tools in the Actions list.": "ドラッグして並べ替えます。プリセットをメインのポップアップバーに移動するには、アクション一覧の AI ツールから外へドラッグしてください。"
+  "Drag to reorder. To move a preset onto the main popup bar, drag it out of AI Tools in the Actions list.": "ドラッグして並べ替えます。プリセットをメインのポップアップバーに移動するには、アクション一覧の AI ツールから外へドラッグしてください。",
+  "Contextual Pill": "コンテキストピル",
+  "Show contextual actions to the left or right of the main bar. Auto follows the horizontal position.": "コンテキストアクションをメインバーの左側または右側に表示します。自動では水平位置に合わせます。",
+  "Contextual Pill Position": "コンテキストピルの位置"
 }
