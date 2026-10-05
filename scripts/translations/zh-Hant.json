@@ -524,6 +524,7 @@
   "Drag to reorder the actions behind this extension's icon.": "拖曳可重新排列此擴充功能圖示下的操作。",
   "Enable AI Tools": "啟用 AI 工具",
   "Example: com.apple.Terminal. Use * to match several apps.": "例如：com.apple.Terminal。使用 * 比對多個 App。",
+  "Use process:<name> or path:<executable> to target apps without a bundle ID. Use * to match several apps.": "使用 process:<name> 或 path:<executable> 指定沒有 Bundle ID 的應用程式。使用 * 比對多個 App。",
   "Extension Removed": "已移除擴充功能",
   "Its files and settings are deleted from this Mac.": "其檔案和設定將從這台 Mac 上刪除。",
   "Keep": "保留",

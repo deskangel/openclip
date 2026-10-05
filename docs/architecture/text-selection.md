@@ -115,7 +115,7 @@ Both copy modes run through [`PasteboardCopyEngine`](../../Sources/OpenClip/Plat
 
 ### Per-app routing (default catalog)
 
-`DefaultAppRules.catalog` assigns modes to app groups; `RuleEngine.resolvePolicies` matches the frontmost app's bundle id (with `.*` prefix / `*` wildcards) against default + user rules. User rules in `~/.openclip/rules.json` override per-key — see `docs/user-guide/app-rules.md` for the JSON keys.
+`DefaultAppRules.catalog` assigns modes to app groups; `RuleEngine.resolvePolicies` matches the frontmost app's identity (bundle ID, or a `process:`/`path:` identifier for bundle-less apps) against default + user rules (with `.*` prefix / `*` wildcards). User rules in `~/.openclip/rules.json` override per-key — see `docs/user-guide/app-rules.md` for the JSON keys.
 
 | Group | Target Application Category | Mode |
 | :--- | :--- | :--- |

@@ -524,6 +524,7 @@
   "Drag to reorder the actions behind this extension's icon.": "Faites glisser pour réordonner les actions regroupées sous l'icône de cette extension.",
   "Enable AI Tools": "Activer les Outils IA",
   "Example: com.apple.Terminal. Use * to match several apps.": "Exemple : com.apple.Terminal. Utilisez * pour cibler plusieurs apps.",
+  "Use process:<name> or path:<executable> to target apps without a bundle ID. Use * to match several apps.": "Utilisez process:<name> ou path:<executable> pour cibler les apps sans identifiant de bundle. Utilisez * pour cibler plusieurs apps.",
   "Extension Removed": "Extension supprimée",
   "Its files and settings are deleted from this Mac.": "Ses fichiers et ses réglages sont supprimés de ce Mac.",
   "Keep": "Conserver",

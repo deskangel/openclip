@@ -10,7 +10,8 @@ extension AppIdentity {
         self.init(
             bundleIdentifier: app.bundleIdentifier,
             localizedName: app.localizedName,
-            processIdentifier: app.processIdentifier
+            processIdentifier: app.processIdentifier,
+            executablePath: app.executableURL?.path
         )
     }
 }

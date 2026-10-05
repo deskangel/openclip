@@ -38,9 +38,7 @@ extension SelectionMonitoring {
         if let targetPID = app.processIdentifier, let sourcePID = latest.context.sourceApp.processIdentifier {
             guard targetPID == sourcePID else { return nil }
         }
-        guard let targetBundle = app.bundleIdentifier, latest.context.sourceApp.bundleIdentifier == targetBundle else {
-            return nil
-        }
+        guard app.isSameApp(as: latest.context.sourceApp) else { return nil }
         guard Date().timeIntervalSince(latest.context.timestamp) <= Constants.selectionMaxAge else {
             return nil
         }
