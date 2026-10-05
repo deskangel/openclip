@@ -58,7 +58,7 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
     /// reads AppKit live, tests force it true.
     internal var primaryButtonPressed: @MainActor () -> Bool = { NSEvent.pressedMouseButtons & 1 != 0 }
     internal var now: @MainActor () -> Date = { Date() }
-    internal lazy var retriever = SelectionRetrievalCoordinator(configuration: .default, detailedCopyCapture: { [weak self] request in
+    internal lazy var retriever = SelectionRetrievalCoordinator(configuration: .openClipDefault, detailedCopyCapture: { [weak self] request in
         guard let self else { return SelectionReadResponse(status: .cancelled) }
         return await self.captureAutomaticCopyResponse(request)
     })
