@@ -63,8 +63,17 @@ private struct AppRuleRowView: View {
     let onUpdate: (AppRule) -> Void
     let onDelete: () -> Void
 
-    private var bundleID: String {
+    private var identifier: String {
         rule.bundleIdentifiers.first ?? String(localized: "Unknown App")
+    }
+
+    private var displayName: String {
+        for prefix in [DefaultAppRules.processNamePrefix, DefaultAppRules.executablePathPrefix] where identifier.hasPrefix(prefix) {
+            let rest = String(identifier.dropFirst(prefix.count))
+            let name = URL(fileURLWithPath: rest).lastPathComponent
+            return name.isEmpty ? rest : name
+        }
+        return identifier
     }
 
     private var isDisabled: Bool {
@@ -82,30 +91,30 @@ private struct AppRuleRowView: View {
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
             // App Icon
-            if let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
+            if let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: identifier) {
                 Image(nsImage: NSWorkspace.shared.icon(forFile: appURL.path))
                     .resizable()
                     .frame(width: 28, height: 28)
                     .opacity(isDisabled ? 0.5 : 1.0)
             } else {
-                Image(systemName: bundleID.contains("*") ? "asterisk.circle" : "app.dashed")
+                Image(systemName: identifier.contains("*") ? "asterisk.circle" : "app.dashed")
                     .font(.system(size: 24))
                     .foregroundColor(.secondary)
                     .opacity(isDisabled ? 0.5 : 1.0)
             }
 
-            // App Title & Bundle ID
+            // App Title & Identifier
             VStack(alignment: .leading, spacing: 2) {
-                if let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID),
+                if let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: identifier),
                    let bundle = Bundle(url: appURL),
                    let appName = bundle.object(forInfoDictionaryKey: "CFBundleName") as? String ?? bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String {
                     Text(appName)
                         .foregroundStyle(isDisabled ? .secondary : .primary)
-                    Text(bundleID)
+                    Text(identifier)
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 } else {
-                    Text(bundleID)
+                    Text(displayName)
                         .foregroundStyle(isDisabled ? .secondary : .primary)
                 }
             }

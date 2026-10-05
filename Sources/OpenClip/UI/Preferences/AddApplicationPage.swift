@@ -27,14 +27,16 @@ public struct AddApplicationPage: View {
         }
 
         for app in NSWorkspace.shared.runningApplications {
-            if app.activationPolicy == .regular,
-               let bid = app.bundleIdentifier,
-               !bid.hasPrefix("com.openclip."),
-               map[bid] == nil {
-                let name = app.localizedName ?? bid
-                let path = app.bundleURL?.path ?? ""
-                map[bid] = InstalledAppInfo(name: name, bundleIdentifier: bid, path: path)
-            }
+            guard app.activationPolicy == .regular,
+                  let identifier = AppIdentity(app).ruleIdentifier,
+                  !identifier.hasPrefix("com.openclip."),
+                  map[identifier] == nil else { continue }
+            let name = app.localizedName ?? AppIdentity(app).processName ?? identifier
+            map[identifier] = InstalledAppInfo(
+                name: name,
+                bundleIdentifier: identifier,
+                path: app.bundleURL?.path ?? app.executableURL?.path ?? ""
+            )
         }
 
         return Array(map.values).sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -45,8 +47,8 @@ public struct AddApplicationPage: View {
         return allApps.filter { $0.name.localizedCaseInsensitiveContains(searchText) || $0.bundleIdentifier.localizedCaseInsensitiveContains(searchText) }
     }
 
-    private func add(_ bundleID: String) {
-        RuleEngine.shared.addOrUpdateRule(AppRule(bundleIdentifiers: [bundleID]))
+    private func add(_ identifier: String) {
+        RuleEngine.shared.addOrUpdateRule(AppRule(bundleIdentifiers: [identifier]))
         router.pop()
     }
 
@@ -80,7 +82,7 @@ public struct AddApplicationPage: View {
                         TextField("e.g. com.apple.Terminal", text: $customBundleID)
                             .textFieldStyle(.roundedBorder)
                             .onSubmit { submitCustom() }
-                        Text("Example: com.apple.Terminal. Use * to match several apps.")
+                        Text("Use process:<name> or path:<executable> to target apps without a bundle ID. Use * to match several apps.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -134,6 +136,11 @@ public struct AddApplicationPage: View {
                                 if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: app.bundleIdentifier) {
                                     Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
                                         .resizable()
+                                        .frame(width: 26, height: 26)
+                                } else if !app.path.isEmpty {
+                                    Image(systemName: "app.dashed")
+                                        .font(.system(size: 20))
+                                        .foregroundStyle(.secondary)
                                         .frame(width: 26, height: 26)
                                 } else {
                                     Image(systemName: "app.fill")

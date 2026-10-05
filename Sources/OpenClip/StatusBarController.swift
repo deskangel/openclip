@@ -496,9 +496,10 @@ class StatusBarController: NSObject, NSMenuDelegate {
         }
 
         let frontApp = currentTargetApp
-        if let frontApp, let bundleID = frontApp.bundleIdentifier {
-            let appName = frontApp.localizedName ?? String(localized: "Current App")
-            let policy = RuleEngine.shared.resolvePolicies(for: bundleID)
+        let frontIdentity = frontApp.map { AppIdentity($0) }
+        if let frontApp, let identity = frontIdentity, identity.ruleIdentifier != nil {
+            let appName = frontApp.localizedName ?? identity.processName ?? String(localized: "Current App")
+            let policy = RuleEngine.shared.resolvePolicies(for: identity)
             let isAppDisabled = policy.disabled
 
             pauseAppItem?.isHidden = false
@@ -528,13 +529,13 @@ class StatusBarController: NSObject, NSMenuDelegate {
 
     private func isValidTargetApp(_ app: NSRunningApplication?) -> Bool {
         guard let app,
-              let bundleID = app.bundleIdentifier,
-              bundleID != Bundle.main.bundleIdentifier,
-              !AppFilter.isExcluded(bundleID: bundleID),
+              app.bundleIdentifier != Bundle.main.bundleIdentifier,
               app.activationPolicy == .regular else {
             return false
         }
-        return true
+        // Bundle-less processes (CLI tools such as scrcpy) are targetable via name/path.
+        return app.bundleIdentifier.map { !AppFilter.isExcluded(bundleID: $0) }
+            ?? (AppIdentity(app).ruleIdentifier != nil)
     }
 
     private func resolveFrontmostApp() -> NSRunningApplication? {
@@ -594,12 +595,14 @@ class StatusBarController: NSObject, NSMenuDelegate {
     }
 
     @objc internal func toggleCurrentAppPause() {
-        guard let app = currentTargetApp, let bundleID = app.bundleIdentifier else { return }
-        let policy = RuleEngine.shared.resolvePolicies(for: bundleID)
+        guard let app = currentTargetApp else { return }
+        let identity = AppIdentity(app)
+        guard let identifier = identity.ruleIdentifier else { return }
+        let policy = RuleEngine.shared.resolvePolicies(for: identity)
         if policy.disabled {
-            if let existingRule = RuleEngine.shared.userRules.first(where: { $0.bundleIdentifiers.contains(bundleID) }) {
+            if let existingRule = RuleEngine.shared.userRules.first(where: { $0.bundleIdentifiers.contains(identifier) }) {
                 if existingRule.bundleIdentifiers.count > 1 {
-                    let remainingIDs = existingRule.bundleIdentifiers.filter { $0 != bundleID }
+                    let remainingIDs = existingRule.bundleIdentifiers.filter { $0 != identifier }
                     let updatedRule = AppRule(
                         bundleIdentifiers: remainingIDs,
                         disabled: existingRule.disabled,
@@ -613,7 +616,7 @@ class StatusBarController: NSObject, NSMenuDelegate {
                     RuleEngine.shared.addOrUpdateRule(updatedRule, saveURL: rulesSaveURL)
                 } else if existingRule.hotkeyOnly != nil || existingRule.useMenuCopy != nil || existingRule.denyPaste != nil || existingRule.retrievalMode != nil || existingRule.gate != nil {
                     let updatedRule = AppRule(
-                        bundleIdentifiers: [bundleID],
+                        bundleIdentifiers: [identifier],
                         disabled: false,
                         hotkeyOnly: existingRule.hotkeyOnly,
                         useMenuCopy: existingRule.useMenuCopy,
@@ -626,14 +629,14 @@ class StatusBarController: NSObject, NSMenuDelegate {
                     RuleEngine.shared.removeRule(id: existingRule.id, saveURL: rulesSaveURL)
                 }
             } else {
-                let overrideRule = AppRule(bundleIdentifiers: [bundleID], disabled: false)
+                let overrideRule = AppRule(bundleIdentifiers: [identifier], disabled: false)
                 RuleEngine.shared.addOrUpdateRule(overrideRule, saveURL: rulesSaveURL)
             }
         } else {
-            if let existingRule = RuleEngine.shared.userRules.first(where: { $0.bundleIdentifiers.contains(bundleID) }) {
-                if existingRule.bundleIdentifiers == [bundleID] {
+            if let existingRule = RuleEngine.shared.userRules.first(where: { $0.bundleIdentifiers.contains(identifier) }) {
+                if existingRule.bundleIdentifiers == [identifier] {
                     let updatedRule = AppRule(
-                        bundleIdentifiers: [bundleID],
+                        bundleIdentifiers: [identifier],
                         disabled: true,
                         hotkeyOnly: existingRule.hotkeyOnly,
                         useMenuCopy: existingRule.useMenuCopy,
@@ -643,7 +646,7 @@ class StatusBarController: NSObject, NSMenuDelegate {
                     )
                     RuleEngine.shared.addOrUpdateRule(updatedRule, saveURL: rulesSaveURL)
                 } else {
-                    let remainingIDs = existingRule.bundleIdentifiers.filter { $0 != bundleID }
+                    let remainingIDs = existingRule.bundleIdentifiers.filter { $0 != identifier }
                     let updatedRule = AppRule(
                         bundleIdentifiers: remainingIDs,
                         disabled: existingRule.disabled,
@@ -656,11 +659,11 @@ class StatusBarController: NSObject, NSMenuDelegate {
                     RuleEngine.shared.removeRule(id: existingRule.id, saveURL: rulesSaveURL)
                     RuleEngine.shared.addOrUpdateRule(updatedRule, saveURL: rulesSaveURL)
 
-                    let rule = AppRule(bundleIdentifiers: [bundleID], disabled: true)
+                    let rule = AppRule(bundleIdentifiers: [identifier], disabled: true)
                     RuleEngine.shared.addOrUpdateRule(rule, saveURL: rulesSaveURL)
                 }
             } else {
-                let rule = AppRule(bundleIdentifiers: [bundleID], disabled: true)
+                let rule = AppRule(bundleIdentifiers: [identifier], disabled: true)
                 RuleEngine.shared.addOrUpdateRule(rule, saveURL: rulesSaveURL)
             }
         }

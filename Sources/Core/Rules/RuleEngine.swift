@@ -94,11 +94,15 @@ public final class RuleEngine: ObservableObject, Sendable {
     }
     
     public func resolvePolicies(for bundleIdentifier: String) -> AppPolicyContext {
+        resolvePolicies(for: AppIdentity(bundleIdentifier: bundleIdentifier))
+    }
+
+    public func resolvePolicies(for identity: AppIdentity) -> AppPolicyContext {
         var context = AppPolicyContext.default
         var explicitRetrievalMode = false
 
         for rule in effectiveRules {
-            if rule.bundleIdentifiers.contains(where: { matchPattern($0, with: bundleIdentifier) }) {
+            if rule.bundleIdentifiers.contains(where: { DefaultAppRules.matches(pattern: $0, identity: identity) }) {
                 if rule.retrievalMode != nil {
                     explicitRetrievalMode = true
                 }
@@ -128,10 +132,6 @@ public final class RuleEngine: ObservableObject, Sendable {
         }
 
         return context
-    }
-    
-    private func matchPattern(_ pattern: String, with bundleId: String) -> Bool {
-        DefaultAppRules.matches(pattern: pattern, bundleID: bundleId)
     }
     
     public static let defaultRules: [AppRule] = DefaultAppRules.catalog

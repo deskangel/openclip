@@ -115,7 +115,7 @@ final class CaptureTextController {
                         mouseDownLocation: anchor.mouseDownLocation,
                         selectionBounds: rect,
                         timestamp: Date(),
-                        appPolicy: RuleEngine.shared.resolvePolicies(for: identity.bundleIdentifier ?? ""),
+                        appPolicy: RuleEngine.shared.resolvePolicies(for: identity),
                         source: .ocr,
                         isEditable: false,
                         pasteTargetAvailable: false
