@@ -185,7 +185,6 @@ public struct GroupSubActionBarView: View {
                 }
             }
         }
-        .animation(.spring(response: 0.16, dampingFraction: 0.88), value: hoveredTarget)
         .fixedSize()
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .onChange(of: totalPages) { _, count in
@@ -197,7 +196,7 @@ public struct GroupSubActionBarView: View {
     @ViewBuilder
     private func subActionButton(action: any Action, index: Int, isHovered: Bool) -> some View {
         let restForeground = PopupThemeModel.restForeground(for: effectiveTheme)
-        let foregroundColor: Color = restForeground
+        let foregroundColor: Color = isHovered ? .white : restForeground
         let backgroundColor: Color = isHovered ? PopupThemeModel.barHoverFill : Color.clear
 
         // Mirrors the main bar: an inline-result action swaps its icon for the computed text once
@@ -320,7 +319,7 @@ public struct GroupSubActionBarView: View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.system(size: 11 * scale, weight: .semibold))
-                .foregroundColor(restForeground)
+                .foregroundColor(isHovered ? .white : restForeground)
                 .frame(width: 29 * scale, height: barButtonHeight)
                 .popupBarHighlight(isHovered ? PopupThemeModel.barHoverFill : .clear, scale: scale, trailingEdge: systemImage == "chevron.right" || !hasRightChevron, isHovered: isHovered, namespace: hoverHighlightNamespace)
                 .contentShape(Rectangle())

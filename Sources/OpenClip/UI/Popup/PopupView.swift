@@ -734,7 +734,6 @@ public struct PopupView: View {
                 completionButton(word: word, index: index, isHovered: isHovered)
             }
         }
-        .animation(.spring(response: 0.16, dampingFraction: 0.88), value: hoveredTarget)
         .fixedSize()
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     }
@@ -750,7 +749,6 @@ public struct PopupView: View {
                 actionButton(action: action, index: index, isHovered: isDirectlyHovered, isActiveParent: isActiveParent, leadingEdge: index == 0, trailingEdge: index == contextualActions.count - 1)
             }
         }
-        .animation(.spring(response: 0.16, dampingFraction: 0.88), value: hoveredTarget)
         .fixedSize()
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .popupCardChrome(
@@ -798,7 +796,7 @@ public struct PopupView: View {
             // the paged actions so it always sits at the far-right edge on every page.
             if showSearchAllActions {
                 let isHovered = hoveredTarget == .search
-                let affordanceForeground = PopupThemeModel.restForeground(for: effectiveTheme)
+                let affordanceForeground: Color = isHovered ? .white : PopupThemeModel.restForeground(for: effectiveTheme)
                 Button {
                     let frame = hoverFrames[.search]
                     onEnterSearch(frame)
@@ -817,7 +815,6 @@ public struct PopupView: View {
                 }
             }
         }
-        .animation(.spring(response: 0.16, dampingFraction: 0.88), value: hoveredTarget)
         .fixedSize()
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .popupCardChrome(
@@ -840,7 +837,7 @@ public struct PopupView: View {
                 .font(.system(size: 13 * scale, weight: .regular))
                 .lineLimit(1)
                 .truncationMode(.tail)
-                .foregroundColor(restForeground)
+                .foregroundColor(isHovered ? .white : restForeground)
                 .frame(maxWidth: 154 * scale)
                 .padding(.horizontal, 11 * scale)
                 .frame(minWidth: buttonWidth, minHeight: barButtonHeight)
@@ -871,7 +868,7 @@ public struct PopupView: View {
             }
         }()
 
-        let foregroundColor: Color = restForeground
+        let foregroundColor: Color = isHovered ? .white : restForeground
 
         let isGroup = action.gesturePolicy.singleClick == .openSubActions || action.chrome.launchesAI
         let subBarAbove = modeStore.subBarAbove
@@ -898,7 +895,9 @@ public struct PopupView: View {
                     .frame(minWidth: buttonWidth, minHeight: barButtonHeight)
                     .popupBarHighlight(backgroundColor, scale: scale, leadingEdge: leadingEdge, trailingEdge: trailingEdge, isHovered: isHovered, namespace: hoverHighlightNamespace)
                     .overlay(alignment: subBarAbove ? .top : .bottom) {
-                        if isGroup {
+                        // The triangle marks a group button only while its sub-bar is closed and
+                        // the button itself isn't hovered; hover and the open bar already show it.
+                        if isGroup && !isHovered && modeStore.activeSubGroupID != action.id {
                             GroupIndicatorTriangle(pointingUp: subBarAbove)
                                 .fill(foregroundColor.opacity(0.65))
                                 .frame(width: 4.0 * scale, height: 2.5 * scale)
@@ -1054,7 +1053,7 @@ public struct PopupView: View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.system(size: 12 * scale, weight: .medium))
-                .foregroundColor(PopupThemeModel.restForeground(for: effectiveTheme))
+                .foregroundColor(isHovered ? .white : PopupThemeModel.restForeground(for: effectiveTheme))
                 .frame(width: chevronWidth, height: barButtonHeight)
                 .popupBarHighlight(isHovered ? PopupThemeModel.barHoverFill : .clear, scale: scale, leadingEdge: systemImage == "chevron.up" || systemImage == "chevron.down", trailingEdge: !showSearchAllActions && (systemImage == "chevron.right" || (systemImage == "chevron.left" && !hasRightChevron)), isHovered: isHovered, namespace: hoverHighlightNamespace)
                 .contentShape(Rectangle())

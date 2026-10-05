@@ -503,7 +503,6 @@ extension View {
                 if isHovered {
                     shape.fill(fill)
                         .matchedGeometryEffect(id: "barHover", in: namespace)
-                        .transition(.opacity.animation(.easeInOut(duration: 0.08)))
                 } else {
                     shape.fill(fill)
                 }
