@@ -79,6 +79,16 @@ final class ActionEditorManifestGuardTests: XCTestCase {
         XCTAssertEqual(located.targetIndex, 0)
         XCTAssertFalse(ActionEditorPage.locatedEntryBacks(actionID: subAction.id, in: located))
     }
+
+    func testDeveloperAndStorePackagesAreNotLogicEditable() {
+        XCTAssertFalse(ActionEditorPage.isLogicEditable(manifestIdentifier: "easydict.openclip.deskangel.2026"))
+        XCTAssertFalse(ActionEditorPage.isLogicEditable(manifestIdentifier: "io.appwrite.openclip.function-runner"))
+        XCTAssertFalse(ActionEditorPage.isLogicEditable(manifestIdentifier: "com.example.extension"))
+    }
+
+    func testCustomActionsAreLogicEditable() {
+        XCTAssertTrue(ActionEditorPage.isLogicEditable(manifestIdentifier: "\(Constants.customIdentifierPrefix)my-custom-action"))
+    }
 }
 
 /// A sub-action-shaped test double that declares options, mirroring a `javascript` command inside
