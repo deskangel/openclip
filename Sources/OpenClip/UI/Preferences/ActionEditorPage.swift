@@ -1202,6 +1202,12 @@ public struct ActionEditorPage: View {
 
     // MARK: - State loading
 
+    /// Only GUI-authored custom actions (com.custom.<id>) allow execution logic and manifest
+    /// serialization. Third-party and developer packages stay read-only on disk.
+    static func isLogicEditable(manifestIdentifier: String) -> Bool {
+        manifestIdentifier.hasPrefix(Constants.customIdentifierPrefix)
+    }
+
     private func loadInitialState() {
         let override = ActionCustomizationManager.shared.override(for: action.id)
 
@@ -1252,7 +1258,7 @@ public struct ActionEditorPage: View {
         // com.custom.<id> packages keep the editor, while store and developer extension packages
         // stay read-only — their behavior belongs to the package, and an accidental rewrite here
         // would silently mutate an installed third-party extension.
-        guard state.manifest.identifier.hasPrefix(Constants.customIdentifierPrefix) else {
+        guard Self.isLogicEditable(manifestIdentifier: state.manifest.identifier) else {
             logicEditable = false
             return
         }
@@ -1334,7 +1340,7 @@ public struct ActionEditorPage: View {
         aliasError = nil
         if let customAction = action as? CustomAction {
             _ = saveCustomActionChanges(customAction)
-        } else if !isBuiltin && !isAIPreset {
+        } else if !isBuiltin && !isAIPreset && logicEditable {
             Task {
                 _ = await saveManifestChanges()
             }
@@ -1384,7 +1390,7 @@ public struct ActionEditorPage: View {
             }
             return
         }
-        if !isBuiltin {
+        if !isBuiltin && logicEditable {
             Task {
                 _ = await saveManifestChanges()
             }
@@ -1508,6 +1514,7 @@ public struct ActionEditorPage: View {
     private static let legacyFallbackSymbol = "star"
 
     private func saveManifestChanges() async -> Bool {
+        guard logicEditable else { return true }
         guard let state = manifestState else {
             // Defensive: the Save button is disabled in this state, but if reached anyway (e.g. a
             // keyboard path) surface the reason instead of silently returning with edits dropped.
