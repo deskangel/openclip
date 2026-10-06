@@ -288,7 +288,7 @@ public struct PopupView: View {
     /// itself only appears when at least one of its sub-actions is applicable to the current
     /// context — with every sub-action disabled the parent would be an inert row. Paste-requiring
     /// actions (Paste/Cut) are dropped when the probe confirmed the target can't paste.
-    private var displayActions: [any Action] {
+    var displayActions: [any Action] {
         let resolver = SubActionResolver()
         let subActionIDs = Set(
             actions.flatMap { parent in
@@ -298,8 +298,8 @@ public struct PopupView: View {
         return actions.filter { action in
             guard !ActionIdentity.isCompletionPseudoAction(action) else { return false }
             if hiddenForPasteAvailability(action) { return false }
-            if action.chrome.popupBehavior == .showSubActions {
-                return !resolver.subActions(of: action, in: actions).isEmpty
+            if action.chrome.popupBehavior == .showSubActions || action.chrome.launchesAI {
+                return isStatic || !resolver.subActions(of: action, in: actions).isEmpty
             }
             return !subActionIDs.contains(action.id)
         }

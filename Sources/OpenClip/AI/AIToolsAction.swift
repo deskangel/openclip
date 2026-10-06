@@ -25,7 +25,7 @@ public struct AIToolsAction: Action, SubActionProviding {
 
     @MainActor
     public func isEnabled(for context: ActionContext) -> Bool {
-        AIServiceManager.shared.isAIEnabled
+        settingsStore.get(.isAIEnabled)
     }
 
     /// Defensive fallback: the bar routes via `chrome.launchesAI` and the palette excludes this
@@ -39,14 +39,8 @@ public struct AIToolsAction: Action, SubActionProviding {
     @MainActor
     public func subActions(in catalog: [any Action]) -> [any Action] {
         let standaloneIDs = settingsStore.get(.standaloneAIActionIDs)
-        let presets = catalog.filter { action in
-            ActionIdentity.isAIPreset(action)
+        return catalog.filter { action in
+            ActionIdentity.isAIPreset(action) && !standaloneIDs.contains(action.id)
         }
-        if !presets.isEmpty {
-            return presets.filter { !standaloneIDs.contains($0.id) }
-        }
-        return AIServiceManager.shared.enabledPresets.map { preset in
-            AIAction(presetID: preset.id, title: preset.title)
-        }.filter { !standaloneIDs.contains($0.id) }
     }
 }

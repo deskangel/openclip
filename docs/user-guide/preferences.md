@@ -161,6 +161,13 @@ and drag the preset between the top-level actions. Its position is saved. To ret
 group, drop it onto the **AI Tools** row. Presets moved out of the group still appear in the full
 search palette, and their existing enable switches, aliases, and hotkeys keep working.
 
+The switch next to **AI Tools** in **Actions** hides the group and its remaining commands without
+turning off AI or any presets on the main bar. Right-click the group and choose **Ungroup** to
+move all its commands out, or use **Remove from Group** on an individual command. An empty group
+disappears from the Actions list and popup. To restore it, right-click a standalone AI command
+and choose **Add to Group → AI Tools**. You can then drag more commands onto or inside the group.
+Hovering over AI Tools opens its commands, and clicking opens their scoped search.
+
 Select a preset under **AI → AI Actions** to edit its icon, display name, **Icon/Text** mode,
 keyboard shortcut, search alias, and prompt. Changes save automatically. These settings follow
 the preset whether it is inside AI Tools or on the main popup bar. **Add Custom AI Action** also

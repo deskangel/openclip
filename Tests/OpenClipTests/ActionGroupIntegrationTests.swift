@@ -562,7 +562,10 @@ final class ActionsOutlineDropTests: XCTestCase {
             cursorPosition: .zero, timestamp: Date(), appPolicy: .default
         ))
         XCTAssertTrue(restored.availableActions(for: context).contains { $0.id == id })
-        XCTAssertFalse(restored.availableActions(for: context).contains { $0.id == "ai.preset.summarize" })
+        let available = restored.availableActions(for: context)
+        let popup = PopupView(actions: available, context: context, onResult: { _ in })
+        XCTAssertFalse(popup.displayActions.contains { $0.id == "ai.preset.summarize" })
+        XCTAssertEqual(SubActionResolver().subActions(of: AIToolsAction(settingsStore: settingsStore), in: available).map(\.id), ["ai.preset.summarize"])
         settingsStore.set(.disabledActionIDs, value: [id])
         XCTAssertFalse(restored.availableActions(for: context).contains { $0.id == id })
     }
@@ -606,7 +609,53 @@ final class ActionsOutlineDropTests: XCTestCase {
         XCTAssertTrue(outlineCoordinator.outlineView(NSOutlineView(), acceptDrop: MockDraggingInfo(actionIDs: ids), item: nil, childIndex: 0))
         XCTAssertEqual(Array(outlineCoordinator.rootNodes.prefix(2).map(\.id)), ids)
         XCTAssertEqual(settingsStore.get(.standaloneAIActionIDs), Set(ids))
-        XCTAssertTrue(outlineCoordinator.rootNodes.first { $0.id == "builtin.aiTools" }?.children.isEmpty == true)
+        XCTAssertFalse(outlineCoordinator.rootNodes.contains { $0.id == "builtin.aiTools" })
+    }
+
+    func testAIGroupContextMenusUngroupAndRestoreAnEmptyGroup() throws {
+        registerAIPresets()
+        let group = try XCTUnwrap(outlineCoordinator.rootNodes.first { $0.id == "builtin.aiTools" })
+        let ungroup = try XCTUnwrap(outlineCoordinator.contextMenu(for: group).items.first { $0.title == "Ungroup" })
+        XCTAssertTrue(NSApp.sendAction(try XCTUnwrap(ungroup.action), to: ungroup.target, from: ungroup))
+        XCTAssertFalse(outlineCoordinator.rootNodes.contains { $0.id == group.id })
+        XCTAssertEqual(settingsStore.get(.standaloneAIActionIDs), ["ai.preset.rewrite", "ai.preset.summarize"])
+
+        let preset = try XCTUnwrap(outlineCoordinator.rootNodes.first { $0.id == "ai.preset.rewrite" })
+        let add = try XCTUnwrap(outlineCoordinator.contextMenu(for: preset).items.first { $0.title == "Add to Group" })
+        let restore = try XCTUnwrap(add.submenu?.items.first)
+        XCTAssertEqual(restore.title, "AI Tools")
+        XCTAssertTrue(NSApp.sendAction(try XCTUnwrap(restore.action), to: restore.target, from: restore))
+        let restored = try XCTUnwrap(outlineCoordinator.rootNodes.first { $0.id == group.id })
+        XCTAssertEqual(restored.children.map(\.id), [preset.id])
+        XCTAssertEqual(settingsStore.get(.standaloneAIActionIDs), ["ai.preset.summarize"])
+    }
+
+    func testRemoveFromAIGroupContextMenuMovesThePresetToRoot() throws {
+        registerAIPresets()
+        let group = try XCTUnwrap(outlineCoordinator.rootNodes.first { $0.id == "builtin.aiTools" })
+        let preset = try XCTUnwrap(group.children.first)
+        let remove = try XCTUnwrap(outlineCoordinator.contextMenu(for: preset).items.first { $0.title == "Remove from Group" })
+        XCTAssertTrue(NSApp.sendAction(try XCTUnwrap(remove.action), to: remove.target, from: remove))
+        XCTAssertTrue(outlineCoordinator.rootNodes.contains { $0.id == preset.id })
+        XCTAssertEqual(settingsStore.get(.standaloneAIActionIDs), [preset.id])
+    }
+
+    func testReturningPresetBetweenAIGroupMembersRestoresSubBarAndOrder() throws {
+        registerAIPresets()
+        let outline = NSOutlineView()
+        let drag = MockDraggingInfo(actionID: "ai.preset.rewrite")
+        XCTAssertTrue(outlineCoordinator.outlineView(outline, acceptDrop: drag, item: nil, childIndex: 0))
+        let group = try XCTUnwrap(outlineCoordinator.rootNodes.first { $0.id == "builtin.aiTools" })
+        XCTAssertEqual(outlineCoordinator.outlineView(outline, validateDrop: drag, proposedItem: group, proposedChildIndex: 1), .move)
+        XCTAssertTrue(outlineCoordinator.outlineView(outline, acceptDrop: drag, item: group, childIndex: 1))
+        let restored = try XCTUnwrap(outlineCoordinator.rootNodes.first { $0.id == group.id })
+        XCTAssertEqual(restored.children.map(\.id), ["ai.preset.summarize", "ai.preset.rewrite"])
+        let context = ActionContext(selection: SelectionContext(
+            text: "Example", sourceApp: AppIdentity(bundleIdentifier: "com.test", localizedName: "Test"),
+            cursorPosition: .zero, timestamp: Date(), appPolicy: .default
+        ))
+        let available = coordinator.resolveActions(for: context)
+        XCTAssertEqual(SubActionResolver().subActions(of: try XCTUnwrap(restored.action), in: available).map(\.id), restored.children.map(\.id))
     }
 
     func testNonAIActionsCannotBePlacedInsideAITools() throws {
