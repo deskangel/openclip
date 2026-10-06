@@ -3,7 +3,7 @@
 //
 // The one rule for an action's enable switch, shared by the Actions list and the extension pages.
 // An action is off when its own id is disabled or its package is; turning a package's action back
-// on re-enables the package; the AI launcher and AI presets keep their state in AIServiceManager;
+// on re-enables the package; AI presets keep their own state in AIServiceManager;
 // a gated (untrusted) extension can only be turned on, which is what re-trusts it.
 
 import SwiftUI
@@ -17,12 +17,6 @@ enum ActionEnablement {
         disabledPackages: Binding<Set<String>>,
         coordinator: ActionCoordinator = .shared
     ) -> Binding<Bool> {
-        if action.chrome.launchesAI {
-            return Binding(
-                get: { AIServiceManager.shared.isAIEnabled },
-                set: { AIServiceManager.shared.isAIEnabled = $0 }
-            )
-        }
         if ActionIdentity.isAIPreset(action) {
             return Binding(
                 get: { AIServiceManager.shared.preset(forActionID: action.id)?.isEnabled ?? false },

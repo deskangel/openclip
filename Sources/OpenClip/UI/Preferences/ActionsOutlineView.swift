@@ -649,13 +649,8 @@ final class ActionsOutlineCoordinator: NSObject, NSOutlineViewDataSource, NSOutl
 
             // AI Tools Group parent
             if action.chrome.launchesAI {
-                var aiPresets = actions.filter { ActionIdentity.isAIPreset($0) }
-                if aiPresets.isEmpty {
-                    aiPresets = AIServiceManager.shared.presets.map { preset in
-                        AIAction(presetID: preset.id, title: preset.title)
-                    }
-                }
-                aiPresets.removeAll { standaloneAIIDs.contains($0.id) }
+                let aiPresets = SubActionResolver().subActions(of: action, in: actions)
+                guard !aiPresets.isEmpty else { continue }
                 let groupMatches = needle.isEmpty || matchesAction(action)
                 let subActionNodes: [OutlineNode] = aiPresets.compactMap { preset in
                     if !needle.isEmpty && !groupMatches && !matchesAction(preset) { return nil }
@@ -907,7 +902,7 @@ final class ActionsOutlineCoordinator: NSObject, NSOutlineViewDataSource, NSOutl
 
         // AI presets can return to their launcher. Other actions cannot join AI Tools.
         if let targetNode = item as? OutlineNode, targetNode.action?.chrome.launchesAI == true,
-           index == NSOutlineViewDropOnItemIndex {
+           index == NSOutlineViewDropOnItemIndex || index >= 0 {
             let allPresets = draggedIDs.allSatisfy { id in
                 parent.coordinator.actions.contains { $0.id == id && ActionIdentity.isAIPreset($0) }
             }
@@ -1000,12 +995,20 @@ final class ActionsOutlineCoordinator: NSObject, NSOutlineViewDataSource, NSOutl
         }
 
         if let targetNode = item as? OutlineNode, targetNode.action?.chrome.launchesAI == true,
-           index == NSOutlineViewDropOnItemIndex {
+           index == NSOutlineViewDropOnItemIndex || index >= 0 {
             let ids = draggedActionIDs(from: info)
             guard !ids.isEmpty, ids.allSatisfy({ id in
                 parent.coordinator.actions.contains { $0.id == id && ActionIdentity.isAIPreset($0) }
             }) else { return false }
             parent.coordinator.setAIActionPlacement(actionIDs: ids, standalone: false)
+            if index >= 0 {
+                let previousMembers = targetNode.children.map(\.id)
+                let insertion = min(index, previousMembers.count)
+                    - previousMembers.prefix(index).filter { ids.contains($0) }.count
+                var members = previousMembers.filter { !ids.contains($0) }
+                members.insert(contentsOf: ids, at: insertion)
+                parent.coordinator.setExtensionGroupMemberOrder(groupID: targetNode.id, memberIDs: members)
+            }
             expandedNodeIDs.insert(targetNode.id)
             rebuildTree()
             outlineView.reloadData()
@@ -1317,6 +1320,17 @@ final class ActionsOutlineCoordinator: NSObject, NSOutlineViewDataSource, NSOutl
             menu.addItem(removeItem)
 
         case .standaloneAction(let action):
+            if ActionIdentity.isAIPreset(action),
+               let launcher = parent.coordinator.actions.first(where: { $0.chrome.launchesAI }) {
+                let addToGroupItem = NSMenuItem(title: String(localized: "Add to Group"), action: nil, keyEquivalent: "")
+                let subMenu = NSMenu()
+                let groupItem = NSMenuItem(title: launcher.title, action: #selector(handleAddToGroupMenuItem(_:)), keyEquivalent: "")
+                groupItem.target = self
+                groupItem.representedObject = (actionID: action.id, groupID: launcher.id)
+                subMenu.addItem(groupItem)
+                addToGroupItem.submenu = subMenu
+                menu.addItem(addToGroupItem)
+            }
             if parent.coordinator.isEligibleForGrouping(actionID: action.id) {
                 if !parent.coordinator.actionGroupDefs.isEmpty {
                     let addToGroupItem = NSMenuItem(title: String(localized: "Add to Group"), action: nil, keyEquivalent: "")
@@ -1337,6 +1351,12 @@ final class ActionsOutlineCoordinator: NSObject, NSOutlineViewDataSource, NSOutl
                     menu.addItem(groupSelected)
                 }
             }
+
+        case .extensionGroup(let action) where action.chrome.launchesAI:
+            let ungroupItem = NSMenuItem(title: String(localized: "Ungroup"), action: #selector(handleUngroupMenuItem(_:)), keyEquivalent: "")
+            ungroupItem.target = self
+            ungroupItem.representedObject = action.id
+            menu.addItem(ungroupItem)
 
         case .extensionGroup, .extensionSubAction, .packageHeader:
             break

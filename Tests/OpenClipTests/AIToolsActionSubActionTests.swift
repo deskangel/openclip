@@ -1,4 +1,5 @@
 import XCTest
+import SwiftUI
 @testable import OpenClip
 @testable import Core
 
@@ -8,11 +9,13 @@ private struct FakeAIAction: Action {
     var title: String { id }
     var icon: ActionIcon { .symbol("sparkles") }
     var chrome: ActionChrome
-    init(id: String, source: ActionChrome.Source = .ai) {
+    var enabled: Bool
+    init(id: String, source: ActionChrome.Source = .ai, enabled: Bool = true) {
         self.id = id
         self.chrome = ActionChrome(source: source)
+        self.enabled = enabled
     }
-    @MainActor func isEnabled(for context: ActionContext) -> Bool { true }
+    @MainActor func isEnabled(for context: ActionContext) -> Bool { enabled }
     @MainActor func perform(_ context: ActionContext) async throws -> ActionResult { .success }
 }
 
@@ -45,11 +48,72 @@ final class AIToolsActionSubActionTests: XCTestCase {
     }
 
     @MainActor
-    func testAIToolsResolvesFromAIServiceManagerWhenCatalogLacksPresets() {
+    func testEmptyCatalogDoesNotResurrectFilteredPresets() {
         let tools = AIToolsAction(settingsStore: MemorySettingsStore())
         let other = FakeAIAction(id: "builtin.copy", source: .builtin)
         let subActions = tools.subActions(in: [other])
-        XCTAssertFalse(subActions.isEmpty)
-        XCTAssertTrue(subActions.allSatisfy { ActionIdentity.isAIPreset($0) })
+        XCTAssertTrue(subActions.isEmpty)
+    }
+
+    private var context: ActionContext {
+        ActionContext(selection: SelectionContext(
+            text: "Example", sourceApp: AppIdentity(bundleIdentifier: "com.test", localizedName: "Test"),
+            cursorPosition: .zero, timestamp: Date(), appPolicy: .default
+        ))
+    }
+
+    func testMovingAllPresetsOutAndBackRestoresSubBarWithOtherPresetsStillStandalone() {
+        let store = MemorySettingsStore()
+        let registry = ActionRegistry(settingsStore: store)
+        let coordinator = ActionCoordinator(registry: registry, settingsStore: store)
+        let tools = AIToolsAction(settingsStore: store)
+        let presets = [FakeAIAction(id: "ai.preset.1"), FakeAIAction(id: "ai.preset.2")]
+        registry.register(builtIns: [tools] + presets)
+
+        func displayedIDs() -> [String] {
+            PopupView(actions: registry.availableActions(for: context), context: context, onResult: { _ in })
+                .displayActions.map(\.id)
+        }
+        XCTAssertEqual(displayedIDs(), [tools.id])
+        coordinator.setAIActionPlacement(actionIDs: presets.map(\.id), standalone: true)
+        XCTAssertEqual(Set(displayedIDs()), Set(presets.map(\.id)))
+        coordinator.setAIActionPlacement(actionIDs: [presets[0].id], standalone: false)
+        XCTAssertEqual(Set(displayedIDs()), [tools.id, presets[1].id])
+        XCTAssertEqual(tools.subActions(in: registry.availableActions(for: context)).map(\.id), [presets[0].id])
+        coordinator.setAIActionPlacement(actionIDs: [presets[1].id], standalone: false)
+        XCTAssertEqual(displayedIDs(), [tools.id])
+        XCTAssertEqual(tools.subActions(in: registry.availableActions(for: context)).map(\.id), presets.map(\.id))
+    }
+
+    func testHidingAIGroupDoesNotDisableStandalonePresetsOrAIService() {
+        let store = MemorySettingsStore()
+        let registry = ActionRegistry(settingsStore: store)
+        let tools = AIToolsAction(settingsStore: store)
+        store.set(.standaloneAIActionIDs, value: ["ai.preset.2"])
+        registry.register(builtIns: [tools, FakeAIAction(id: "ai.preset.1"), FakeAIAction(id: "ai.preset.2")])
+        let toggle = ActionEnablement.binding(
+            for: tools,
+            disabledActionIDs: Binding(get: { store.get(.disabledActionIDs) }, set: { store.set(.disabledActionIDs, value: $0) }),
+            disabledPackages: .constant([])
+        )
+        let globalAIEnabled = AIServiceManager.shared.isAIEnabled
+        toggle.wrappedValue = false
+        XCTAssertFalse(toggle.wrappedValue)
+        XCTAssertEqual(store.get(.disabledActionIDs), [tools.id])
+        XCTAssertEqual(AIServiceManager.shared.isAIEnabled, globalAIEnabled)
+        XCTAssertEqual(registry.availableActions(for: context).map(\.id), ["ai.preset.2"])
+        XCTAssertEqual(registry.searchCatalog(for: context).map(\.id), ["ai.preset.2"])
+        toggle.wrappedValue = true
+        XCTAssertEqual(tools.subActions(in: registry.availableActions(for: context)).map(\.id), ["ai.preset.1"])
+    }
+
+    func testGroupDisappearsWhenAllRemainingPresetsAreDisabled() {
+        let store = MemorySettingsStore()
+        let registry = ActionRegistry(settingsStore: store)
+        let tools = AIToolsAction(settingsStore: store)
+        registry.register(builtIns: [tools, FakeAIAction(id: "ai.preset.1", enabled: false)])
+        let available = registry.availableActions(for: context)
+        XCTAssertTrue(tools.subActions(in: available).isEmpty)
+        XCTAssertTrue(PopupView(actions: available, context: context, onResult: { _ in }).displayActions.isEmpty)
     }
 }

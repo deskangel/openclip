@@ -403,6 +403,10 @@ public final class ActionCoordinator: ObservableObject, Sendable {
     }
 
     public func addToGroup(actionID: String, groupID: String, atIndex: Int? = nil) {
+        if actions.first(where: { $0.id == groupID })?.chrome.launchesAI == true {
+            setAIActionPlacement(actionIDs: [actionID], standalone: false)
+            return
+        }
         guard let _ = actionGroupDefs.firstIndex(where: { $0.id == groupID }) else { return }
         let trimmedID = actionID.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedID.isEmpty else { return }
@@ -444,11 +448,22 @@ public final class ActionCoordinator: ObservableObject, Sendable {
     }
 
     public func ungroup(groupID: String) {
+        if let launcherIndex = actions.firstIndex(where: { $0.id == groupID && $0.chrome.launchesAI }) {
+            let memberIDs = Set(memberActionIDs(for: groupID))
+            setAIActionPlacement(actionIDs: Array(memberIDs), standalone: true)
+            let indices = IndexSet(actions.indices.filter { memberIDs.contains(actions[$0].id) })
+            moveActions(from: indices, to: launcherIndex)
+            return
+        }
         actionGroupDefs.removeAll { $0.id == groupID }
         saveAndApplyGroupDefs()
     }
 
     public func removeFromGroup(actionID: String, groupID: String) {
+        if actions.first(where: { $0.id == groupID })?.chrome.launchesAI == true {
+            setAIActionPlacement(actionIDs: [actionID], standalone: true)
+            return
+        }
         guard let index = actionGroupDefs.firstIndex(where: { $0.id == groupID }) else { return }
         let hadMembers = nonEmptyGroupIDs
         actionGroupDefs[index].memberActionIDs.removeAll { $0 == actionID }

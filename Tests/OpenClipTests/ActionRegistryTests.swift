@@ -226,7 +226,7 @@ final class ActionRegistryTests: XCTestCase {
     }
 
     @MainActor
-    func testAIChromeActionsExcludedFromBarButIncludedInSearchCatalog() {
+    func testAIPresetsRemainInAvailableCatalogForGroupResolution() {
         // Own store: `ActionRegistry()` reads the real preferences domain (the test host shares
         // OpenClip's bundle id), so a developer disabling Copy in the app would fail this test.
         let registry = ActionRegistry(settingsStore: MemorySettingsStore())
@@ -239,9 +239,8 @@ final class ActionRegistryTests: XCTestCase {
         let context = ActionContext(selection: selection, modifiers: [])
         let available = registry.availableActions(for: context)
 
-        // AI preset actions never flood the popup bar (the reorderable AI Tools action is the
-        // bar's entry point), but the palette still discovers them.
-        XCTAssertFalse(available.contains { $0.id == "ai.preset.proofread" })
+        // The popup resolves group children from this catalog before hiding them at the top level.
+        XCTAssertTrue(available.contains { $0.id == "ai.preset.proofread" })
         XCTAssertTrue(available.contains { $0.id == "mock.normal" })
         XCTAssertTrue(registry.searchCatalog(for: context).contains { $0.id == "ai.preset.proofread" })
     }

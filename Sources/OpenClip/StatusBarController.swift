@@ -417,13 +417,11 @@ class StatusBarController: NSObject, NSMenuDelegate {
         let actions = ActionCoordinator.shared.actions
         let customGroupMemberIDs = Set(ActionCoordinator.shared.actionGroupDefs.flatMap(\.memberActionIDs))
         let disabledActionIDs = settingsStore.get(.disabledActionIDs)
-        let isAIEnabled = settingsStore.get(.isAIEnabled)
 
         let items = TopLevelActionResolver.resolveTopLevelItems(
             from: actions,
             customGroupMemberIDs: customGroupMemberIDs,
             disabledActionIDs: disabledActionIDs,
-            isAIEnabled: isAIEnabled,
             presentationProvider: { action in
                 ActionCustomizationManager.shared.presented(action, surface: .table)
             }
@@ -456,27 +454,16 @@ class StatusBarController: NSObject, NSMenuDelegate {
 
     @objc private func toggleActionItem(_ sender: NSMenuItem) {
         guard let item = sender.representedObject as? TopLevelActionItem else { return }
-        if item.isAI {
-            let current = settingsStore.get(.isAIEnabled)
-            let newStatus = !current
-            settingsStore.set(.isAIEnabled, value: newStatus)
-            AIServiceManager.shared.isAIEnabled = newStatus
-            sender.state = newStatus ? .on : .off
-            notificationCenter.post(name: .openClipEnabledStateChanged, object: nil)
+        var disabledActionIDs = settingsStore.get(.disabledActionIDs)
+        if disabledActionIDs.contains(item.id) {
+            disabledActionIDs.remove(item.id)
+            sender.state = .on
         } else {
-            var disabledActionIDs = settingsStore.get(.disabledActionIDs)
-            let isCurrentlyDisabled = disabledActionIDs.contains(item.id)
-            if isCurrentlyDisabled {
-                disabledActionIDs.remove(item.id)
-                settingsStore.set(.disabledActionIDs, value: disabledActionIDs)
-                sender.state = .on
-            } else {
-                disabledActionIDs.insert(item.id)
-                settingsStore.set(.disabledActionIDs, value: disabledActionIDs)
-                sender.state = .off
-            }
-            notificationCenter.post(name: .openClipEnabledStateChanged, object: nil)
+            disabledActionIDs.insert(item.id)
+            sender.state = .off
         }
+        settingsStore.set(.disabledActionIDs, value: disabledActionIDs)
+        notificationCenter.post(name: .openClipEnabledStateChanged, object: nil)
     }
 
     internal func updateRootMenuDynamicItems() {

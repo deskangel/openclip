@@ -155,6 +155,14 @@ areas; stale debt notes are worse than none.
   sub-bar and scoped search. Dropping a preset onto AI Tools removes its explicit order and
   returns it to the group. Bar and palette clicks share the controller's AI execution path;
   the global AI switch and individual preset enablement still apply.
+- **AI Tools follows group visibility and membership.** Its Actions-list and menu-bar toggles
+  use `disabledActionIDs`, independently of the global AI service switch. Hidden groups also
+  hide their grouped presets from the bar and search, while standalone presets remain usable.
+  The available-action catalog retains eligible AI children so hover sub-bars and scoped search
+  resolve the same members, without rebuilding filtered-out presets from the AI singleton.
+  Empty AI groups disappear from the popup and Actions list. Ungroup moves all members to the
+  root, Remove from Group moves one, and a standalone preset's Add to Group > AI Tools menu
+  restores the group even after its final member left. Dropping between its members also works.
 - **AI presets share the standard action editor.** Their AI settings pages expose the same icon
   picker, Icon/Text display mode, search alias and per-action shortcut as other leaf actions,
   alongside an autosaved prompt field. Appearance and aliases use the existing stores keyed by
