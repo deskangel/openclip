@@ -199,17 +199,21 @@ struct PopupThemeSelector: View {
             }
 
             SettingsCard("Behavior") {
-                SettingsToggleRow(
+                appearanceControlRow(
                     title: "Show Command Palette",
-                    subtitle: "Show the command palette button at the end of the popup bar.",
-                    isOn: $showSearchAllActions
-                )
+                    info: "Show the command palette button at the end of the popup bar."
+                ) {
+                    Toggle("", isOn: $showSearchAllActions)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                        .accessibilityLabel("Show Command Palette")
+                }
 
                 SettingsDivider()
 
-                SettingsRow(
+                appearanceControlRow(
                     title: "Show Contextual Actions",
-                    subtitle: "Show relevant actions first based on what you select."
+                    info: "Show relevant actions first based on what you select."
                 ) {
                     HStack(spacing: 8) {
                         Button {
@@ -236,9 +240,9 @@ struct PopupThemeSelector: View {
                     }
                 }
 
-                SettingsRow(
+                appearanceControlRow(
                     title: "Contextual Pill",
-                    subtitle: "Show contextual actions to the left or right of the main bar. Auto follows the horizontal position."
+                    info: "Show contextual actions to the left or right of the main bar. Auto follows the horizontal position."
                 ) {
                     segmentedPicker(
                         selection: $contextualPillPosition,

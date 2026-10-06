@@ -211,7 +211,7 @@ public struct GroupSubActionBarView: View {
                     .frame(maxWidth: PopupMetrics.inlineResultMaxWidth * scale)
                     .padding(.horizontal, PopupMetrics.inlineResultHorizontalPadding * scale)
                     .frame(minWidth: buttonWidth, minHeight: barButtonHeight)
-                    .popupBarHighlight(backgroundColor, scale: scale, leadingEdge: index == 0, trailingEdge: index == pagedSubActions.count - 1 && !hasLeftChevron && !hasRightChevron, isHovered: isHovered, namespace: hoverHighlightNamespace)
+                    .popupBarHighlight(backgroundColor, scale: scale, isText: true, leadingEdge: index == 0, trailingEdge: index == pagedSubActions.count - 1 && !hasLeftChevron && !hasRightChevron, isHovered: isHovered, namespace: hoverHighlightNamespace)
                     .transition(.opacity)
             } else {
                 ActionIconView(icon: action.displayIcon(using: presenter), size: 13.5, scale: scale)
@@ -221,7 +221,7 @@ public struct GroupSubActionBarView: View {
                         return 0.0
                     }())
                     .frame(minWidth: buttonWidth, maxWidth: 130 * scale, minHeight: barButtonHeight)
-                    .popupBarHighlight(backgroundColor, scale: scale, leadingEdge: index == 0, trailingEdge: index == pagedSubActions.count - 1 && !hasLeftChevron && !hasRightChevron, isHovered: isHovered, namespace: hoverHighlightNamespace)
+                    .popupBarHighlight(backgroundColor, scale: scale, isText: { if case .text = action.displayIcon(using: presenter) { return true }; return false }(), leadingEdge: index == 0, trailingEdge: index == pagedSubActions.count - 1 && !hasLeftChevron && !hasRightChevron, isHovered: isHovered, namespace: hoverHighlightNamespace)
                     .transition(.opacity)
             }
         }

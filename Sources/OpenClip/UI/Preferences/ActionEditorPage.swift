@@ -30,6 +30,9 @@ public struct ActionEditorPage: View {
     @Binding var disabledActionIDs: Set<String>
     @Binding var disabledPackages: Set<String>
 
+    @State private var isRenamingTitle = false
+    @State private var titleBeforeRename = ""
+    @FocusState private var heroNameFocused: Bool
     @State private var customTitle: String = ""
     @State private var iconSymbol: String = ""
     @State private var initialIconSymbol: String = ""
@@ -490,10 +493,35 @@ public struct ActionEditorPage: View {
                     VStack(alignment: .leading, spacing: 3) {
                         let displayTitle = customTitle.trimmingCharacters(in: .whitespacesAndNewlines)
                         HStack(alignment: .center, spacing: 8) {
-                            Text(displayTitle.isEmpty ? action.title : displayTitle)
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(SettingsDesignTokens.primaryText)
-                                .lineLimit(1)
+                            if isRenamingTitle {
+                                TextField("Action Name", text: $customTitle)
+                                    .textFieldStyle(.plain)
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 4)
+                                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.05)))
+                                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.accentColor.opacity(0.65), lineWidth: 1))
+                                    .frame(maxWidth: 280, alignment: .leading)
+                                    .focused($heroNameFocused)
+                                    .onAppear { heroNameFocused = true }
+                                    .onSubmit { isRenamingTitle = false }
+                                    .onExitCommand {
+                                        customTitle = titleBeforeRename
+                                        isRenamingTitle = false
+                                    }
+                                    .onChange(of: heroNameFocused) { _, focused in
+                                        if !focused { isRenamingTitle = false }
+                                    }
+                            } else {
+                                Text(displayTitle.isEmpty ? action.title : displayTitle)
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(SettingsDesignTokens.primaryText)
+                                    .lineLimit(1)
+                                    .onTapGesture(count: 2) {
+                                        titleBeforeRename = customTitle
+                                        isRenamingTitle = true
+                                    }
+                            }
 
                             if let version = manifestVersion, !version.isEmpty {
                                 Text("v\(version)")

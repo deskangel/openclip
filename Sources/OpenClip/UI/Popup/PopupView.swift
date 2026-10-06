@@ -841,7 +841,7 @@ public struct PopupView: View {
                 .frame(maxWidth: 154 * scale)
                 .padding(.horizontal, 11 * scale)
                 .frame(minWidth: buttonWidth, minHeight: barButtonHeight)
-                .popupBarHighlight(isHovered ? PopupThemeModel.barHoverFill : .clear, scale: scale, trailingEdge: index == cachedCompletions.count - 1, isHovered: isHovered, namespace: hoverHighlightNamespace)
+                .popupBarHighlight(isHovered ? PopupThemeModel.barHoverFill : .clear, scale: scale, isText: true, trailingEdge: index == cachedCompletions.count - 1, isHovered: isHovered, namespace: hoverHighlightNamespace)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -883,7 +883,7 @@ public struct PopupView: View {
                     .frame(maxWidth: PopupMetrics.inlineResultMaxWidth * scale)
                     .padding(.horizontal, PopupMetrics.inlineResultHorizontalPadding * scale)
                     .frame(minWidth: buttonWidth, minHeight: barButtonHeight)
-                    .popupBarHighlight(backgroundColor, scale: scale, leadingEdge: leadingEdge, trailingEdge: trailingEdge, isHovered: isHovered, namespace: hoverHighlightNamespace)
+                    .popupBarHighlight(backgroundColor, scale: scale, isText: true, leadingEdge: leadingEdge, trailingEdge: trailingEdge, isHovered: isHovered, namespace: hoverHighlightNamespace)
                     .transition(.opacity)
             } else {
                 iconView(for: action.displayIcon(using: presenter))
@@ -893,7 +893,7 @@ public struct PopupView: View {
                         return 0.0
                     }())
                     .frame(minWidth: buttonWidth, minHeight: barButtonHeight)
-                    .popupBarHighlight(backgroundColor, scale: scale, leadingEdge: leadingEdge, trailingEdge: trailingEdge, isHovered: isHovered, namespace: hoverHighlightNamespace)
+                    .popupBarHighlight(backgroundColor, scale: scale, isText: { if case .text = action.displayIcon(using: presenter) { return true }; return false }(), leadingEdge: leadingEdge, trailingEdge: trailingEdge, isHovered: isHovered, namespace: hoverHighlightNamespace)
                     .overlay(alignment: subBarAbove ? .top : .bottom) {
                         // The triangle marks a group button only while its sub-bar is closed and
                         // the button itself isn't hovered; hover and the open bar already show it.

@@ -94,7 +94,7 @@ final class ActionDuplicationTests: XCTestCase {
     }
 
     /// The context menu's Delete item appears only for what can actually be removed: custom
-    /// actions, installed extensions, and groups. Built-ins and AI presets never qualify.
+    /// actions, installed extensions, groups, and AI presets. Built-ins never qualify.
     func testCanDeleteClassifiesActionSources() {
         let custom = CustomAction(id: "custom.a", title: "A", iconName: "star", type: .openURL(urlTemplate: "https://example.com"))
         XCTAssertTrue(ActionDeletion.canDelete(custom))
@@ -103,6 +103,8 @@ final class ActionDuplicationTests: XCTestCase {
         XCTAssertTrue(ActionDeletion.canDelete(extensionAction))
 
         XCTAssertFalse(ActionDeletion.canDelete(CopyAction()))
+        XCTAssertTrue(ActionDeletion.canDelete(AIAction(presetID: "rewrite", title: "Rewrite")))
+        XCTAssertFalse(ActionDeletion.canDelete(AIToolsAction(settingsStore: settingsStore)))
 
         let group = CustomAction(
             id: "custom.group",

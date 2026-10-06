@@ -147,7 +147,7 @@ areas; stale debt notes are worse than none.
 
 ## Action-Search Palette & Popup Growth
 
-- **Action bar hover chrome** uses a rounded highlight in the unmodified system accent color from v1.8.0-beta.1, inset by 2 scaled points horizontally for interior buttons, 3 for end buttons, and 3 vertically, shared by the main and sub-action bars. Interior corners use a 7-point radius; outer edge corners use 10 points (both scaled). Foregrounds and full button hit areas stay unchanged; hovered buttons use a white foreground and the highlight snaps between them with no transition; search chrome is unchanged.
+- **Action bar hover chrome** uses a rounded highlight in the system accent color softened 8% toward white, with no horizontal inset for interior text buttons and 2 scaled points for end text buttons; icon buttons retain 2 points for interiors and 3 for ends. All highlights are inset by 3 scaled points vertically, shared by the main and sub-action bars. Interior corners use a 7-point radius; outer edge corners use 10 points (both scaled). Foregrounds and full button hit areas stay unchanged; hovered buttons use a white foreground and the highlight snaps between them with no transition; search chrome is unchanged.
 
 - **AI presets can leave AI Tools.** `SettingKey.standaloneAIActionIDs` records presets dragged
   to the Actions list's root. Their canonical IDs participate in `action.order`, survive preset
@@ -162,7 +162,20 @@ areas; stale debt notes are worse than none.
   resolve the same members, without rebuilding filtered-out presets from the AI singleton.
   Empty AI groups disappear from the popup and Actions list. Ungroup moves all members to the
   root, Remove from Group moves one, and a standalone preset's Add to Group > AI Tools menu
-  restores the group even after its final member left. Dropping between its members also works.
+  restores the group even after its final member left. Add to Group captures all selected eligible
+  actions, including multiple standalone AI presets. Dropping between its members also works.
+  AI presets support selection-based Delete in the Actions list, removing the saved preset and
+  clearing its shortcut, alias, appearance override, and standalone placement.
+  Return on a single selected action or its Rename context menu edits its display name inline
+  through the customization store; double-clicking a row opens its editor.
+  The editor hero title also supports double-click renaming. A slow second click on a selected
+  name also renames it. Enter or focus loss commits, and Escape cancels. The list chevron still opens the full editor.
+- **Actions-list drag destinations are explicit.** A soft accent fill highlights only the destination
+  group header, without an outline; root drops use the native full-width insertion line. The leading
+  gutter at an expanded group’s bottom gap moves actions out; the indented side reorders inside. Multi-member drops reorder the
+  whole selection using the displayed gap index. Returning AI presets uses the same insertion
+  calculation. Moving the last member out preserves the root destination when its empty group
+  disappears; dragging a group with selected children keeps its membership intact.
 - **AI presets share the standard action editor.** Their AI settings pages expose the same icon
   picker, Icon/Text display mode, search alias and per-action shortcut as other leaf actions,
   alongside an autosaved prompt field. Appearance and aliases use the existing stores keyed by

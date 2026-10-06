@@ -60,9 +60,9 @@ enum PopupThemeModel {
         }
     }
 
-    /// Original system accent color used by the beta.1 hover fill.
+    /// Slightly softened accent for the popup action bars.
     static var barHoverFill: Color {
-        Color.accentColor
+        Color(nsColor: NSColor.controlAccentColor.blended(withFraction: 0.08, of: .white) ?? .controlAccentColor)
     }
 
     /// The secondary foreground color (hints, badges) for the given effective theme token.
@@ -486,6 +486,7 @@ extension View {
     func popupBarHighlight(
         _ fill: Color,
         scale: CGFloat,
+        isText: Bool = false,
         leadingEdge: Bool = false,
         trailingEdge: Bool = false,
         isHovered: Bool,
@@ -507,7 +508,7 @@ extension View {
                     shape.fill(fill)
                 }
             }
-            .padding(.horizontal, (leadingEdge || trailingEdge ? 3 : 2) * scale)
+            .padding(.horizontal, (isText ? (leadingEdge || trailingEdge ? 2 : 0) : (leadingEdge || trailingEdge ? 3 : 2)) * scale)
             .padding(.vertical, 3 * scale)
         }
     }

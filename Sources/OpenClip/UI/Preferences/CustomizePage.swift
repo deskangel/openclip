@@ -22,8 +22,6 @@ struct CustomizePage: View {
     @ObservedObject private var coordinator = ActionCoordinator.shared
     @ObservedObject private var customizationManager = ActionCustomizationManager.shared
 
-    @State private var isShowingHelp = false
-
     init(
         selectedRowIDs: Binding<Set<String>>,
         disabledActionIDs: Binding<Set<String>>,
@@ -99,41 +97,9 @@ struct CustomizePage: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .overlay(alignment: .bottomTrailing) {
-            helpButton
-        }
     }
 
-    /// The page's instructions, behind the floating help button the pane keeps in its corner —
-    /// the same affordance System Settings uses, so the list itself stays uncluttered.
-    private var helpButton: some View {
-        Button {
-            isShowingHelp.toggle()
-        } label: {
-            Image(systemName: "questionmark")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .frame(width: 28, height: 28)
-                .background(Circle().fill(.quaternary))
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .help(String(localized: "About the Actions list"))
-        .accessibilityLabel(String(localized: "About the Actions list"))
-        .padding(16)
-        .popover(isPresented: $isShowingHelp, arrowEdge: .bottom) {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: "hand.draw")
-                    .font(.system(size: 15))
-                    .foregroundStyle(.secondary)
-                Text("Drag to reorder the popup bar or group actions. Turn off an action to hide it. An alias or hotkey triggers an action anywhere.")
-                    .font(.callout)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(width: 300, alignment: .leading)
-            .padding(16)
-        }
-    }
+
 }
 
 // MARK: - Rows
@@ -147,6 +113,11 @@ struct ActionRowView: View {
     @Binding var disabledActionIDs: Set<String>
     @Binding var disabledPackages: Set<String>
 
+    var isRenaming: Bool = false
+    var onRename: ((String?) -> Void)? = nil
+    @State private var editedTitle = ""
+    @FocusState private var nameFocused: Bool
+
     var body: some View {
         let isEnabled = ActionEnablement.binding(
             for: action,
@@ -159,10 +130,31 @@ struct ActionRowView: View {
                 .frame(width: 20, height: 20, alignment: .center)
                 .foregroundStyle(.secondary)
 
-            Text(presentationModel.title)
-                .font(.system(size: 13, weight: .regular))
-                .foregroundStyle(isEnabled.wrappedValue ? .primary : .secondary)
-                .lineLimit(1)
+            if isRenaming {
+                TextField("Action Name", text: $editedTitle)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13))
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 4)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.05)))
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.accentColor.opacity(0.65), lineWidth: 1))
+                    .frame(maxWidth: 280, alignment: .leading)
+                    .focused($nameFocused)
+                    .onAppear {
+                        editedTitle = presentationModel.title
+                        nameFocused = true
+                    }
+                    .onSubmit { onRename?(editedTitle) }
+                    .onExitCommand { onRename?(nil) }
+                    .onChange(of: nameFocused) { _, focused in
+                        if !focused { onRename?(editedTitle) }
+                    }
+            } else {
+                Text(presentationModel.title)
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(isEnabled.wrappedValue ? .primary : .secondary)
+                    .lineLimit(1)
+            }
 
             if let gated = action as? GatedExtensionAction, let tooltip = extensionGateDescription(for: gated.reason) {
                 GateInfoIcon(tooltip: tooltip)
