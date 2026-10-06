@@ -4,6 +4,21 @@ All notable user-facing changes to OpenClip.
 
 ---
 
+## Unreleased
+
+### Features & Improvements
+- Added automatic contextual pill placement and refined popup hover highlights.
+- Added rule matching by process name and path for apps without bundle identifiers.
+- Improved AI action creation and customization settings.
+- Restricted action-logic editing to custom actions.
+
+### Fixes & Stability
+- Improved popup eligibility in other apps' fullscreen Spaces. A popup detected outside the active Space now gets one fresh-panel recovery attempt while its source app remains frontmost.
+- Updated OpenSelection to 2.15.3 to bound Accessibility inspection and menu traversal workers during stalled app responses.
+- Retained trace-linked placement and recovery diagnostics while reducing routine selection log noise.
+
+---
+
 ## v1.8.0-beta.1 - 2026-10-03
 
 ### Features & Improvements

@@ -478,7 +478,8 @@ public final class HotkeyManager {
             rtf: selectionRTF,
             flavors: selectionFlavors,
             selectionGeneration: generation,
-            isEditable: isClipboardFallback ? false : read.isEditable
+            isEditable: isClipboardFallback ? false : read.isEditable,
+            traceID: read.traceID
         )
         let canPaste = await probeTask?.value
         context = context.with(pasteTargetAvailable: canPaste)

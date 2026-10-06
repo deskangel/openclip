@@ -147,7 +147,7 @@ areas; stale debt notes are worse than none.
 
 ## Action-Search Palette & Popup Growth
 
-- **Action bar hover chrome** uses a rounded accent highlight blended 15% toward white inset by 2 scaled points horizontally for interior buttons, 3 for end buttons, and 3 vertically, shared by the main and sub-action bars. Interior corners use a 7-point radius; outer edge corners use 10 points (both scaled). Foregrounds and full button hit areas stay unchanged; hovered buttons use a white foreground and the highlight snaps between them with no transition; search chrome is unchanged.
+- **Action bar hover chrome** uses a rounded highlight in the unmodified system accent color from v1.8.0-beta.1, inset by 2 scaled points horizontally for interior buttons, 3 for end buttons, and 3 vertically, shared by the main and sub-action bars. Interior corners use a 7-point radius; outer edge corners use 10 points (both scaled). Foregrounds and full button hit areas stay unchanged; hovered buttons use a white foreground and the highlight snaps between them with no transition; search chrome is unchanged.
 
 - **AI presets can leave AI Tools.** `SettingKey.standaloneAIActionIDs` records presets dragged
   to the Actions list's root. Their canonical IDs participate in `action.order`, survive preset
@@ -199,7 +199,8 @@ areas; stale debt notes are worse than none.
 - **Search and result-card footers share separate theme-aware buttons.**
   `PopupFooterButtonChrome` uses a native `.glassEffect` rounded rectangle for the glass theme on
   macOS 26+, with a material/tint fallback; secondary actions are neutral and the primary action
-  uses the accent color. Buttons have a 12pt radius, compact targets, and a 6pt gap, with an 8pt
+  uses the accent color. In light mode, primary glass buttons use a full-opacity accent base and
+  glass tint to avoid washing out the color beneath white labels. Buttons have a 12pt radius, compact targets, and a 6pt gap, with an 8pt
   trailing inset so the final button sits closer to the popup edge.
 - **The search header can move the popup.** Dragging its magnifying glass or the clear strips above
   and below the text field uses the result card's panel-drag path; editing and selecting search text
@@ -452,11 +453,27 @@ replace a newer popup.
   switches; programmatic focus changes without an observed gesture are not detected.
   It is not an AX focused-element identity guarantee, and arbitrary extension keystrokes
   remain outside this paste-result check.
-- **OpenSelection integration is published and pinned.** `project.yml` uses the remote
-  OpenSelection repository at revision `918a1cae87b3a80bf7abf76e76373eb56c6c3610`.
-  The clipboard coordination, structured outcomes and correlated diagnostics live on that
-  repository's main branch. Fresh builds resolve the same source through SwiftPM; the local
-  checkout is no longer required, and the temporary bootstrap script/patch are retired.
+- **OpenSelection is published and pinned to 2.15.3.** `project.yml` resolves the remote
+  tag at `a421effaebe473eb121fe0ebc469117a1de325e0`; the local checkout is optional.
+  Inspect and menu budgets use monotonic clocks. Inspect deliberately leaves the initial
+  system-wide focused-app lookup at the process-default timeout to avoid mutating the
+  process-global AX timeout. That call remains residual exposure; subsequent element
+  reads are bounded. Shared-trace refresh can extend an overlapping retry worker's budget.
+- **Selection-to-popup diagnostics carry the retrieval trace.** `SelectionContext.traceID`
+  survives context transformations and correlates blocked delivery, placement failures,
+  recovery, and related occlusion/dismissal events. Routine successful presentation is quiet.
+  See `docs/logging.md`. Window state is evidence, not proof of on-screen pixels;
+  pre-retrieval gesture rejection may have no retrieval trace.
+- **Popup fullscreen eligibility is explicit.** The main panel uses `canJoinAllApplications`
+  alongside `canJoinAllSpaces` and `fullScreenAuxiliary` to join other apps' fullscreen
+  Spaces. At the first delayed visibility check, a visible non-key panel still off-Space
+  gets one replacement panel with the existing hosting view and frame, only while its
+  source PID remains frontmost. A separate presentation token invalidates checks on hide
+  or replacement (including re-shows retaining an AI session). Resetting flags on the old
+  window failed in live traces #102/#104/#106; the new window identity replaces that failed
+  approach. Recovery is restricted to action mode. The content view and frame survive; recovery never activates OpenClip or makes the panel key. The second check logs
+  unresolved placement. Automated tests verify the guards and bounded retry; actual
+  fullscreen placement still requires WindowServer validation on the affected machine.
 - **Automatic reads are tied to the selection source process.** The monitor uses the activated app
   from the workspace notification and cancels pending reads and clears the cached selection on a
   switch away from the source. Queued notifications for apps no longer frontmost, activation of

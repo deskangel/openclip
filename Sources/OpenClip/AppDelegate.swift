@@ -114,6 +114,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         // delivery time here because the hold/retrieval sleeps can outlast the pause toggle.
         macMonitor.onSelection = { [weak self] context, canPaste in
             let isPaused = DefaultSettingsStore.shared.get(.pauseUntilTimestamp) > Date().timeIntervalSince1970
+            if isPaused || self?.popupController == nil {
+                Log.selection.debug("[Trace#\(context.traceID ?? 0, privacy: .public)] popup delivery blocked paused=\(isPaused, privacy: .public) controllerAvailable=\(self?.popupController != nil, privacy: .public)")
+            }
             if !isPaused {
                 // A real selection means the user has seen (or no longer needs) the nudge.
                 self?.coachMarkController?.dismiss()

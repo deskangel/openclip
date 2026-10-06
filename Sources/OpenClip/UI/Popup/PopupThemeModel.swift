@@ -60,9 +60,9 @@ enum PopupThemeModel {
         }
     }
 
-    /// Temporary lighter version of the original accent hover fill.
+    /// Original system accent color used by the beta.1 hover fill.
     static var barHoverFill: Color {
-        Color(nsColor: NSColor.controlAccentColor.blended(withFraction: 0.15, of: .white) ?? .controlAccentColor)
+        Color.accentColor
     }
 
     /// The secondary foreground color (hints, badges) for the given effective theme token.
@@ -255,9 +255,9 @@ struct PopupFooterButtonChrome: ViewModifier {
                !NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency {
                 if let tint {
                     content
-                        .background(shape.fill(tint.opacity(isHovered ? 0.38 : 0.28)))
+                        .background(shape.fill(tint.opacity(colorScheme == .light ? 1.0 : (isHovered ? 0.38 : 0.28))))
                         .background(.ultraThinMaterial, in: shape)
-                        .glassEffect(.regular.tint(tint.opacity(0.42)).interactive(), in: shape)
+                        .glassEffect(.regular.tint(tint.opacity(colorScheme == .light ? 1.0 : 0.42)).interactive(), in: shape)
                         .overlay(shape.stroke(Color.white.opacity(0.24), lineWidth: 0.5))
                 } else {
                     content

@@ -1681,6 +1681,10 @@ final class MacSelectionMonitorTests: XCTestCase {
 
         XCTAssertNotNil(delivered, "Popup must be delivered when modifier is none")
         XCTAssertEqual(delivered?.text, "normal selection")
+        XCTAssertNotNil(delivered?.traceID, "Retrieval ID must reach popup delivery")
+        XCTAssertEqual(delivered?.traceID, monitor.lastReadResponse?.traceID)
+        XCTAssertEqual(delivered?.with(cursorPosition: .zero).with(pasteTargetAvailable: true).traceID,
+                       delivered?.traceID, "Popup placement and paste enrichment must retain correlation")
     }
 
     func testSelectionModifierKeyboardTriggerObeysModifier() async {

@@ -19,8 +19,7 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
     private func recordRead(_ response: SelectionTriggerResponse) {
         lastReadResponse = response
         onReadOutcome?(response)
-        if let traceID = response.traceID,
-           [.clipboardFallback, .targetChanged, .cancelled, .tooLarge].contains(response.status) {
+        if let traceID = response.traceID, response.status != .selection {
             Log.selection.debug("[Trace#\(traceID, privacy: .public)] monitor delivery outcome: \(response.status.rawValue, privacy: .public)")
         }
     }
@@ -522,7 +521,8 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
                 flavors: selectionFlavors,
                 selectionGeneration: self.selectionGeneration,
                 isEditable: isClipboardFallback ? false : isEditable,
-                pasteTargetAvailable: canPaste
+                pasteTargetAvailable: canPaste,
+                traceID: read.traceID
             )
             guard !Task.isCancelled else { return }
             guard self.isSelectionSourceActive(app) else {
@@ -783,7 +783,8 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
             flavors: result.flavors,
             selectionGeneration: selectionGeneration,
             isEditable: response.isEditable,
-            pasteTargetAvailable: nil
+            pasteTargetAvailable: nil,
+            traceID: response.traceID
         )
         let canPaste = await probeTask?.value
         guard isSelectionSourceActive(app) else {
@@ -804,6 +805,8 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
         // `latestSelection` stays warm for the hotkey.
         if !policy.hotkeyOnly, self.settingsStore.get(.isAppEnabled), modifierSatisfied {
             self.onSelection?(context, canPaste)
+        } else {
+            Log.selection.debug("[Trace#\(response.traceID ?? 0, privacy: .public)] presentation blocked hotkeyOnly=\(policy.hotkeyOnly, privacy: .public) enabled=\(self.settingsStore.get(.isAppEnabled), privacy: .public) modifierSatisfied=\(modifierSatisfied, privacy: .public)")
         }
     }
 
