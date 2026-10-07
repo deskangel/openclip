@@ -4,10 +4,6 @@ All notable user-facing changes to OpenClip.
 
 ---
 
-## Unreleased
-
----
-
 ## v1.8.0 - 2026-10-07
 
 ### Features & Improvements
