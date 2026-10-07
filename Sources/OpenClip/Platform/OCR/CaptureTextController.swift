@@ -52,8 +52,22 @@ final class CaptureTextController {
             panel.makeKeyAndOrderFront(nil)
             return panel
         }
-        // Cursor rectangles may not be recalculated when nonactivating panels are ordered front.
-        // Hold one explicit cursor override for the whole multi-display capture session.
+        // The window server only consults cursor rects (and honors
+        // NSCursor.push/set) for the active app: a background
+        // nonactivating overlay keeps the arrow no matter what the views
+        // request (same reason ⌘⇧4 lives in the window server itself).
+        // Follow the SnipController pattern (cf. Microsoft ZoomItMac):
+        // order a key-capable borderless overlay front, activate so its
+        // cursor rects are evaluated, then hold one explicit crosshair
+        // override for the session. Activation resets the cursor, so the
+        // lease re-asserts after it settles.
+        NSApp.activate(ignoringOtherApps: true)
+        for panel in panels {
+            panel.makeFirstResponder(panel.contentView)
+            if let view = panel.contentView {
+                panel.invalidateCursorRects(for: view)
+            }
+        }
         cursorLease.begin()
     }
 
@@ -234,23 +248,34 @@ final class CaptureCursorLease {
     private let pushCursor: () -> Void
     private let popCursor: () -> Void
     private let setCursor: () -> Void
+    private let asyncSet: (@escaping () -> Void) -> Void
+    private let asyncReassert: (@escaping () -> Void) -> Void
+    private var pushCount = 0
     private(set) var isActive = false
 
     init(
         pushCursor: @escaping () -> Void = { NSCursor.crosshair.push() },
         popCursor: @escaping () -> Void = { NSCursor.pop() },
-        setCursor: @escaping () -> Void = { NSCursor.crosshair.set() }
+        setCursor: @escaping () -> Void = { NSCursor.crosshair.set() },
+        asyncSet: @escaping (@escaping () -> Void) -> Void = { work in DispatchQueue.main.async(execute: work) },
+        asyncReassert: @escaping (@escaping () -> Void) -> Void = { work in DispatchQueue.main.asyncAfter(deadline: .now() + 0.08, execute: work) }
     ) {
         self.pushCursor = pushCursor
         self.popCursor = popCursor
         self.setCursor = setCursor
+        self.asyncSet = asyncSet
+        self.asyncReassert = asyncReassert
     }
 
     func begin() {
         guard !isActive else { return }
         isActive = true
-        pushCursor()
-        setCursor()
+        pushIfActive()
+        // App/window activation resets the cursor after the synchronous
+        // push, so re-assert once it has settled (cf. ZoomItMac's
+        // CrosshairCursorLease second push).
+        asyncSet { [weak self] in self?.setIfActive() }
+        asyncReassert { [weak self] in self?.pushIfActive() }
     }
 
     func refresh() {
@@ -261,7 +286,22 @@ final class CaptureCursorLease {
     func end() {
         guard isActive else { return }
         isActive = false
-        popCursor()
+        while pushCount > 0 {
+            popCursor()
+            pushCount -= 1
+        }
+    }
+
+    private func pushIfActive() {
+        guard isActive else { return }
+        pushCursor()
+        pushCount += 1
+        setCursor()
+    }
+
+    private func setIfActive() {
+        guard isActive else { return }
+        setCursor()
     }
 }
 
@@ -321,7 +361,12 @@ private final class RegionSelectionPanel: NSPanel {
 
     init(screen: NSScreen) {
         displayScreen = screen
-        super.init(contentRect: screen.frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        // A borderless window that can still become key (and main), so the
+        // selection view receives key events (Escape) and the crosshair
+        // cursor rects are honored. A `.nonactivatingPanel` would keep the
+        // source app active but the window server ignores cursor requests
+        // from inactive apps, so the arrow would linger over the overlay.
+        super.init(contentRect: screen.frame, styleMask: [.borderless], backing: .buffered, defer: false)
         isOpaque = false
         backgroundColor = .clear
         level = .screenSaver
@@ -331,7 +376,7 @@ private final class RegionSelectionPanel: NSPanel {
     }
 
     override var canBecomeKey: Bool { true }
-    override var canBecomeMain: Bool { false }
+    override var canBecomeMain: Bool { true }
     fileprivate func refreshCaptureCursor() { onCursorRefresh?() }
     fileprivate func finish(_ rect: CGRect, releasePoint: CGPoint, mouseDownPoint: CGPoint) {
         onSelection?(rect, releasePoint, mouseDownPoint, displayScreen)
@@ -387,6 +432,15 @@ private final class RegionSelectionView: NSView {
     override func resetCursorRects() {
         super.resetCursorRects()
         addCursorRect(bounds, cursor: .crosshair)
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        // The cursor rect is only evaluated once the view is in an active
+        // key window; assert immediately so no arrow frame slips through.
+        if window != nil {
+            NSCursor.crosshair.set()
+        }
     }
 
     override func draw(_ dirtyRect: NSRect) {

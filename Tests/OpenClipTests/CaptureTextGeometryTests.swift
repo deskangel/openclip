@@ -81,7 +81,9 @@ final class CaptureTextGeometryTests: XCTestCase {
         let lease = CaptureCursorLease(
             pushCursor: { pushes += 1 },
             popCursor: { pops += 1; events.append("restore") },
-            setCursor: { sets += 1 }
+            setCursor: { sets += 1 },
+            asyncSet: { $0() },
+            asyncReassert: { $0() }
         )
 
         lease.begin()
@@ -96,10 +98,13 @@ final class CaptureTextGeometryTests: XCTestCase {
         lease.end()
         lease.refresh()
 
-        XCTAssertEqual(pushes, 1)
-        XCTAssertEqual(pops, 1)
-        XCTAssertEqual(sets, 2)
-        XCTAssertEqual(events, ["close", "restore"])
+        // begin() pushes once synchronously, then re-asserts with a second
+        // push after activation settles (activation resets the cursor).
+        // end() pops every outstanding push so the stack stays balanced.
+        XCTAssertEqual(pushes, 2)
+        XCTAssertEqual(pops, 2)
+        XCTAssertEqual(sets, 4)
+        XCTAssertEqual(events, ["close", "restore", "restore"])
         XCTAssertFalse(lease.isActive)
     }
 }
