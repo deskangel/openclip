@@ -147,7 +147,7 @@ areas; stale debt notes are worse than none.
 
 ## Action-Search Palette & Popup Growth
 
-- **Action bar hover chrome** uses a rounded accent highlight blended 15% toward white inset by 2 scaled points horizontally for interior buttons, 3 for end buttons, and 3 vertically, shared by the main and sub-action bars. Interior corners use a 7-point radius; outer edge corners use 10 points (both scaled). Foregrounds and full button hit areas stay unchanged; hovered buttons use a white foreground and the highlight snaps between them with no transition; search chrome is unchanged.
+- **Action bar hover chrome** uses a rounded highlight in the system accent color softened 8% toward white, with no horizontal inset for interior text buttons and 2 scaled points for end text buttons; icon buttons retain 2 points for interiors and 3 for ends. All highlights are inset by 3 scaled points vertically, shared by the main and sub-action bars. Interior corners use a 7-point radius; outer edge corners use 10 points (both scaled). Foregrounds and full button hit areas stay unchanged; hovered buttons use a white foreground and the highlight snaps between them with no transition; search chrome is unchanged.
 
 - **AI presets can leave AI Tools.** `SettingKey.standaloneAIActionIDs` records presets dragged
   to the Actions list's root. Their canonical IDs participate in `action.order`, survive preset
@@ -155,6 +155,27 @@ areas; stale debt notes are worse than none.
   sub-bar and scoped search. Dropping a preset onto AI Tools removes its explicit order and
   returns it to the group. Bar and palette clicks share the controller's AI execution path;
   the global AI switch and individual preset enablement still apply.
+- **AI Tools follows group visibility and membership.** Its Actions-list and menu-bar toggles
+  use `disabledActionIDs`, independently of the global AI service switch. Hidden groups also
+  hide their grouped presets from the bar and search, while standalone presets remain usable.
+  The available-action catalog retains eligible AI children so hover sub-bars and scoped search
+  resolve the same members, without rebuilding filtered-out presets from the AI singleton.
+  Empty AI groups disappear from the popup and Actions list. Ungroup moves all members to the
+  root, Remove from Group moves one, and a standalone preset's Add to Group > AI Tools menu
+  restores the group even after its final member left. Add to Group captures all selected eligible
+  actions, including multiple standalone AI presets. Dropping between its members also works.
+  AI presets support selection-based Delete in the Actions list, removing the saved preset and
+  clearing its shortcut, alias, appearance override, and standalone placement.
+  Return on a single selected action or its Rename context menu edits its display name inline
+  through the customization store; double-clicking a row opens its editor.
+  The editor hero title also supports double-click renaming. A slow second click on a selected
+  name also renames it. Enter or focus loss commits, and Escape cancels. The list chevron still opens the full editor.
+- **Actions-list drag destinations are explicit.** A soft accent fill highlights only the destination
+  group header, without an outline; root drops use the native full-width insertion line. The leading
+  gutter at an expanded group’s bottom gap moves actions out; the indented side reorders inside. Multi-member drops reorder the
+  whole selection using the displayed gap index. Returning AI presets uses the same insertion
+  calculation. Moving the last member out preserves the root destination when its empty group
+  disappears; dragging a group with selected children keeps its membership intact.
 - **AI presets share the standard action editor.** Their AI settings pages expose the same icon
   picker, Icon/Text display mode, search alias and per-action shortcut as other leaf actions,
   alongside an autosaved prompt field. Appearance and aliases use the existing stores keyed by
@@ -199,7 +220,8 @@ areas; stale debt notes are worse than none.
 - **Search and result-card footers share separate theme-aware buttons.**
   `PopupFooterButtonChrome` uses a native `.glassEffect` rounded rectangle for the glass theme on
   macOS 26+, with a material/tint fallback; secondary actions are neutral and the primary action
-  uses the accent color. Buttons have a 12pt radius, compact targets, and a 6pt gap, with an 8pt
+  uses the accent color. In light mode, primary glass buttons use a full-opacity accent base and
+  glass tint to avoid washing out the color beneath white labels. Buttons have a 12pt radius, compact targets, and a 6pt gap, with an 8pt
   trailing inset so the final button sits closer to the popup edge.
 - **The search header can move the popup.** Dragging its magnifying glass or the clear strips above
   and below the text field uses the result card's panel-drag path; editing and selecting search text
@@ -452,11 +474,27 @@ replace a newer popup.
   switches; programmatic focus changes without an observed gesture are not detected.
   It is not an AX focused-element identity guarantee, and arbitrary extension keystrokes
   remain outside this paste-result check.
-- **OpenSelection integration is published and pinned.** `project.yml` uses the remote
-  OpenSelection repository at revision `918a1cae87b3a80bf7abf76e76373eb56c6c3610`.
-  The clipboard coordination, structured outcomes and correlated diagnostics live on that
-  repository's main branch. Fresh builds resolve the same source through SwiftPM; the local
-  checkout is no longer required, and the temporary bootstrap script/patch are retired.
+- **OpenSelection is published and pinned to 2.15.3.** `project.yml` resolves the remote
+  tag at `a421effaebe473eb121fe0ebc469117a1de325e0`; the local checkout is optional.
+  Inspect and menu budgets use monotonic clocks. Inspect deliberately leaves the initial
+  system-wide focused-app lookup at the process-default timeout to avoid mutating the
+  process-global AX timeout. That call remains residual exposure; subsequent element
+  reads are bounded. Shared-trace refresh can extend an overlapping retry worker's budget.
+- **Selection-to-popup diagnostics carry the retrieval trace.** `SelectionContext.traceID`
+  survives context transformations and correlates blocked delivery, placement failures,
+  recovery, and related occlusion/dismissal events. Routine successful presentation is quiet.
+  See `docs/logging.md`. Window state is evidence, not proof of on-screen pixels;
+  pre-retrieval gesture rejection may have no retrieval trace.
+- **Popup fullscreen eligibility is explicit.** The main panel uses `canJoinAllApplications`
+  alongside `canJoinAllSpaces` and `fullScreenAuxiliary` to join other apps' fullscreen
+  Spaces. At the first delayed visibility check, a visible non-key panel still off-Space
+  gets one replacement panel with the existing hosting view and frame, only while its
+  source PID remains frontmost. A separate presentation token invalidates checks on hide
+  or replacement (including re-shows retaining an AI session). Resetting flags on the old
+  window failed in live traces #102/#104/#106; the new window identity replaces that failed
+  approach. Recovery is restricted to action mode. The content view and frame survive; recovery never activates OpenClip or makes the panel key. The second check logs
+  unresolved placement. Automated tests verify the guards and bounded retry; actual
+  fullscreen placement still requires WindowServer validation on the affected machine.
 - **Automatic reads are tied to the selection source process.** The monitor uses the activated app
   from the workspace notification and cancels pending reads and clears the cached selection on a
   switch away from the source. Queued notifications for apps no longer frontmost, activation of

@@ -19,8 +19,7 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
     private func recordRead(_ response: SelectionTriggerResponse) {
         lastReadResponse = response
         onReadOutcome?(response)
-        if let traceID = response.traceID,
-           [.clipboardFallback, .targetChanged, .cancelled, .tooLarge].contains(response.status) {
+        if let traceID = response.traceID, response.status != .selection {
             Log.selection.debug("[Trace#\(traceID, privacy: .public)] monitor delivery outcome: \(response.status.rawValue, privacy: .public)")
         }
     }
@@ -103,8 +102,8 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
     }
     /// Policy resolution for the target app; tests fix it to `.default` so real user rules
     /// (~/.openclip/rules.json) cannot alter gating or force copy-based strategies mid-test.
-    internal var policyResolver: @MainActor (String?) -> AppPolicyContext = { bundleID in
-        RuleEngine.shared.resolvePolicies(for: bundleID ?? "")
+    internal var policyResolver: @MainActor (AppIdentity) -> AppPolicyContext = { identity in
+        RuleEngine.shared.resolvePolicies(for: identity)
     }
     
     // Delegated to OpenSelectionMonitor
@@ -256,9 +255,7 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
         if let targetPID = app.processIdentifier, let sourcePID = latest.context.sourceApp.processIdentifier {
             guard targetPID == sourcePID else { return nil }
         }
-        guard let targetBundle = app.bundleIdentifier, latest.context.sourceApp.bundleIdentifier == targetBundle else {
-            return nil
-        }
+        guard app.isSameApp(as: latest.context.sourceApp) else { return nil }
         guard now().timeIntervalSince(latest.context.timestamp) <= Constants.selectionMaxAge else {
             latestSelection = nil
             return nil
@@ -443,7 +440,7 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
             var delivered = false
             defer { if !delivered { self.triggeredByHold = false } }
 
-            let policy = self.policyResolver(app.bundleIdentifier)
+            let policy = self.policyResolver(AppIdentity(app))
             if policy.disabled || policy.hotkeyOnly {
                 return
             }
@@ -524,7 +521,8 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
                 flavors: selectionFlavors,
                 selectionGeneration: self.selectionGeneration,
                 isEditable: isClipboardFallback ? false : isEditable,
-                pasteTargetAvailable: canPaste
+                pasteTargetAvailable: canPaste,
+                traceID: read.traceID
             )
             guard !Task.isCancelled else { return }
             guard self.isSelectionSourceActive(app) else {
@@ -638,7 +636,7 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
                 return
             }
             
-            let policy = self.policyResolver(app.bundleIdentifier)
+            let policy = self.policyResolver(AppIdentity(app))
             if policy.disabled {
                 return
             }
@@ -703,7 +701,7 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
                 return
             }
             
-            let policy = self.policyResolver(app.bundleIdentifier)
+            let policy = self.policyResolver(AppIdentity(app))
             if policy.disabled {
                 return
             }
@@ -785,7 +783,8 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
             flavors: result.flavors,
             selectionGeneration: selectionGeneration,
             isEditable: response.isEditable,
-            pasteTargetAvailable: nil
+            pasteTargetAvailable: nil,
+            traceID: response.traceID
         )
         let canPaste = await probeTask?.value
         guard isSelectionSourceActive(app) else {
@@ -806,6 +805,8 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
         // `latestSelection` stays warm for the hotkey.
         if !policy.hotkeyOnly, self.settingsStore.get(.isAppEnabled), modifierSatisfied {
             self.onSelection?(context, canPaste)
+        } else {
+            Log.selection.debug("[Trace#\(response.traceID ?? 0, privacy: .public)] presentation blocked hotkeyOnly=\(policy.hotkeyOnly, privacy: .public) enabled=\(self.settingsStore.get(.isAppEnabled), privacy: .public) modifierSatisfied=\(modifierSatisfied, privacy: .public)")
         }
     }
 

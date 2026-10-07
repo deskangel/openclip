@@ -47,14 +47,14 @@ final class GroupSubActionBarViewTests: XCTestCase {
         let shortTextAction = TestAction(id: "t1", title: "AB", icon: .text("AB"))
         let longTextAction = TestAction(id: "t2", title: "Format JSON", icon: .text("Format JSON"))
 
-        // Standard symbol icon defaults to actionButtonWidth (34)
+        // Standard symbol icon defaults to actionButtonWidth (39)
         XCTAssertEqual(GroupSubActionBarView.estimatedButtonWidth(for: symbolAction), PopupMetrics.actionButtonWidth)
-        // Short text (<=2 chars) defaults to actionButtonWidth (34)
+        // Short text (<=2 chars) defaults to actionButtonWidth (39)
         XCTAssertEqual(GroupSubActionBarView.estimatedButtonWidth(for: shortTextAction), PopupMetrics.actionButtonWidth)
-        // Long text is estimated from character count + padding, capped at 125
+        // Long text is estimated from character count + padding, capped at 144
         let longWidth = GroupSubActionBarView.estimatedButtonWidth(for: longTextAction)
         XCTAssertGreaterThan(longWidth, PopupMetrics.actionButtonWidth)
-        XCTAssertLessThanOrEqual(longWidth, 125)
+        XCTAssertLessThanOrEqual(longWidth, 144)
     }
 
     @MainActor
@@ -81,7 +81,7 @@ final class GroupSubActionBarViewTests: XCTestCase {
         XCTAssertEqual(widthWithoutChevrons, expectedActionWidth)
 
         let widthWithChevrons = GroupSubActionBarView.measuredPageWidth(actions: [a1, a2], hasLeftChevron: true, hasRightChevron: true)
-        XCTAssertEqual(widthWithChevrons, expectedActionWidth + 29 + 29)
+        XCTAssertEqual(widthWithChevrons, expectedActionWidth + PopupPageLayout.chevronWidth + PopupPageLayout.chevronWidth)
     }
 
     @MainActor

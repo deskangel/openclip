@@ -524,6 +524,7 @@
   "Drag to reorder the actions behind this extension's icon.": "拖动可重新排列此扩展图标下的操作。",
   "Enable AI Tools": "启用 AI 工具",
   "Example: com.apple.Terminal. Use * to match several apps.": "例如：com.apple.Terminal。使用 * 匹配多个应用。",
+  "Use process:<name> or path:<executable> to target apps without a bundle ID. Use * to match several apps.": "使用 process:<name> 或 path:<executable> 指定没有 Bundle ID 的应用。使用 * 匹配多个应用。",
   "Extension Removed": "已移除扩展",
   "Its files and settings are deleted from this Mac.": "其文件和设置将从这台 Mac 上删除。",
   "Keep": "保留",
@@ -764,5 +765,6 @@
   "Drag to reorder. To move a preset onto the main popup bar, drag it out of AI Tools in the Actions list.": "拖动以重新排序。要将预设移到主弹出工具栏，请在操作列表中将其拖出 AI 工具。",
   "Contextual Pill": "上下文胶囊",
   "Show contextual actions to the left or right of the main bar. Auto follows the horizontal position.": "在主栏的左侧或右侧显示上下文操作。“自动”会跟随水平位置。",
-  "Contextual Pill Position": "上下文胶囊位置"
+  "Contextual Pill Position": "上下文胶囊位置",
+  "Rename": "重命名"
 }

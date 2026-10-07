@@ -539,6 +539,31 @@ final class ActionsOutlineDropTests: XCTestCase {
         outlineCoordinator.rebuildTree()
     }
 
+    func testAddToGroupMenuMovesAllSelectedActions() throws {
+        let groupID = try XCTUnwrap(coordinator.createGroup(title: "Group", iconName: "folder", memberActionIDs: ["action.4"]))
+        outlineCoordinator.rebuildTree()
+        let outline = ActionsOutlineTableView()
+        outline.addTableColumn(NSTableColumn(identifier: NSUserInterfaceItemIdentifier("action")))
+        outline.dataSource = outlineCoordinator
+        outline.delegate = outlineCoordinator
+        outline.allowsMultipleSelection = true
+        outlineCoordinator.outlineView = outline
+        outline.reloadData()
+        let selectedIDs: Set<String> = ["action.1", "action.2"]
+        let rows = IndexSet((0..<outline.numberOfRows).filter {
+            guard let node = outline.item(atRow: $0) as? OutlineNode else { return false }
+            return selectedIDs.contains(node.id)
+        })
+        XCTAssertEqual(rows.count, 2)
+        outline.selectRowIndexes(rows, byExtendingSelection: false)
+        let menu = outlineCoordinator.contextMenu(for: standalone("action.1"))
+        let add = try XCTUnwrap(menu.items.first { $0.title == "Add to Group" })
+        let destination = try XCTUnwrap(add.submenu?.items.first)
+        XCTAssertTrue(NSApp.sendAction(try XCTUnwrap(destination.action), to: destination.target, from: destination))
+        XCTAssertEqual(coordinator.actionGroupDefs.first { $0.id == groupID }?.memberActionIDs, ["action.4", "action.1", "action.2"])
+        XCTAssertFalse(outlineCoordinator.rootNodes.contains { selectedIDs.contains($0.id) })
+    }
+
     func testDraggingAIPresetToRootPersistsPlacementAndOrder() throws {
         registerAIPresets()
         let id = "ai.preset.rewrite"
@@ -562,7 +587,10 @@ final class ActionsOutlineDropTests: XCTestCase {
             cursorPosition: .zero, timestamp: Date(), appPolicy: .default
         ))
         XCTAssertTrue(restored.availableActions(for: context).contains { $0.id == id })
-        XCTAssertFalse(restored.availableActions(for: context).contains { $0.id == "ai.preset.summarize" })
+        let available = restored.availableActions(for: context)
+        let popup = PopupView(actions: available, context: context, onResult: { _ in })
+        XCTAssertFalse(popup.displayActions.contains { $0.id == "ai.preset.summarize" })
+        XCTAssertEqual(SubActionResolver().subActions(of: AIToolsAction(settingsStore: settingsStore), in: available).map(\.id), ["ai.preset.summarize"])
         settingsStore.set(.disabledActionIDs, value: [id])
         XCTAssertFalse(restored.availableActions(for: context).contains { $0.id == id })
     }
@@ -606,7 +634,53 @@ final class ActionsOutlineDropTests: XCTestCase {
         XCTAssertTrue(outlineCoordinator.outlineView(NSOutlineView(), acceptDrop: MockDraggingInfo(actionIDs: ids), item: nil, childIndex: 0))
         XCTAssertEqual(Array(outlineCoordinator.rootNodes.prefix(2).map(\.id)), ids)
         XCTAssertEqual(settingsStore.get(.standaloneAIActionIDs), Set(ids))
-        XCTAssertTrue(outlineCoordinator.rootNodes.first { $0.id == "builtin.aiTools" }?.children.isEmpty == true)
+        XCTAssertFalse(outlineCoordinator.rootNodes.contains { $0.id == "builtin.aiTools" })
+    }
+
+    func testAIGroupContextMenusUngroupAndRestoreAnEmptyGroup() throws {
+        registerAIPresets()
+        let group = try XCTUnwrap(outlineCoordinator.rootNodes.first { $0.id == "builtin.aiTools" })
+        let ungroup = try XCTUnwrap(outlineCoordinator.contextMenu(for: group).items.first { $0.title == "Ungroup" })
+        XCTAssertTrue(NSApp.sendAction(try XCTUnwrap(ungroup.action), to: ungroup.target, from: ungroup))
+        XCTAssertFalse(outlineCoordinator.rootNodes.contains { $0.id == group.id })
+        XCTAssertEqual(settingsStore.get(.standaloneAIActionIDs), ["ai.preset.rewrite", "ai.preset.summarize"])
+
+        let preset = try XCTUnwrap(outlineCoordinator.rootNodes.first { $0.id == "ai.preset.rewrite" })
+        let add = try XCTUnwrap(outlineCoordinator.contextMenu(for: preset).items.first { $0.title == "Add to Group" })
+        let restore = try XCTUnwrap(add.submenu?.items.first)
+        XCTAssertEqual(restore.title, "AI Tools")
+        XCTAssertTrue(NSApp.sendAction(try XCTUnwrap(restore.action), to: restore.target, from: restore))
+        let restored = try XCTUnwrap(outlineCoordinator.rootNodes.first { $0.id == group.id })
+        XCTAssertEqual(restored.children.map(\.id), [preset.id])
+        XCTAssertEqual(settingsStore.get(.standaloneAIActionIDs), ["ai.preset.summarize"])
+    }
+
+    func testRemoveFromAIGroupContextMenuMovesThePresetToRoot() throws {
+        registerAIPresets()
+        let group = try XCTUnwrap(outlineCoordinator.rootNodes.first { $0.id == "builtin.aiTools" })
+        let preset = try XCTUnwrap(group.children.first)
+        let remove = try XCTUnwrap(outlineCoordinator.contextMenu(for: preset).items.first { $0.title == "Remove from Group" })
+        XCTAssertTrue(NSApp.sendAction(try XCTUnwrap(remove.action), to: remove.target, from: remove))
+        XCTAssertTrue(outlineCoordinator.rootNodes.contains { $0.id == preset.id })
+        XCTAssertEqual(settingsStore.get(.standaloneAIActionIDs), [preset.id])
+    }
+
+    func testReturningPresetBetweenAIGroupMembersRestoresSubBarAndOrder() throws {
+        registerAIPresets()
+        let outline = NSOutlineView()
+        let drag = MockDraggingInfo(actionID: "ai.preset.rewrite")
+        XCTAssertTrue(outlineCoordinator.outlineView(outline, acceptDrop: drag, item: nil, childIndex: 0))
+        let group = try XCTUnwrap(outlineCoordinator.rootNodes.first { $0.id == "builtin.aiTools" })
+        XCTAssertEqual(outlineCoordinator.outlineView(outline, validateDrop: drag, proposedItem: group, proposedChildIndex: 1), .move)
+        XCTAssertTrue(outlineCoordinator.outlineView(outline, acceptDrop: drag, item: group, childIndex: 1))
+        let restored = try XCTUnwrap(outlineCoordinator.rootNodes.first { $0.id == group.id })
+        XCTAssertEqual(restored.children.map(\.id), ["ai.preset.summarize", "ai.preset.rewrite"])
+        let context = ActionContext(selection: SelectionContext(
+            text: "Example", sourceApp: AppIdentity(bundleIdentifier: "com.test", localizedName: "Test"),
+            cursorPosition: .zero, timestamp: Date(), appPolicy: .default
+        ))
+        let available = coordinator.resolveActions(for: context)
+        XCTAssertEqual(SubActionResolver().subActions(of: try XCTUnwrap(restored.action), in: available).map(\.id), restored.children.map(\.id))
     }
 
     func testNonAIActionsCannotBePlacedInsideAITools() throws {
@@ -618,6 +692,148 @@ final class ActionsOutlineDropTests: XCTestCase {
     }
 
     // MARK: - Reordering inside an extension's group
+
+    private func makeDropOutline() -> ActionsOutlineTableView {
+        let outline = ActionsOutlineTableView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        outline.addTableColumn(NSTableColumn(identifier: NSUserInterfaceItemIdentifier("action")))
+        outline.dataSource = outlineCoordinator
+        outline.delegate = outlineCoordinator
+        outlineCoordinator.outlineView = outline
+        outline.reloadData()
+        for node in outlineCoordinator.rootNodes where node.isGroup { outline.expandItem(node) }
+        return outline
+    }
+
+    func testMultipleGroupMembersMoveTogetherIntoReportedGap() throws {
+        let id = try XCTUnwrap(coordinator.createGroup(title: "Group", iconName: "folder",
+            memberActionIDs: ["action.1", "action.2", "action.3", "action.4"]))
+        outlineCoordinator.rebuildTree()
+        let group = try XCTUnwrap(outlineCoordinator.rootNodes.first { $0.id == id })
+        let outline = makeDropOutline()
+        let drag = MockDraggingInfo(actionIDs: ["action.1", "action.2"])
+        XCTAssertEqual(outlineCoordinator.outlineView(outline, validateDrop: drag, proposedItem: group, proposedChildIndex: 4), .move)
+        XCTAssertEqual(outline.highlightedDropGroupID, id)
+        XCTAssertTrue(outlineCoordinator.outlineView(outline, acceptDrop: drag, item: group, childIndex: 4))
+        XCTAssertEqual(coordinator.memberActionIDs(for: id), ["action.3", "action.4", "action.1", "action.2"])
+        XCTAssertNil(outline.highlightedDropGroupID)
+    }
+
+    func testMultipleExtensionCommandsReorderTogether() throws {
+        let groupID = "com.pkg.extgroup"
+        coordinator.register(action: GroupAction(id: groupID, title: "Extensions", icon: .symbol("folder"),
+            chrome: ActionChrome(rowStyle: .actionGroup, popupBehavior: .showSubActions, source: .extensionPkg(packageID: "com.pkg"))))
+        let ids = (1...4).map { "\(groupID).s\($0)" }
+        for id in ids { coordinator.register(action: DummyAction(id: id, title: id)) }
+        outlineCoordinator.rebuildTree()
+        let group = try XCTUnwrap(outlineCoordinator.rootNodes.first { $0.id == groupID })
+        let outline = makeDropOutline()
+        let drag = MockDraggingInfo(actionIDs: Array(ids.prefix(2)))
+        XCTAssertEqual(outlineCoordinator.outlineView(outline, validateDrop: drag, proposedItem: group, proposedChildIndex: 4), .move)
+        XCTAssertTrue(outlineCoordinator.outlineView(outline, acceptDrop: drag, item: group, childIndex: 4))
+        XCTAssertEqual(coordinator.memberActionIDs(for: groupID), [ids[2], ids[3], ids[0], ids[1]])
+    }
+
+    func testDroppingMembersOnTheirOwnGroupHeaderKeepsThemGrouped() throws {
+        let id = try XCTUnwrap(coordinator.createGroup(title: "Group", iconName: "folder", memberActionIDs: ["action.1", "action.2", "action.3"]))
+        outlineCoordinator.rebuildTree()
+        let group = try XCTUnwrap(outlineCoordinator.rootNodes.first { $0.id == id })
+        let outline = makeDropOutline()
+        let drag = MockDraggingInfo(actionID: "action.1")
+        XCTAssertEqual(outlineCoordinator.outlineView(outline, validateDrop: drag, proposedItem: group, proposedChildIndex: NSOutlineViewDropOnItemIndex), .move)
+        XCTAssertEqual(outline.highlightedDropGroupID, id)
+        XCTAssertTrue(outlineCoordinator.outlineView(outline, acceptDrop: drag, item: group, childIndex: NSOutlineViewDropOnItemIndex))
+        XCTAssertEqual(coordinator.memberActionIDs(for: id), ["action.2", "action.3", "action.1"])
+    }
+
+    func testMixedExistingAndIncomingMembersKeepDropOrder() throws {
+        let id = try XCTUnwrap(coordinator.createGroup(title: "Group", iconName: "folder", memberActionIDs: ["action.1", "action.2", "action.3"]))
+        outlineCoordinator.rebuildTree()
+        let group = try XCTUnwrap(outlineCoordinator.rootNodes.first { $0.id == id })
+        XCTAssertTrue(outlineCoordinator.outlineView(NSOutlineView(), acceptDrop: MockDraggingInfo(actionIDs: ["action.1", "action.4"]), item: group, childIndex: 3))
+        XCTAssertEqual(coordinator.memberActionIDs(for: id), ["action.2", "action.3", "action.1", "action.4"])
+    }
+
+    func testMovingLastGroupMemberOutPreservesRootDestination() throws {
+        let id = try XCTUnwrap(coordinator.createGroup(title: "Group", iconName: "folder", memberActionIDs: ["action.1"]))
+        outlineCoordinator.rebuildTree()
+        let index = try XCTUnwrap(outlineCoordinator.rootNodes.firstIndex { $0.id == id })
+        let outline = makeDropOutline()
+        let drag = MockDraggingInfo(actionID: "action.1")
+        XCTAssertEqual(outlineCoordinator.outlineView(outline, validateDrop: drag, proposedItem: nil, proposedChildIndex: index), .move)
+        XCTAssertNil(outline.highlightedDropGroupID)
+        XCTAssertTrue(outlineCoordinator.outlineView(outline, acceptDrop: drag, item: nil, childIndex: index))
+        XCTAssertFalse(coordinator.actionGroupDefs.contains { $0.id == id })
+        XCTAssertEqual(outlineCoordinator.rootNodes.compactMap { $0.action?.id }, ["action.1", "action.2", "action.3", "action.4"])
+    }
+
+    func testDraggingGroupWithItsSelectedChildDoesNotUngroupChild() throws {
+        let id = try XCTUnwrap(coordinator.createGroup(title: "Group", iconName: "folder", memberActionIDs: ["action.1", "action.2"]))
+        outlineCoordinator.rebuildTree()
+        let count = outlineCoordinator.rootNodes.count
+        XCTAssertTrue(outlineCoordinator.outlineView(NSOutlineView(), acceptDrop: MockDraggingInfo(actionIDs: [id, "action.1"]), item: nil, childIndex: count))
+        XCTAssertEqual(coordinator.memberActionIDs(for: id), ["action.1", "action.2"])
+        XCTAssertEqual(coordinator.actions.map(\.id), ["action.3", "action.4", id, "action.1", "action.2"])
+    }
+
+    func testHoveringAISiblingRetainsGroupDestination() throws {
+        registerAIPresets()
+        let group = try XCTUnwrap(outlineCoordinator.rootNodes.first { $0.id == "builtin.aiTools" })
+        let outline = makeDropOutline()
+        let drag = MockDraggingInfo(actionID: group.children[0].id)
+        XCTAssertEqual(outlineCoordinator.outlineView(outline, validateDrop: drag, proposedItem: group.children[1], proposedChildIndex: NSOutlineViewDropOnItemIndex), .move)
+        XCTAssertEqual(outline.highlightedDropGroupID, group.id)
+    }
+
+    func testLeadingBottomEdgeMovesMemberAfterItsGroup() throws {
+        let id = try XCTUnwrap(coordinator.createGroup(title: "Group", iconName: "folder", memberActionIDs: ["action.1", "action.2"]))
+        outlineCoordinator.rebuildTree()
+        let rootIndex = try XCTUnwrap(outlineCoordinator.rootNodes.firstIndex { $0.id == id })
+        let group = outlineCoordinator.rootNodes[rootIndex]
+        let outline = makeDropOutline()
+        let lastRow = outline.row(forItem: try XCTUnwrap(group.children.last))
+        XCTAssertGreaterThanOrEqual(lastRow, 0)
+        let frame = outline.rect(ofRow: lastRow)
+        let point = NSPoint(x: frame.minX + 5, y: frame.maxY - 1)
+        let drag = MockDraggingInfo(actionID: "action.1")
+        drag.draggingLocation = outline.convert(point, to: nil)
+        XCTAssertEqual(outlineCoordinator.outlineView(outline, validateDrop: drag, proposedItem: group, proposedChildIndex: group.children.count), .move)
+        XCTAssertNil(outline.highlightedDropGroupID)
+        // AppKit forwards the retargeted root gap to acceptDrop.
+        XCTAssertTrue(outlineCoordinator.outlineView(outline, acceptDrop: drag, item: nil, childIndex: rootIndex + 1))
+        XCTAssertEqual(coordinator.memberActionIDs(for: id), ["action.2"])
+        let rootIDs = outlineCoordinator.rootNodes.compactMap { $0.action?.id }
+        XCTAssertEqual(rootIDs, [id, "action.1", "action.3", "action.4"])
+    }
+
+    func testIndentedBottomEdgeKeepsMemberInsideGroup() throws {
+        let id = try XCTUnwrap(coordinator.createGroup(title: "Group", iconName: "folder", memberActionIDs: ["action.1", "action.2"]))
+        outlineCoordinator.rebuildTree()
+        let group = try XCTUnwrap(outlineCoordinator.rootNodes.first { $0.id == id })
+        let outline = makeDropOutline()
+        let lastRow = outline.row(forItem: try XCTUnwrap(group.children.last))
+        let rowFrame = outline.rect(ofRow: lastRow)
+        let cellFrame = outline.frameOfCell(atColumn: 0, row: lastRow)
+        let drag = MockDraggingInfo(actionID: "action.1")
+        drag.draggingLocation = outline.convert(NSPoint(x: cellFrame.minX + 60, y: rowFrame.maxY - 1), to: nil)
+        XCTAssertEqual(outlineCoordinator.outlineView(outline, validateDrop: drag, proposedItem: group, proposedChildIndex: group.children.count), .move)
+        XCTAssertEqual(outline.highlightedDropGroupID, id)
+        XCTAssertTrue(outlineCoordinator.outlineView(outline, acceptDrop: drag, item: group, childIndex: group.children.count))
+        XCTAssertEqual(coordinator.memberActionIDs(for: id), ["action.2", "action.1"])
+    }
+
+    func testBottomGapHitRegionDistinguishesIndentation() {
+        let row = NSRect(x: 0, y: 100, width: 600, height: 40)
+        XCTAssertTrue(ActionsOutlineCoordinator.isRootGapAfterGroup(point: NSPoint(x: 10, y: 139), lastRow: row, childContentMinX: 50))
+        XCTAssertFalse(ActionsOutlineCoordinator.isRootGapAfterGroup(point: NSPoint(x: 100, y: 139), lastRow: row, childContentMinX: 50))
+        XCTAssertTrue(ActionsOutlineCoordinator.isRootGapAfterGroup(point: NSPoint(x: 100, y: 145), lastRow: row, childContentMinX: 50))
+        XCTAssertFalse(ActionsOutlineCoordinator.isRootGapAfterGroup(point: NSPoint(x: 10, y: 120), lastRow: row, childContentMinX: 50))
+    }
+
+    func testBlockInsertionCorrectsGapAndDeduplicates() {
+        XCTAssertEqual(ActionsOutlineCoordinator.inserting(["a", "b", "c", "d"], moving: ["a", "c", "a"], toChildIndex: 4), ["b", "d", "a", "c"])
+        XCTAssertEqual(ActionsOutlineCoordinator.inserting(["a", "b", "c"], moving: ["c", "a"], toChildIndex: 0), ["c", "a", "b"])
+        XCTAssertEqual(ActionsOutlineCoordinator.inserting(["a", "b", "c"], moving: ["a", "b"], toChildIndex: 2), ["a", "b", "c"])
+    }
 
     func testMovingACommandDownLandsWhereTheGapWas() {
         let members = ["a", "b", "c", "d"]

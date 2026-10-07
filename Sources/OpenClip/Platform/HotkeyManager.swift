@@ -45,13 +45,14 @@ public final class HotkeyManager {
         if settingsStore.get(.pauseUntilTimestamp) > Date().timeIntervalSince1970 {
             return false
         }
-        guard let frontmost,
-              let bundleID = frontmost.bundleIdentifier else { return false }
-        if AppFilter.isExcluded(bundleID: bundleID) {
+        guard let frontmost else { return false }
+        if let bundleID = frontmost.bundleIdentifier, AppFilter.isExcluded(bundleID: bundleID) {
             return false
         }
-        let policy = RuleEngine.shared.resolvePolicies(for: bundleID)
-        return !policy.disabled
+        // A transient helper with no bundle ID, name, or path cannot be configured — never trigger.
+        let identity = AppIdentity(frontmost)
+        guard identity.ruleIdentifier != nil else { return false }
+        return !RuleEngine.shared.resolvePolicies(for: identity).disabled
     }
 
     public func setup(
@@ -199,25 +200,24 @@ public final class HotkeyManager {
             return nil
         }
 
-        // When an identifiable frontmost app exists, apply per-app gating.
-        // When it is nil (e.g. during a clipboard-manager → destination app transition)
-        // skip the per-app checks and fall through to the clipboard / empty-context path.
+        // When an identifiable frontmost app exists — including a bundle-less one identified by
+        // process name or executable path — apply per-app gating. When it is nil (e.g. during a
+        // clipboard-manager → destination app transition) skip the per-app checks and fall
+        // through to the clipboard / empty-context path.
         let appIdentity: AppIdentity
         let policy: AppPolicyContext
         let canUseMonitoredSelection: Bool
 
-        if let frontApp = frontmostApp,
-           let bundleID = frontApp.bundleIdentifier {
-            if AppFilter.isExcluded(bundleID: bundleID) { return nil }
-            let resolved = RuleEngine.shared.resolvePolicies(for: bundleID)
+        if let identity = frontmostApp.map(AppIdentity.init), identity.ruleIdentifier != nil {
+            if let bundleID = identity.bundleIdentifier, AppFilter.isExcluded(bundleID: bundleID) { return nil }
+            let resolved = RuleEngine.shared.resolvePolicies(for: identity)
             if resolved.disabled { return nil }
-            appIdentity = AppIdentity(frontApp)
+            appIdentity = identity
             policy = resolved
             canUseMonitoredSelection = true
         } else {
-            // No identifiable app — use a neutral identity. Per-app exclusion and disabled
-            // rules cannot apply without a bundle ID, so we only honour the global pause
-            // (checked above).
+            // No identifiable app — per-app exclusion and disabled rules cannot apply, so only
+            // the global pause (checked above) is honoured.
             appIdentity = AppIdentity(bundleIdentifier: nil, localizedName: nil)
             policy = .default
             canUseMonitoredSelection = false
@@ -399,7 +399,7 @@ public final class HotkeyManager {
         }
 
         guard isTriggerAuthorized() else { return denied() }
-        let policy = RuleEngine.shared.resolvePolicies(for: frontApp.bundleIdentifier ?? "")
+        let policy = RuleEngine.shared.resolvePolicies(for: appIdentity)
         let probeTask = popupController?.preparePasteProbe(for: frontApp, policy: policy)
 
         var retrievedText = ""
@@ -478,7 +478,8 @@ public final class HotkeyManager {
             rtf: selectionRTF,
             flavors: selectionFlavors,
             selectionGeneration: generation,
-            isEditable: isClipboardFallback ? false : read.isEditable
+            isEditable: isClipboardFallback ? false : read.isEditable,
+            traceID: read.traceID
         )
         let canPaste = await probeTask?.value
         context = context.with(pasteTargetAvailable: canPaste)

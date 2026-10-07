@@ -60,9 +60,9 @@ enum PopupThemeModel {
         }
     }
 
-    /// Temporary lighter version of the original accent hover fill.
+    /// Slightly softened accent for the popup action bars.
     static var barHoverFill: Color {
-        Color(nsColor: NSColor.controlAccentColor.blended(withFraction: 0.15, of: .white) ?? .controlAccentColor)
+        Color(nsColor: NSColor.controlAccentColor.blended(withFraction: 0.08, of: .white) ?? .controlAccentColor)
     }
 
     /// The secondary foreground color (hints, badges) for the given effective theme token.
@@ -255,9 +255,9 @@ struct PopupFooterButtonChrome: ViewModifier {
                !NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency {
                 if let tint {
                     content
-                        .background(shape.fill(tint.opacity(isHovered ? 0.38 : 0.28)))
+                        .background(shape.fill(tint.opacity(colorScheme == .light ? 1.0 : (isHovered ? 0.38 : 0.28))))
                         .background(.ultraThinMaterial, in: shape)
-                        .glassEffect(.regular.tint(tint.opacity(0.42)).interactive(), in: shape)
+                        .glassEffect(.regular.tint(tint.opacity(colorScheme == .light ? 1.0 : 0.42)).interactive(), in: shape)
                         .overlay(shape.stroke(Color.white.opacity(0.24), lineWidth: 0.5))
                 } else {
                     content
@@ -486,6 +486,7 @@ extension View {
     func popupBarHighlight(
         _ fill: Color,
         scale: CGFloat,
+        isText: Bool = false,
         leadingEdge: Bool = false,
         trailingEdge: Bool = false,
         isHovered: Bool,
@@ -507,7 +508,7 @@ extension View {
                     shape.fill(fill)
                 }
             }
-            .padding(.horizontal, (leadingEdge || trailingEdge ? 3 : 2) * scale)
+            .padding(.horizontal, (isText ? (leadingEdge || trailingEdge ? 2 : 0) : (leadingEdge || trailingEdge ? 3 : 2)) * scale)
             .padding(.vertical, 3 * scale)
         }
     }

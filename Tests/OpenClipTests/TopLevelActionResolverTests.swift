@@ -32,8 +32,7 @@ final class TopLevelActionResolverTests: XCTestCase {
         let items = TopLevelActionResolver.resolveTopLevelItems(
             from: [],
             customGroupMemberIDs: [],
-            disabledActionIDs: [],
-            isAIEnabled: true
+            disabledActionIDs: []
         )
         XCTAssertTrue(items.isEmpty)
     }
@@ -53,8 +52,7 @@ final class TopLevelActionResolverTests: XCTestCase {
         let items = TopLevelActionResolver.resolveTopLevelItems(
             from: [copyAction, extAction],
             customGroupMemberIDs: [],
-            disabledActionIDs: ["builtin.copy"],
-            isAIEnabled: true
+            disabledActionIDs: ["builtin.copy"]
         )
 
         XCTAssertEqual(items.count, 2)
@@ -100,8 +98,7 @@ final class TopLevelActionResolverTests: XCTestCase {
         let items = TopLevelActionResolver.resolveTopLevelItems(
             from: actions,
             customGroupMemberIDs: customGroupMemberIDs,
-            disabledActionIDs: [],
-            isAIEnabled: true
+            disabledActionIDs: []
         )
 
         XCTAssertEqual(items.count, 2)
@@ -138,8 +135,7 @@ final class TopLevelActionResolverTests: XCTestCase {
         let items = TopLevelActionResolver.resolveTopLevelItems(
             from: actions,
             customGroupMemberIDs: [],
-            disabledActionIDs: ["com.pkg.tools"],
-            isAIEnabled: true
+            disabledActionIDs: ["com.pkg.tools"]
         )
 
         XCTAssertEqual(items.count, 1)
@@ -171,8 +167,7 @@ final class TopLevelActionResolverTests: XCTestCase {
         let itemsEnabled = TopLevelActionResolver.resolveTopLevelItems(
             from: actions,
             customGroupMemberIDs: [],
-            disabledActionIDs: [],
-            isAIEnabled: true
+            disabledActionIDs: []
         )
 
         XCTAssertEqual(itemsEnabled.count, 2)
@@ -184,8 +179,7 @@ final class TopLevelActionResolverTests: XCTestCase {
         let itemsDisabled = TopLevelActionResolver.resolveTopLevelItems(
             from: actions,
             customGroupMemberIDs: [],
-            disabledActionIDs: [],
-            isAIEnabled: false
+            disabledActionIDs: ["builtin.ai"]
         )
 
         XCTAssertEqual(itemsDisabled[0].id, "builtin.ai")

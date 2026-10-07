@@ -21,6 +21,10 @@ import Core
 @MainActor
 public class PopupWindowController {
     var panel: PopupPanel?
+    // Separate from the AI session: re-shows can preserve that session but must invalidate
+    // pending Space recovery from an earlier presentation.
+    private(set) var presentationAttemptID = UUID()
+    private var didAttemptSpaceRecovery = false
     private var globalEventMonitor: Any?
     private var localEventMonitor: Any?
     private var currentContext: SelectionContext?
@@ -202,6 +206,9 @@ public class PopupWindowController {
     }
 
     func show(for context: SelectionContext, pasteAvailable: Bool?, preservingSessionID: UUID?, streamingTask: Task<Void, Never>?, initialMode: PopupMode = .actions) {
+        presentationAttemptID = UUID()
+        didAttemptSpaceRecovery = false
+        let attemptID = presentationAttemptID
         let evaluator = InlineResultEvaluator.shared
         let aiSession: UUID
         if let preservingSessionID {
@@ -437,6 +444,21 @@ public class PopupWindowController {
         }
         
         setupMonitors()
+        // Two bounded snapshots catch delayed AppKit hiding/Space changes without polling.
+        Task { @MainActor [weak self] in
+            for delay in [150_000_000, 600_000_000] {
+                try? await Task.sleep(nanoseconds: UInt64(delay))
+                guard let self, self.presentationAttemptID == attemptID, self.currentContext != nil else { return }
+                if delay == 150_000_000 {
+                    self.recoverPopupSpaceIfNeeded(for: attemptID,
+                        frontmostPID: NSWorkspace.shared.frontmostApplication?.processIdentifier)
+                } else if self.panel?.isOnActiveSpace == false {
+                    self.logPresentation("space-recovery-unresolved")
+                } else if self.didAttemptSpaceRecovery {
+                    self.logPresentation("space-recovery-verified")
+                }
+            }
+        }
 
         if initialMode == .search {
             enterKeyMode()
@@ -448,10 +470,75 @@ public class PopupWindowController {
         }
     }
 
+    /// Replace stale WindowServer membership once after AppKit has had time to order the window.
+    /// Never activate the app or make the panel key to recover an automatic action bar.
+    @discardableResult
+    func recoverPopupSpaceIfNeeded(for attemptID: UUID, frontmostPID: pid_t?,
+                                   makePanel: () -> PopupPanel = { PopupPanel() }) -> Bool {
+        guard presentationAttemptID == attemptID, !didAttemptSpaceRecovery,
+              let context = currentContext, let panel,
+              panel.isVisible, !panel.isOnActiveSpace, !panel.isKeyWindow, modeStore.mode == .actions,
+              let sourcePID = context.sourceApp.processIdentifier,
+              frontmostPID == sourcePID else { return false }
+        didAttemptSpaceRecovery = true
+        logPresentation("space-recovery-start")
+        // Reordering the same window and resetting its Space flags failed in live traces.
+        // Retain the hosting view/state, but give WindowServer a new window identity.
+        let frame = panel.frame
+        let content = panel.contentView
+        let replacement = makePanel()
+        replacement.heightCap = panel.heightCap
+        replacement.appearance = panel.appearance
+        replacement.ignoresMouseEvents = panel.ignoresMouseEvents
+        NotificationCenter.default.removeObserver(self, name: NSWindow.didChangeOcclusionStateNotification, object: panel)
+        panel.orderOut(nil)
+        panel.contentView = nil
+        self.panel = replacement
+        replacement.contentView = content
+        replacement.setFrame(frame, display: false)
+        replacement.pinBottomEdgeOnResize = panel.pinBottomEdgeOnResize
+        replacement.releasesBottomPinAfterGrowth = panel.releasesBottomPinAfterGrowth
+        replacement.horizontalAnchor = panel.horizontalAnchor
+        NotificationCenter.default.addObserver(self, selector: #selector(panelOcclusionDidChange(_:)),
+            name: NSWindow.didChangeOcclusionStateNotification, object: replacement)
+        replacement.orderFront(nil)
+        lastPopupFrame = replacement.frame
+        logPresentation("space-recovery-recreated")
+        return true
+    }
+
+    /// Metadata only: never include selected text, window titles, or clipboard contents.
+    private func logPresentation(_ event: String) {
+        guard let context = currentContext else { return }
+        // Successful reads already have a correlated cascade summary. Keep window metadata
+        // only for placement failures and recovery, rather than every click and hover.
+        guard event.hasPrefix("space-recovery") || didAttemptSpaceRecovery
+            || (panel?.isVisible == true && panel?.isOnActiveSpace == false) else { return }
+        let frontmost = NSWorkspace.shared.frontmostApplication
+        let frame = panel.map { NSStringFromRect($0.frame) } ?? "none"
+        let ageMS = sessionShowTime > 0 ? Int((ProcessInfo.processInfo.systemUptime - sessionShowTime) * 1000) : 0
+        let metadata = "event=\(event) pid=\(ProcessInfo.processInfo.processIdentifier) source=\(context.sourceApp.bundleIdentifier ?? "unknown") frontmost=\(frontmost?.bundleIdentifier ?? "unknown") session=\(aiSessionID) ageMS=\(ageMS) visible=\(panel?.isVisible ?? false) activeSpace=\(panel?.isOnActiveSpace ?? false) unoccluded=\(panel?.occlusionState.contains(.visible) ?? false) appActive=\(NSApp.isActive) appHidden=\(NSApp.isHidden) window=\(panel?.windowNumber ?? -1) level=\(panel?.level.rawValue ?? 0) alpha=\(panel?.alphaValue ?? 0) key=\(panel?.isKeyWindow ?? false) hidesOnDeactivate=\(panel?.hidesOnDeactivate ?? false) frame=\(frame) mode=\(modeStore.mode)"
+        let message: Core.LogMessage = "[Trace#\(context.traceID ?? 0, privacy: .public)] popup \(metadata, privacy: .public)"
+        if event == "space-recovery-unresolved" {
+            Log.presentation.warning(message)
+        } else if event.hasPrefix("space-recovery") {
+            Log.presentation.notice(message)
+        } else {
+            Log.presentation.debug(message)
+        }
+    }
+
+    @objc private func panelOcclusionDidChange(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow, window === panel else { return }
+        logPresentation("occlusion-changed")
+    }
+
     public var isVisible: Bool { (panel?.isVisible == true) || (currentContext != nil) }
 
     /// Starts a session without creating AppKit window monitors or ordering windows on screen. Internal for tests.
     func startTestSession(for context: SelectionContext, pasteAvailable: Bool? = nil, initialMode: PopupMode = .actions) {
+        presentationAttemptID = UUID()
+        didAttemptSpaceRecovery = false
         isMenuTracking = false
         let selectionContext = context.with(
             pasteTargetAvailable: PasteAvailability.effective(policy: context.appPolicy, probe: pasteAvailable)
@@ -1090,7 +1177,9 @@ public class PopupWindowController {
         panel.setFrame(frame, display: true)
     }
 
-    public func hide() {
+    public func hide(reason: String = #function, callerLine: Int = #line) {
+        presentationAttemptID = UUID()
+        logPresentation("hide reason=\(reason) callerLine=\(callerLine)")
         // End the AI session first: cancel the live stream and invalidate its token so any
         // chunk already in flight is dropped instead of re-flipping state after the resets below.
         activeStreamingTask?.cancel()
@@ -1196,6 +1285,7 @@ public class PopupWindowController {
             return event
         }
         
+        NotificationCenter.default.addObserver(self, selector: #selector(panelOcclusionDidChange(_:)), name: NSWindow.didChangeOcclusionStateNotification, object: panel)
         NotificationCenter.default.addObserver(self, selector: #selector(menuDidBeginTracking), name: NSMenu.didBeginTrackingNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(menuDidEndTracking), name: NSMenu.didEndTrackingNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(appDidDeactivate), name: NSApplication.didResignActiveNotification, object: nil)
@@ -1292,7 +1382,7 @@ public class PopupWindowController {
                 }
 
                 if dist > dismissalLimit {
-                    hide()
+                    hide(reason: "cursor-distance")
                 }
             }
         case .leftMouseDown:

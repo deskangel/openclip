@@ -10,6 +10,8 @@ public enum SelectionSource: Sendable {
 }
 
 public struct SelectionContext: Sendable {
+    /// Retrieval correlation ID, carried through presentation without retaining content in logs.
+    public let traceID: UInt64?
     /// Generation of observed selection/focus gestures; nil for untracked contexts.
     public let selectionGeneration: UInt64?
     public let text: String
@@ -48,8 +50,10 @@ public struct SelectionContext: Sendable {
         selectionGeneration: UInt64? = nil,
         source: SelectionSource? = nil,
         isEditable: Bool? = nil,
-        pasteTargetAvailable: Bool? = nil
+        pasteTargetAvailable: Bool? = nil,
+        traceID: UInt64? = nil
     ) {
+        self.traceID = traceID
         self.selectionGeneration = selectionGeneration
         self.text = text
         self.sourceApp = sourceApp
@@ -83,7 +87,8 @@ public struct SelectionContext: Sendable {
             selectionGeneration: selectionGeneration,
             source: source,
             isEditable: isEditable,
-            pasteTargetAvailable: pasteTargetAvailable
+            pasteTargetAvailable: pasteTargetAvailable,
+            traceID: traceID
         )
     }
 
@@ -103,7 +108,8 @@ public struct SelectionContext: Sendable {
             selectionGeneration: selectionGeneration,
             source: source,
             isEditable: self.isEditable ?? isEditable,
-            pasteTargetAvailable: pasteTargetAvailable ?? self.pasteTargetAvailable
+            pasteTargetAvailable: pasteTargetAvailable ?? self.pasteTargetAvailable,
+            traceID: traceID
         )
     }
 }

@@ -12,12 +12,13 @@ import KeyboardShortcuts
 
 enum ActionDeletion {
     /// Whether the user may delete `action`: custom actions, installed extensions, and custom
-    /// groups qualify; built-ins and AI presets do not.
+    /// groups and AI presets qualify; built-ins do not.
     static func canDelete(_ action: any Action) -> Bool {
         if action.chrome.rowStyle == .actionGroup { return true }
         switch action.chrome.source {
         case .custom, .extensionPkg: return true
-        case .builtin, .ai: return false
+        case .ai: return ActionIdentity.isAIPreset(action)
+        case .builtin: return false
         }
     }
 
@@ -49,7 +50,16 @@ enum ActionDeletion {
             // Uninstall by package identifier, not the action id: a package's command id need not
             // carry the package prefix, and `uninstallExtension` matches on the identifier.
             await uninstall(actionID: ActionIdentity.extensionPackageID(of: action) ?? id)
-        case .builtin, .ai:
+        case .ai:
+            guard let preset = AIServiceManager.shared.preset(forActionID: id) else { return }
+            KeyboardShortcuts.reset(.actionHotkey(id))
+            ActionBindingStore.shared.setAlias(nil, for: id)
+            ActionCustomizationManager.shared.resetOverride(for: id)
+            ActionCoordinator.shared.setAIActionPlacement(actionIDs: [id], standalone: false)
+            AIServiceManager.shared.presets.removeAll { $0.id == preset.id }
+            AIActionSync.shared.sync()
+            SettingsRouter.shared.clearConfigurationRequest(for: id)
+        case .builtin:
             break
         }
     }

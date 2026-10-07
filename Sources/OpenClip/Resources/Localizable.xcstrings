@@ -14645,6 +14645,34 @@
         }
       }
     },
+    "Rename": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重命名"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新命名"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Renommer"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "名前を変更"
+          }
+        }
+      }
+    },
     "Rename the group or change the icon its actions sit behind.": {
       "localizations": {
         "zh-Hans": {
@@ -20353,6 +20381,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "選択したテキストのプレースホルダーとして **{text}** を使用します。"
+          }
+        }
+      }
+    },
+    "Use process:<name> or path:<executable> to target apps without a bundle ID. Use * to match several apps.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用 process:<name> 或 path:<executable> 指定没有 Bundle ID 的应用。使用 * 匹配多个应用。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用 process:<name> 或 path:<executable> 指定沒有 Bundle ID 的應用程式。使用 * 比對多個 App。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utilisez process:<name> ou path:<executable> pour cibler les apps sans identifiant de bundle. Utilisez * pour cibler plusieurs apps."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "バンドル ID を持たないアプリは process:<name> または path:<executable> で指定します。複数のアプリに一致させるには * を使います。"
           }
         }
       }

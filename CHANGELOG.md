@@ -4,6 +4,33 @@ All notable user-facing changes to OpenClip.
 
 ---
 
+## v1.8.0 - 2026-10-07
+
+### Features & Improvements
+- **Modifier-held selection triggers**: Trigger popup actions conditionally by holding modifier keys (⌘, ⌥, ⇧, ⌃, or fn) while making text selections, allowing quick contextual actions without cluttering normal text selection.
+- **Standalone AI actions on popup bar**: Place custom AI actions directly on the main popup bar alongside standard actions for instant one-click access.
+- **Command Palette toggle**: Choose whether to display the command palette (⌘) button at the end of the popup bar under **Customize → Behavior**, while retaining the keyboard shortcut (⌥⌘C).
+- **Screen text capture (OCR)**: Draw a region on screen to capture text using ScreenCaptureKit; the selected text feeds directly into the popup action bar.
+- **Direct extension bundle installation**: Support drag-and-drop and double-click installation of `.openclipext` bundles directly.
+- **Contextual pill placement**: Choose automatic, left, or right placement for the contextual pill, defaulting to Auto.
+- **Rule matching by process name and path**: Target apps without bundle identifiers using their process name or executable path.
+- **Customize polish**: Inline renaming, AI preset deletion, and drag-and-drop polish in the action editor.
+- **UI & accessibility polish**: Larger popup bar metrics with 15 pt labels, refined hover highlights, contextual action and command palette controls in Settings, polished button styling, and unified menu bar status layout.
+
+### Fixes & Stability
+- Hardened selection and clipboard delivery across macOS apps with correlated diagnostics.
+- Improved popup eligibility in other apps' fullscreen Spaces. A popup detected outside the active Space now gets one fresh-panel recovery attempt while its source app remains frontmost.
+- Restored AI group visibility and preset round trips so group membership behaves consistently.
+- Reliable screen-capture crosshair cursor over the selection overlay.
+- Updated OpenSelection to 2.15.3 to bound Accessibility inspection and menu traversal workers during stalled app responses.
+- Retained trace-linked placement and recovery diagnostics while reducing routine selection log noise.
+- Enhanced search palette layout, context indicators, and row interactions.
+
+### Contributors
+Thanks to @iiHawe, @deskangel, @md786-dotcom, and @vynexor for their contributions to this release! ([#128](https://github.com/ganeshmshetty/openclip/pull/128), [#134](https://github.com/ganeshmshetty/openclip/pull/134), [#135](https://github.com/ganeshmshetty/openclip/pull/135), [#138](https://github.com/ganeshmshetty/openclip/pull/138), [#141](https://github.com/ganeshmshetty/openclip/pull/141), [#143](https://github.com/ganeshmshetty/openclip/pull/143))
+
+---
+
 ## v1.8.0-beta.1 - 2026-10-03
 
 ### Features & Improvements

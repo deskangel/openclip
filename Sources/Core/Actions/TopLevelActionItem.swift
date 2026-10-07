@@ -32,7 +32,6 @@ public enum TopLevelActionResolver {
         from actions: [any Action],
         customGroupMemberIDs: Set<String>,
         disabledActionIDs: Set<String>,
-        isAIEnabled: Bool,
         presentationProvider: ((any Action) -> ActionPresentationModel)? = nil
     ) -> [TopLevelActionItem] {
         let groupPackages = Set(
@@ -71,7 +70,7 @@ public enum TopLevelActionResolver {
             }
             // Standalone action
             let isAI = action.chrome.launchesAI
-            let isEnabled = isAI ? isAIEnabled : !disabledActionIDs.contains(action.id)
+            let isEnabled = !disabledActionIDs.contains(action.id)
             items.append(TopLevelActionItem(
                 id: action.id,
                 title: presentation.title,

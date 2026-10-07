@@ -15,12 +15,12 @@ public enum PopupMetrics {
     /// moved away from the original release point before the popup appears.
     static let ocrArrivalDismissalGrace: TimeInterval = 1.0
     /// Standard width and height of an action button in the popup bar and sub-bar (normalized baseline at 1.0 scale).
-    public static let actionButtonWidth: CGFloat = 34.0
-    public static let barButtonHeight: CGFloat = 29.0
+    public static let actionButtonWidth: CGFloat = 39.0
+    public static let barButtonHeight: CGFloat = 33.5
     /// Maximum baseline width (pt at 1.0 scale) for an inline result button in the bar.
-    public static let inlineResultMaxWidth: CGFloat = 150.0
+    public static let inlineResultMaxWidth: CGFloat = 172.0
     /// Horizontal padding (pt at 1.0 scale) inside an expanded inline result button.
-    public static let inlineResultHorizontalPadding: CGFloat = 8.0
+    public static let inlineResultHorizontalPadding: CGFloat = 9.0
     /// Cross-fade duration (seconds) between button rest icon/text and computed result.
     /// Benchmark (Tier 1 p95=0.01ms, Tier 2 p50=12.9ms): perceptual floor of 0.20s
     /// plus 2× Tier 2 p50 → 0.046s raw; rounded up to 0.05s, then bumped to 0.22s so
@@ -54,7 +54,7 @@ public enum PopupMetrics {
     /// Maximum width (pt at 1.0 scale) for the trailing inline accessory in the search palette.
     public static let inlineSearchAccessoryMaxWidth: CGFloat = 120.0
     /// Corner radius for popup action bars and sub-bars (normalized baseline).
-    public static let popupCornerRadius: CGFloat = 12.0
+    public static let popupCornerRadius: CGFloat = 14.0
     /// Corner radius for modal result cards and the action-search palette.
     public static let cardCornerRadius: CGFloat = 22.0
     /// Corner radius for the action-search palette, reduced by 2 pt from the shared card radius.
@@ -78,7 +78,7 @@ public enum PopupMetrics {
     public static let toastShadowInset: CGFloat = 8.0
     public static let popupPadding: CGFloat = 8.0
     /// Gap between the prioritized contextual actions island and the standard actions island in the split popup bar.
-    public static let splitIslandGap: CGFloat = 8.0
+    public static let splitIslandGap: CGFloat = 9.0
     /// Card drop-shadow geometry, mirrored by `PopupCardChromeModifier` (`PopupThemeModel.swift`).
     /// A tight contact shadow grounds the card and a low-alpha ambient lifts it. The ambient blur
     /// spreads beyond its nominal `radius` before fading out and its `y` offset pushes that spread

@@ -330,7 +330,7 @@ public final class ActionRegistry: ObservableObject, Sendable {
     private func hiddenGroupIDs(isRowVisible: (any Action) -> Bool) -> Set<String> {
         Set(
             actions
-                .filter { $0.chrome.popupBehavior == .showSubActions }
+                .filter { $0.chrome.popupBehavior == .showSubActions || $0.chrome.launchesAI }
                 .filter { !isRowVisible($0) }
                 .map(\.id)
         )
@@ -338,17 +338,23 @@ public final class ActionRegistry: ObservableObject, Sendable {
 
     /// True when the action belongs to a group in `hiddenGroupIDs` — either by id prefix (built-in
     /// and extension groups) or by explicit membership (custom groups keep canonical ids).
-    private func belongsToHiddenGroup(_ action: any Action, hiddenGroupIDs: Set<String>, customGroupMemberToGroupID: [String: String]) -> Bool {
+    private func belongsToHiddenGroup(_ action: any Action, hiddenGroupIDs: Set<String>, memberToGroupID: [String: String]) -> Bool {
         if hiddenGroupIDs.contains(where: { action.id.hasPrefix($0 + ".") }) { return true }
-        if let owningGroupID = customGroupMemberToGroupID[action.id], hiddenGroupIDs.contains(owningGroupID) {
+        if let owningGroupID = memberToGroupID[action.id], hiddenGroupIDs.contains(owningGroupID) {
             return true
         }
         return false
     }
 
-    /// Custom-group membership map (member id → group id).
-    private func customGroupMembership() -> [String: String] {
+    /// Explicit and provider-declared membership, including AI presets with canonical IDs.
+    private func groupMembership() -> [String: String] {
         var map: [String: String] = [:]
+        let resolver = SubActionResolver()
+        for parent in actions {
+            for child in resolver.subActions(of: parent, in: actions) {
+                map[child.id] = parent.id
+            }
+        }
         for def in groupDefs {
             for memberID in def.memberActionIDs {
                 map[memberID] = def.id
@@ -360,13 +366,9 @@ public final class ActionRegistry: ObservableObject, Sendable {
     public func availableActions(for context: ActionContext) -> [any Action] {
         let disabledIDs = settingsStore.get(.disabledActionIDs)
         let disabledPackages = settingsStore.get(.disabledPackages)
-        let standaloneAIIDs = settingsStore.get(.standaloneAIActionIDs)
-
         func passes(_ action: any Action) -> Bool {
-            // Presets stay in AI Tools until explicitly moved into the main bar.
-            if ActionIdentity.isAIPreset(action), !standaloneAIIDs.contains(action.id) {
-                return false
-            }
+            // Keep group children in the catalog for sub-bars. PopupView removes them from
+            // the top-level bar through SubActionResolver, just like other group members.
             if action is GatedExtensionAction {
                 return false
             }
@@ -379,11 +381,11 @@ public final class ActionRegistry: ObservableObject, Sendable {
         // row is disabled (or otherwise not visible) hides its sub-actions entirely, so a
         // disabled group never leaks its sub-actions into the bar.
         let hiddenGroups = hiddenGroupIDs(isRowVisible: passes)
-        let customGroupMemberToGroupID = customGroupMembership()
+        let memberToGroupID = groupMembership()
 
         let available = actions.filter { action in
             guard passes(action) else { return false }
-            return !belongsToHiddenGroup(action, hiddenGroupIDs: hiddenGroups, customGroupMemberToGroupID: customGroupMemberToGroupID)
+            return !belongsToHiddenGroup(action, hiddenGroupIDs: hiddenGroups, memberToGroupID: memberToGroupID)
         }
 
         guard settingsStore.get(.contextualActionsEnabled) else {
@@ -424,7 +426,7 @@ public final class ActionRegistry: ObservableObject, Sendable {
         let hiddenGroups = hiddenGroupIDs { row in
             !isDisabledInSettings(row, disabledIDs: disabledIDs, disabledPackages: disabledPackages)
         }
-        let customGroupMemberToGroupID = customGroupMembership()
+        let memberToGroupID = groupMembership()
 
         return actions.filter { action in
             if action.chrome.launchesAI || ActionIdentity.isCompletionPseudoAction(action) || action is GatedExtensionAction {
@@ -433,7 +435,7 @@ public final class ActionRegistry: ObservableObject, Sendable {
             if isDisabledInSettings(action, disabledIDs: disabledIDs, disabledPackages: disabledPackages) {
                 return false
             }
-            if belongsToHiddenGroup(action, hiddenGroupIDs: hiddenGroups, customGroupMemberToGroupID: customGroupMemberToGroupID) {
+            if belongsToHiddenGroup(action, hiddenGroupIDs: hiddenGroups, memberToGroupID: memberToGroupID) {
                 return false
             }
             return canPerform(action, in: context)

@@ -524,6 +524,7 @@
   "Drag to reorder the actions behind this extension's icon.": "この拡張機能のアイコンにまとめられたアクションをドラッグして並べ替えます。",
   "Enable AI Tools": "AI ツールを有効にする",
   "Example: com.apple.Terminal. Use * to match several apps.": "例: com.apple.Terminal。複数のアプリに一致させるには * を使います。",
+  "Use process:<name> or path:<executable> to target apps without a bundle ID. Use * to match several apps.": "バンドル ID を持たないアプリは process:<name> または path:<executable> で指定します。複数のアプリに一致させるには * を使います。",
   "Extension Removed": "拡張機能を削除しました",
   "Its files and settings are deleted from this Mac.": "そのファイルと設定はこの Mac から削除されます。",
   "Keep": "残す",
@@ -764,5 +765,6 @@
   "Drag to reorder. To move a preset onto the main popup bar, drag it out of AI Tools in the Actions list.": "ドラッグして並べ替えます。プリセットをメインのポップアップバーに移動するには、アクション一覧の AI ツールから外へドラッグしてください。",
   "Contextual Pill": "コンテキストピル",
   "Show contextual actions to the left or right of the main bar. Auto follows the horizontal position.": "コンテキストアクションをメインバーの左側または右側に表示します。自動では水平位置に合わせます。",
-  "Contextual Pill Position": "コンテキストピルの位置"
+  "Contextual Pill Position": "コンテキストピルの位置",
+  "Rename": "名前を変更"
 }

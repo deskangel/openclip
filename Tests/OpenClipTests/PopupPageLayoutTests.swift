@@ -40,15 +40,15 @@ final class PopupPageLayoutTests: XCTestCase {
         let shortText = StubAction(id: "2", title: "OK", icon: .text("OK"))
         let longText = StubAction(id: "3", title: "Formal Tone", icon: .text("Formal Tone"))
 
-        XCTAssertEqual(PopupPageLayout.estimatedItemWidth(for: symbol), 34.0)
-        XCTAssertEqual(PopupPageLayout.estimatedItemWidth(for: shortText), 34.0)
+        XCTAssertEqual(PopupPageLayout.estimatedItemWidth(for: symbol), PopupMetrics.actionButtonWidth)
+        XCTAssertEqual(PopupPageLayout.estimatedItemWidth(for: shortText), PopupMetrics.actionButtonWidth)
         let longWidth = PopupPageLayout.estimatedItemWidth(for: longText)
-        XCTAssertGreaterThan(longWidth, 34.0)
-        XCTAssertLessThanOrEqual(longWidth, 125.0)
+        XCTAssertGreaterThan(longWidth, PopupMetrics.actionButtonWidth)
+        XCTAssertLessThanOrEqual(longWidth, 144.0)
 
         // Scale scaling
         let scaledSymbol = PopupPageLayout.estimatedItemWidth(for: symbol, scale: 1.2)
-        XCTAssertEqual(scaledSymbol, 34.0 * 1.2, accuracy: 0.001)
+        XCTAssertEqual(scaledSymbol, PopupMetrics.actionButtonWidth * 1.2, accuracy: 0.001)
     }
 
     func testComputePagesSinglePageFit() {
@@ -59,7 +59,7 @@ final class PopupPageLayoutTests: XCTestCase {
         let pages = PopupPageLayout.computePages(
             actions: actions,
             leadingWidth: 0,
-            trailingWidth: 34.0,
+            trailingWidth: PopupMetrics.actionButtonWidth,
             maxBudget: 340.0
         )
 
@@ -68,15 +68,15 @@ final class PopupPageLayoutTests: XCTestCase {
     }
 
     func testComputePagesMultiPagePackingWithChevrons() {
-        // 12 icon actions = 12 * 34 = 408pt > 340pt
+        // 12 icon actions = 12 * actionButtonWidth > 340pt
         let actions = (0..<12).map {
             StubAction(id: "act.\($0)", title: "Action \($0)", icon: .symbol("star"))
         }
 
         let pages = PopupPageLayout.computePages(
             actions: actions,
-            leadingWidth: 29.0, // completion chevron
-            trailingWidth: 34.0, // search button
+            leadingWidth: PopupPageLayout.chevronWidth, // completion chevron
+            trailingWidth: PopupMetrics.actionButtonWidth, // search button
             maxBudget: 340.0
         )
 
@@ -104,7 +104,7 @@ final class PopupPageLayoutTests: XCTestCase {
                 hasLeftChevron: true,
                 hasRightChevron: true
             )
-            XCTAssertLessThanOrEqual(width, 260.0 + 58.0)
+            XCTAssertLessThanOrEqual(width, 260.0 + 2 * PopupPageLayout.chevronWidth)
         }
     }
 
@@ -112,7 +112,7 @@ final class PopupPageLayoutTests: XCTestCase {
         let actions = (0..<6).map { InlineStubAction(id: "inline.\($0)", title: "Inline \($0)") }
         let results = Dictionary(uniqueKeysWithValues: actions.map { ($0.id, "1,234,567.89 USD") })
 
-        // Six 34pt icon buttons fit the budget; the rendered preview text does not.
+        // Six icon buttons fit the budget; the rendered preview text does not.
         let iconPacked = PopupPageLayout.computePages(actions: actions, maxBudget: 260.0)
         let previewPacked = PopupPageLayout.computePages(actions: actions, inlineResults: results, maxBudget: 260.0)
 
@@ -133,19 +133,19 @@ final class PopupPageLayoutTests: XCTestCase {
             actions: [a1, a2],
             hasLeftChevron: false,
             hasRightChevron: false,
-            leadingWidth: 29.0,
-            trailingWidth: 34.0
+            leadingWidth: PopupPageLayout.chevronWidth,
+            trailingWidth: PopupMetrics.actionButtonWidth
         )
-        XCTAssertEqual(withoutChevrons, 29.0 + 34.0 + 68.0)
+        XCTAssertEqual(withoutChevrons, PopupPageLayout.chevronWidth + PopupMetrics.actionButtonWidth + 2 * PopupMetrics.actionButtonWidth)
 
         let withChevrons = PopupPageLayout.measuredBarWidth(
             actions: [a1, a2],
             hasLeftChevron: true,
             hasRightChevron: true,
-            leadingWidth: 29.0,
-            trailingWidth: 34.0
+            leadingWidth: PopupPageLayout.chevronWidth,
+            trailingWidth: PopupMetrics.actionButtonWidth
         )
-        XCTAssertEqual(withChevrons, 29.0 + 34.0 + 68.0 + 58.0)
+        XCTAssertEqual(withChevrons, PopupPageLayout.chevronWidth + PopupMetrics.actionButtonWidth + 2 * PopupMetrics.actionButtonWidth + 2 * PopupPageLayout.chevronWidth)
     }
 
     func testMaxScreenFractionAndMaxBarWidth() {
@@ -177,7 +177,7 @@ final class PopupPageLayoutTests: XCTestCase {
 
     func testComputePagesPaginatesWhenBudgetExceededBeforeMaxItemsPerPage() {
         // 10 icon actions with maxItemsPerPage: 8.
-        // But maxBudget is 150pt (fits ~4 icon actions of 34pt + chevrons).
+        // But maxBudget is 150pt (fits ~3 icon actions plus chevrons).
         let actions = (0..<10).map {
             StubAction(id: "act.\($0)", title: "Action \($0)", icon: .symbol("star"))
         }
@@ -188,7 +188,7 @@ final class PopupPageLayoutTests: XCTestCase {
             maxItemsPerPage: 8
         )
 
-        // Must split into more than 2 pages because budget < 8 * 34pt
+        // Must split into more than 2 pages because budget < 8 * actionButtonWidth
         XCTAssertGreaterThan(pages.count, 2)
         for page in pages {
             XCTAssertLessThanOrEqual(page.count, 8)
