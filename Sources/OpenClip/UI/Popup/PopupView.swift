@@ -167,7 +167,7 @@ public struct PopupView: View {
     @Namespace private var hoverHighlightNamespace
 
     private var buttonWidth: CGFloat { PopupMetrics.actionButtonWidth * scale }
-    private var chevronWidth: CGFloat { 29 * scale }
+    private var chevronWidth: CGFloat { PopupPageLayout.chevronWidth * scale }
     private var barButtonHeight: CGFloat { PopupMetrics.barButtonHeight * scale }
     private var cornerRadius: CGFloat { PopupMetrics.popupCornerRadius * scale }
     private var islandGap: CGFloat { PopupMetrics.splitIslandGap * scale }
@@ -802,7 +802,7 @@ public struct PopupView: View {
                     onEnterSearch(frame)
                 } label: {
                     Image(systemName: "command")
-                        .font(.system(size: 13 * scale, weight: .regular))
+                        .font(.system(size: 15 * scale, weight: .regular))
                         .foregroundColor(affordanceForeground)
                         .frame(width: buttonWidth, height: barButtonHeight)
                         .popupBarHighlight(isHovered ? PopupThemeModel.barHoverFill : .clear, scale: scale, trailingEdge: true, isHovered: isHovered, namespace: hoverHighlightNamespace)
@@ -834,12 +834,12 @@ public struct PopupView: View {
             onResult(.paste(word))
         } label: {
             Text(word)
-                .font(.system(size: 13 * scale, weight: .regular))
+                .font(.system(size: 15 * scale, weight: .regular))
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .foregroundColor(isHovered ? .white : restForeground)
-                .frame(maxWidth: 154 * scale)
-                .padding(.horizontal, 11 * scale)
+                .frame(maxWidth: 177 * scale)
+                .padding(.horizontal, 12.5 * scale)
                 .frame(minWidth: buttonWidth, minHeight: barButtonHeight)
                 .popupBarHighlight(isHovered ? PopupThemeModel.barHoverFill : .clear, scale: scale, isText: true, trailingEdge: index == cachedCompletions.count - 1, isHovered: isHovered, namespace: hoverHighlightNamespace)
                 .contentShape(Rectangle())
@@ -876,7 +876,7 @@ public struct PopupView: View {
         let labelView = Group {
             if action.chrome.isInlineResult, let resolved = modeStore.inlineResults[action.id] {
                 Text(resolved)
-                    .font(.system(size: 13 * scale, weight: .regular))
+                    .font(.system(size: 15 * scale, weight: .regular))
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .foregroundColor(foregroundColor)
@@ -889,7 +889,7 @@ public struct PopupView: View {
                 iconView(for: action.displayIcon(using: presenter))
                     .foregroundColor(foregroundColor)
                     .padding(.horizontal, {
-                        if case .text = action.displayIcon(using: presenter) { return 6.0 * scale }
+                        if case .text = action.displayIcon(using: presenter) { return 7.0 * scale }
                         return 0.0
                     }())
                     .frame(minWidth: buttonWidth, minHeight: barButtonHeight)
@@ -900,8 +900,8 @@ public struct PopupView: View {
                         if isGroup && !isHovered && modeStore.activeSubGroupID != action.id {
                             GroupIndicatorTriangle(pointingUp: subBarAbove)
                                 .fill(foregroundColor.opacity(0.65))
-                                .frame(width: 4.0 * scale, height: 2.5 * scale)
-                                .padding(subBarAbove ? .top : .bottom, 1.8 * scale)
+                                .frame(width: 4.6 * scale, height: 2.9 * scale)
+                                .padding(subBarAbove ? .top : .bottom, 2.1 * scale)
                         }
                     }
                     .transition(.opacity)
@@ -1052,7 +1052,7 @@ public struct PopupView: View {
         let isHovered = hoveredTarget == target
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 12 * scale, weight: .medium))
+                .font(.system(size: 14 * scale, weight: .medium))
                 .foregroundColor(isHovered ? .white : PopupThemeModel.restForeground(for: effectiveTheme))
                 .frame(width: chevronWidth, height: barButtonHeight)
                 .popupBarHighlight(isHovered ? PopupThemeModel.barHoverFill : .clear, scale: scale, leadingEdge: systemImage == "chevron.up" || systemImage == "chevron.down", trailingEdge: !showSearchAllActions && (systemImage == "chevron.right" || (systemImage == "chevron.left" && !hasRightChevron)), isHovered: isHovered, namespace: hoverHighlightNamespace)
@@ -1162,7 +1162,7 @@ public struct PopupView: View {
  
     @ViewBuilder
     private func iconView(for icon: ActionIcon) -> some View {
-        ActionIconView(icon: icon, size: 13.5, scale: scale)
+        ActionIconView(icon: icon, size: 15.5, scale: scale)
     }
 }
 

@@ -226,10 +226,10 @@ public struct ActionIconView: View {
                         .frame(minWidth: targetDimension, minHeight: targetDimension, alignment: .center)
                 } else {
                     Text(text)
-                        .font(.system(size: 13 * scale, weight: .regular))
+                        .font(.system(size: 15 * scale, weight: .regular))
                         .lineLimit(1)
                         .truncationMode(.tail)
-                        .frame(maxWidth: 118 * scale)
+                        .frame(maxWidth: 136 * scale)
                 }
             case .url(let url):
                 AsyncImage(url: url) { phase in

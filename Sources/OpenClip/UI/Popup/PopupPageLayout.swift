@@ -11,10 +11,10 @@ import Core
 @MainActor
 public enum PopupPageLayout {
     /// Chevron button width (normalized baseline at 1.0 scale).
-    public static let chevronWidth: CGFloat = 29.0
+    public static let chevronWidth: CGFloat = 33.5
 
-    /// Per-character width estimate at the popup's 13 pt regular label font.
-    private static let estimatedGlyphWidth: CGFloat = 7.8
+    /// Per-character width estimate at the popup's 15 pt regular label font.
+    private static let estimatedGlyphWidth: CGFloat = 9.0
 
     /// Estimates the horizontal width of a single action button in points at the given scale.
     ///
@@ -38,8 +38,8 @@ public enum PopupPageLayout {
         }
         let icon = action.displayIcon(using: presenter)
         if case .text(let text) = icon, text.count > 2 {
-            let estimated = estimatedTextWidth(text, scale: scale) + 22.0 * scale
-            return max(PopupMetrics.actionButtonWidth * scale, min(125.0 * scale, estimated))
+            let estimated = estimatedTextWidth(text, scale: scale) + 25.0 * scale
+            return max(PopupMetrics.actionButtonWidth * scale, min(144.0 * scale, estimated))
         }
         return PopupMetrics.actionButtonWidth * scale
     }

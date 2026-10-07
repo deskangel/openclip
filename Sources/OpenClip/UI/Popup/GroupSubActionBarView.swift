@@ -204,7 +204,7 @@ public struct GroupSubActionBarView: View {
         let labelView = Group {
             if action.chrome.isInlineResult, let resolved = modeStore.inlineResults[action.id] {
                 Text(resolved)
-                    .font(.system(size: 13 * scale, weight: .regular))
+                    .font(.system(size: 15 * scale, weight: .regular))
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .foregroundColor(foregroundColor)
@@ -214,13 +214,13 @@ public struct GroupSubActionBarView: View {
                     .popupBarHighlight(backgroundColor, scale: scale, isText: true, leadingEdge: index == 0, trailingEdge: index == pagedSubActions.count - 1 && !hasLeftChevron && !hasRightChevron, isHovered: isHovered, namespace: hoverHighlightNamespace)
                     .transition(.opacity)
             } else {
-                ActionIconView(icon: action.displayIcon(using: presenter), size: 13.5, scale: scale)
+                ActionIconView(icon: action.displayIcon(using: presenter), size: 15.5, scale: scale)
                     .foregroundColor(foregroundColor)
                     .padding(.horizontal, {
-                        if case .text = action.displayIcon(using: presenter) { return 10.0 * scale }
+                        if case .text = action.displayIcon(using: presenter) { return 11.5 * scale }
                         return 0.0
                     }())
-                    .frame(minWidth: buttonWidth, maxWidth: 130 * scale, minHeight: barButtonHeight)
+                    .frame(minWidth: buttonWidth, maxWidth: 150 * scale, minHeight: barButtonHeight)
                     .popupBarHighlight(backgroundColor, scale: scale, isText: { if case .text = action.displayIcon(using: presenter) { return true }; return false }(), leadingEdge: index == 0, trailingEdge: index == pagedSubActions.count - 1 && !hasLeftChevron && !hasRightChevron, isHovered: isHovered, namespace: hoverHighlightNamespace)
                     .transition(.opacity)
             }
@@ -318,9 +318,9 @@ public struct GroupSubActionBarView: View {
         let restForeground = PopupThemeModel.restForeground(for: effectiveTheme)
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 11 * scale, weight: .semibold))
+                .font(.system(size: 12.5 * scale, weight: .semibold))
                 .foregroundColor(isHovered ? .white : restForeground)
-                .frame(width: 29 * scale, height: barButtonHeight)
+                .frame(width: PopupPageLayout.chevronWidth * scale, height: barButtonHeight)
                 .popupBarHighlight(isHovered ? PopupThemeModel.barHoverFill : .clear, scale: scale, trailingEdge: systemImage == "chevron.right" || !hasRightChevron, isHovered: isHovered, namespace: hoverHighlightNamespace)
                 .contentShape(Rectangle())
         }
