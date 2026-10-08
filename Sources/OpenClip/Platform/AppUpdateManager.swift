@@ -74,6 +74,7 @@ public final class AppUpdateManager: NSObject, ObservableObject, SPUUpdaterDeleg
         }
     }
 
+    private var isInteractiveUpdatePresented = false
     private var immediateInstallationBlock: (() -> Void)?
     private var cancellables = Set<AnyCancellable>()
     private var lastNotifiedVersion: String?
@@ -139,11 +140,27 @@ public final class AppUpdateManager: NSObject, ObservableObject, SPUUpdaterDeleg
 
     /// Triggers an interactive update check (shows Sparkle's native update window or dialog).
     public func checkForUpdates() {
-        if NSApp.activationPolicy() != .regular {
-            NSApp.setActivationPolicy(.regular)
-        }
-        NSApp.activate(ignoringOtherApps: true)
+        guard controller.updater.canCheckForUpdates || controller.updater.sessionInProgress else { return }
+        beginInteractiveUpdatePresentation()
         controller.checkForUpdates(nil)
+    }
+
+    /// Share the Settings window's activation lease so overlapping windows keep the app regular.
+    func beginInteractiveUpdatePresentation() {
+        guard !isInteractiveUpdatePresented else { return }
+        isInteractiveUpdatePresented = true
+        AppActivationPolicy.enter()
+    }
+
+    func finishInteractiveUpdatePresentation() {
+        guard isInteractiveUpdatePresented else { return }
+        isInteractiveUpdatePresented = false
+        AppActivationPolicy.leave()
+    }
+
+    public func updater(_ updater: SPUUpdater, didFinishUpdateCycleFor updateCheck: SPUUpdateCheck, error: (any Error)?) {
+        // Sparkle calls this after the driver finishes, including cancellation, no update, and errors.
+        finishInteractiveUpdatePresentation()
     }
 
     /// Installs the update immediately and relaunches the app if ready, or triggers an update check.

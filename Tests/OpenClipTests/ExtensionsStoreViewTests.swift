@@ -629,6 +629,46 @@ final class ExtensionsStoreViewTests: XCTestCase {
             item("old", version: "1.0.0", added: "2026-09-01T00:00:00Z"), now: now))
     }
 
+    @MainActor
+    func testNewPageSearchExcludesSavedShowcaseAndKeepsAllMatches() {
+        let viewModel = ExtensionsStoreViewModel(api: RecordingStoreAPI())
+        func item(_ id: String) -> ExtensionItem {
+            ExtensionItem(id: id, name: id, description: "", author: "", icon: "",
+                          downloadCount: 0, downloadURL: "", version: "1.1.0",
+                          addedAt: "2020-01-01T00:00:00Z")
+        }
+        viewModel.selectedSort = .recentlyAdded
+        viewModel.newItems = [item("unrelated-showcase")]
+        viewModel.searchQuery = "matching"
+        viewModel.extensions = (0..<15).map { item("matching-\($0)") }
+
+        XCTAssertEqual(Set(viewModel.flatDisplayedExtensions.map(\.id)),
+                       Set(viewModel.extensions.map(\.id)),
+                       "search must keep every match, without the New floor or saved showcase")
+
+        viewModel.extensions = []
+        XCTAssertTrue(viewModel.flatDisplayedExtensions.isEmpty,
+                      "a query with no matches must show the empty state")
+    }
+
+    @MainActor
+    func testNewSelectionFloorKeepsLegacyFirstRelease() throws {
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-10-08T00:00:00Z"))
+        let firstRelease = ExtensionItem(id: "first-release", name: "First Release", description: "",
+                                         author: "", icon: "", downloadCount: 0, downloadURL: "",
+                                         version: "1.0.0", publishedAt: "2020-01-01T00:00:00Z")
+        let updated = (0..<12).map { index in
+            ExtensionItem(id: "updated-\(index)", name: "Updated \(index)", description: "",
+                          author: "", icon: "", downloadCount: 0, downloadURL: "",
+                          version: "1.1.0", publishedAt: "2026-10-07T00:00:00Z")
+        }
+        let selected = ExtensionsStoreViewModel.newSelection([firstRelease] + updated, now: now)
+        XCTAssertEqual(selected.count, 12)
+        XCTAssertTrue(selected.contains { $0.id == firstRelease.id },
+                      "filling the minimum must not discard an eligible legacy first release")
+        XCTAssertEqual(Set(selected.map(\.id)).count, selected.count)
+    }
+
     // MARK: - Helpers
 
     @MainActor

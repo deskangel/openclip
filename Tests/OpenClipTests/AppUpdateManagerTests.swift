@@ -1,4 +1,5 @@
 import XCTest
+import AppKit
 import Combine
 @testable import OpenClip
 @testable import Core
@@ -18,6 +19,56 @@ final class AppUpdateManagerTests: XCTestCase {
         AppUpdateManager.shared.setAvailableUpdateVersionForTesting(nil)
         cancellables.removeAll()
         super.tearDown()
+    }
+
+    func testInteractiveUpdateCleanupRestoresAccessoryAfterRepeatedChecks() async {
+        let manager = AppUpdateManager.shared
+        let original = NSApp.activationPolicy()
+        defer { NSApp.setActivationPolicy(original) }
+        NSApp.setActivationPolicy(.accessory)
+
+        manager.beginInteractiveUpdatePresentation()
+        manager.beginInteractiveUpdatePresentation()
+        XCTAssertEqual(NSApp.activationPolicy(), .regular)
+        manager.finishInteractiveUpdatePresentation()
+        manager.finishInteractiveUpdatePresentation()
+        await waitForActivationPolicy(.accessory)
+    }
+
+    func testInteractiveUpdateCleanupKeepsOverlappingSettingsActive() async {
+        let manager = AppUpdateManager.shared
+        let original = NSApp.activationPolicy()
+        defer { NSApp.setActivationPolicy(original) }
+        NSApp.setActivationPolicy(.accessory)
+
+        manager.beginInteractiveUpdatePresentation()
+        AppActivationPolicy.enter() // Settings opens while the update dialog is visible.
+        manager.finishInteractiveUpdatePresentation()
+        try? await Task.sleep(nanoseconds: 5_000_000)
+        XCTAssertEqual(NSApp.activationPolicy(), .regular)
+
+        AppActivationPolicy.leave() // Settings then closes.
+        await waitForActivationPolicy(.accessory)
+    }
+
+    func testInteractiveUpdateCleanupPreservesExistingRegularPolicy() async {
+        let manager = AppUpdateManager.shared
+        let original = NSApp.activationPolicy()
+        defer { NSApp.setActivationPolicy(original) }
+        NSApp.setActivationPolicy(.regular)
+
+        manager.beginInteractiveUpdatePresentation()
+        manager.finishInteractiveUpdatePresentation()
+        try? await Task.sleep(nanoseconds: 5_000_000)
+        XCTAssertEqual(NSApp.activationPolicy(), .regular)
+    }
+
+    private func waitForActivationPolicy(_ expected: NSApplication.ActivationPolicy) async {
+        for _ in 0..<20 {
+            if NSApp.activationPolicy() == expected { break }
+            try? await Task.sleep(nanoseconds: 5_000_000)
+        }
+        XCTAssertEqual(NSApp.activationPolicy(), expected)
     }
 
     func testAvailableUpdateVersionPublishing() {

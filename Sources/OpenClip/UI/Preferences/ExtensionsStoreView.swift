@@ -174,7 +174,9 @@ public final class ExtensionsStoreViewModel: ObservableObject {
     public static func newSelection(_ items: [ExtensionItem], now: Date = Date(), minimum: Int = minimumNewCount) -> [ExtensionItem] {
         let sorted = items.sorted(by: addedNewestFirst)
         let windowed = sorted.filter { isNew($0, now: now) }
-        return windowed.count >= minimum ? windowed : Array(sorted.prefix(minimum))
+        guard windowed.count < minimum else { return windowed }
+        let remaining = sorted.filter { !isNew($0, now: now) }
+        return windowed + remaining.prefix(minimum - windowed.count)
     }
 
     /// Curated picks for the Featured section.
@@ -323,10 +325,12 @@ public final class ExtensionsStoreViewModel: ObservableObject {
 
     /// Rows for the flat (non-sectioned) store list. Every page reorders the full catalogue — except
     /// New, which shows the New selection (window with the `minimumNewCount` floor) so the list and
-    /// its count match the website's New tab instead of showing the whole catalogue.
+    /// its count match the website's New tab instead of showing the whole catalogue. Searches use
+    /// only the API result set, without mixing in the saved showcase or applying the New floor.
     public var flatDisplayedExtensions: [ExtensionItem] {
         let ordered = displayedExtensions
-        guard selectedSort == .recentlyAdded else { return ordered }
+        guard selectedSort == .recentlyAdded,
+              searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return ordered }
         return newDisplayItems
     }
 

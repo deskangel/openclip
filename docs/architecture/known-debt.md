@@ -19,6 +19,14 @@ areas; stale debt notes are worse than none.
   behavior and interfaces, returns raw corrected code, and permits a brief missing-context response
   when a reliable fix cannot be determined.
 
+## Manual Update Window Activation
+
+- Manual Sparkle checks share `AppActivationPolicy` with Settings. A single activation lease spans
+  the update flow and is released by `didFinishUpdateCycleFor`, including cancellation, errors, and
+  no-update outcomes. Repeated checks during a session do not acquire extra leases. The last lease
+  restores the original activation policy once no regular windows remain visible; a Settings window
+  opened during the check keeps its own lease.
+
 ## Settings Migration (UserDefaults → SettingsStore)
 
 - The typed settings abstraction is `SettingsStore` + `SettingKey<T>` (see `Sources/Core/Settings/`).
@@ -514,12 +522,13 @@ replace a newer popup.
   fire for an inactive non-key window — so hover highlights, tooltips, and the group sub-bar dwell
   all died in fullscreen. `PopupPanel.ContentView` and `SubBarPanel.ContentView` now install
   `.activeAlways` + `.mouseMoved` tracking areas (AppKit delivers these regardless of app/key
-  status) and forward to `PopupWindowController.handleTrackingMouseMoved`/`handleTrackingMouseExited`,
+  status) and forward mouse movement, entry, and exit to `PopupWindowController.handleTrackingMouseMoved`,
   which drive the same `updatePopupHover`/`updateSubBarHover` pipeline. That path deliberately passes
   `toggleClickThrough: false`: with no monitor to notice pointer re-entry, toggling
   `ignoresMouseEvents` would strand the panel under the cursor. The monitors remain the source of
-  click/scroll/key dismissal; pointer-leaves-popup dismissal in fullscreen still relies only on the
-  panel's `mouseExited`, not global distance.
+  click/scroll/key dismissal. Panel `mouseExited` updates hover and sub-bar grace; it does not
+  dismiss the main popup. Pointer-distance dismissal in fullscreen remains dependent on monitor
+  delivery and is not supplied by this tracking-area path.
 - **Automatic reads are tied to the selection source process.** The monitor uses the activated app
   from the workspace notification and cancels pending reads and clears the cached selection on a
   switch away from the source. Queued notifications for apps no longer frontmost, activation of
