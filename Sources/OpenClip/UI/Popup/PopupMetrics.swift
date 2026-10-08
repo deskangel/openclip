@@ -21,6 +21,11 @@ public enum PopupMetrics {
     public static let inlineResultMaxWidth: CGFloat = 172.0
     /// Horizontal padding (pt at 1.0 scale) inside an expanded inline result button.
     public static let inlineResultHorizontalPadding: CGFloat = 9.0
+    /// Breathing room (pt at 1.0 scale) at each end of a group sub-bar's button row so the first/last
+    /// button's hover highlight is not flush against the rounded card edge. The main bar gets this
+    /// visually from its end icon buttons (centered glyph in a `actionButtonWidth` slot); the sub-bar's
+    /// end buttons are often text labels whose highlight would otherwise sit ~2 pt from the edge.
+    public static let subBarEndInset: CGFloat = 1.0
     /// Cross-fade duration (seconds) between button rest icon/text and computed result.
     /// Benchmark (Tier 1 p95=0.01ms, Tier 2 p50=12.9ms): perceptual floor of 0.20s
     /// plus 2× Tier 2 p50 → 0.046s raw; rounded up to 0.05s, then bumped to 0.22s so

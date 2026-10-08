@@ -495,6 +495,19 @@ replace a newer popup.
   approach. Recovery is restricted to action mode. The content view and frame survive; recovery never activates OpenClip or makes the panel key. The second check logs
   unresolved placement. Automated tests verify the guards and bounded retry; actual
   fullscreen placement still requires WindowServer validation on the affected machine.
+- **Hover over fullscreen rides the panels' `.activeAlways` tracking areas, not the event
+  monitors.** While OpenClip is inactive over another app's fullscreen Space, the global monitor
+  receives no own-window `mouseMoved` events (they are not "global"), the local monitor gets none
+  (the non-activating panel is not key and the app is not active), and SwiftUI `.onHover` does not
+  fire for an inactive non-key window — so hover highlights, tooltips, and the group sub-bar dwell
+  all died in fullscreen. `PopupPanel.ContentView` and `SubBarPanel.ContentView` now install
+  `.activeAlways` + `.mouseMoved` tracking areas (AppKit delivers these regardless of app/key
+  status) and forward to `PopupWindowController.handleTrackingMouseMoved`/`handleTrackingMouseExited`,
+  which drive the same `updatePopupHover`/`updateSubBarHover` pipeline. That path deliberately passes
+  `toggleClickThrough: false`: with no monitor to notice pointer re-entry, toggling
+  `ignoresMouseEvents` would strand the panel under the cursor. The monitors remain the source of
+  click/scroll/key dismissal; pointer-leaves-popup dismissal in fullscreen still relies only on the
+  panel's `mouseExited`, not global distance.
 - **Automatic reads are tied to the selection source process.** The monitor uses the activated app
   from the workspace notification and cancels pending reads and clears the cached selection on a
   switch away from the source. Queued notifications for apps no longer frontmost, activation of
