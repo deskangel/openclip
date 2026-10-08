@@ -5,6 +5,7 @@
 // properties that the status bar menu and General preferences tab can drive. Ed25519-verified updates
 // are fetched from the appcast URL in Info.plist (SUFeedURL) — no Apple Developer ID or notarization required.
 import Foundation
+import AppKit
 import Sparkle
 import Combine
 @preconcurrency import UserNotifications
@@ -15,10 +16,6 @@ public final class AppUpdateManager: NSObject, ObservableObject, SPUUpdaterDeleg
     public static let shared = AppUpdateManager()
 
     public static let defaultFeedURL = "https://github.com/ganeshmshetty/openclip/releases/latest/download/appcast.xml"
-
-    /// The beta feed. It lives on a rolling `beta` pre-release rather than `latest`, so the stable
-    /// feed (which GitHub resolves to the newest non-pre-release) never advertises a beta build.
-    public static let betaFeedURL = "https://github.com/ganeshmshetty/openclip/releases/download/beta/appcast.xml"
 
     public static let updateNotificationCategory = "OPENCLIP_UPDATE_CATEGORY"
 
@@ -67,8 +64,7 @@ public final class AppUpdateManager: NSObject, ObservableObject, SPUUpdaterDeleg
         }
     }
 
-    /// Which update feed Sparkle follows. Changing it re-points the feed and re-arms the update
-    /// cycle so the new channel takes effect without a relaunch.
+    /// Kept for settings persistence. Always targets the stable feed release.
     @Published public var updateChannel: UpdateChannel {
         didSet {
             guard updateChannel != oldValue else { return }
@@ -128,48 +124,41 @@ public final class AppUpdateManager: NSObject, ObservableObject, SPUUpdaterDeleg
         currentFeedURL
     }
 
-    /// Beta appcast items are tagged `<sparkle:channel>beta</sparkle:channel>`. Only clients whose
-    /// delegate allows that channel see them; stable clients ignore them entirely — and the stable
-    /// feed never contains them anyway.
     public func allowedChannels(for updater: SPUUpdater) -> Set<String> {
         allowedChannelNames
     }
 
-    /// The feed URL for the selected channel. Stable keeps the Info.plist URL (GitHub's `latest`
-    /// download, which resolves to the newest non-pre-release); beta points at the rolling
-    /// `beta` pre-release.
+    /// The feed URL for OpenClip releases.
     public var currentFeedURL: String {
-        switch updateChannel {
-        case .stable:
-            return Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String ?? Self.defaultFeedURL
-        case .beta:
-            return Self.betaFeedURL
-        }
+        Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String ?? Self.defaultFeedURL
     }
 
-    /// The Sparkle channels this build accepts for the selected channel.
     public var allowedChannelNames: Set<String> {
-        updateChannel == .beta ? ["beta"] : []
+        []
     }
 
-    /// Triggers an interactive update check (shows the Sparkle UI).
+    /// Triggers an interactive update check (shows Sparkle's native update window or dialog).
     public func checkForUpdates() {
+        if NSApp.activationPolicy() != .regular {
+            NSApp.setActivationPolicy(.regular)
+        }
+        NSApp.activate(ignoringOtherApps: true)
         controller.checkForUpdates(nil)
     }
 
-    /// Installs the update immediately and relaunches the app.
+    /// Installs the update immediately and relaunches the app if ready, or triggers an update check.
     public func installUpdateNow() {
         if let block = immediateInstallationBlock {
             block()
         } else {
-            controller.checkForUpdates(nil)
+            checkForUpdates()
         }
     }
 
     /// Marks the update as staged to install automatically when OpenClip terminates.
     public func installUpdateOnQuit() {
         self.isUpdateStagedForQuitInstall = true
-        Log.updates.info("User confirmed update will be applied on quit")
+        Log.updates.info("Update staged for install on quit")
     }
 
     /// Returns the date of the last successful update check, if any.
@@ -189,7 +178,7 @@ public final class AppUpdateManager: NSObject, ObservableObject, SPUUpdaterDeleg
     }
 
     public func updaterDidNotFindUpdate(_ updater: SPUUpdater, error: any Error) {
-        Log.updates.info("Sparkle: no update found or up to date: \(error.localizedDescription, privacy: .private)")
+        Log.updates.info("Sparkle: no update found or up to date: \(error.localizedDescription, privacy: .public)")
         self.availableUpdateVersion = nil
         self.availableUpdateReleaseNotes = nil
         self.availableUpdateReleaseNotesFormat = nil
@@ -229,11 +218,22 @@ public final class AppUpdateManager: NSObject, ObservableObject, SPUUpdaterDeleg
         if notifyOnUpdate {
             self.postUpdateNotification(version: version, isReadyToInstall: true)
         }
-        return true
+        return false // Let Sparkle continue its normal scheduler and install automatically on quit
     }
 
     public func updater(_ updater: SPUUpdater, didAbortWithError error: any Error) {
-        Log.updates.error("Sparkle update error: \(error.localizedDescription, privacy: .private)")
+        let nsError = error as NSError
+        // Sparkle uses error code 1001 (SUNoUpdateError) when no update is found and 4001 (SUInstallationCanceledError)
+        // when an update check is canceled. These are expected control flow, not system failures.
+        if nsError.code == 1001 || nsError.code == 4001 {
+            if nsError.code == 1001 {
+                Log.updates.info("Sparkle update check completed: app is up to date")
+            } else {
+                Log.updates.info("Sparkle update check canceled by user")
+            }
+            return
+        }
+        Log.updates.error("Sparkle update error (\(nsError.code)): \(error.localizedDescription, privacy: .public)")
     }
 
     // MARK: - User Notifications

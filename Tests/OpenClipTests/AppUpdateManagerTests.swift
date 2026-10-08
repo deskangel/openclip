@@ -140,8 +140,8 @@ final class AppUpdateManagerTests: XCTestCase {
 
         manager.updateChannel = .beta
         XCTAssertEqual(DefaultSettingsStore.shared.get(.updateChannel), UpdateChannel.beta.rawValue)
-        XCTAssertEqual(manager.currentFeedURL, AppUpdateManager.betaFeedURL)
-        XCTAssertEqual(manager.allowedChannelNames, ["beta"])
+        XCTAssertTrue(manager.currentFeedURL.contains("releases/latest"))
+        XCTAssertTrue(manager.allowedChannelNames.isEmpty)
 
         manager.updateChannel = .stable
         XCTAssertEqual(DefaultSettingsStore.shared.get(.updateChannel), UpdateChannel.stable.rawValue)

@@ -12,7 +12,6 @@ import Core
 @MainActor
 struct AboutTab: View {
     @State private var isExporting = false
-    @State private var isReleaseNotesPopoverPresented = false
     @ObservedObject private var updateManager = AppUpdateManager.shared
 
     private var version: String {
@@ -27,16 +26,6 @@ struct AboutTab: View {
 
                 // Software updates
                 SettingsCard("Software Updates") {
-                    if let newVersion = updateManager.availableUpdateVersion {
-                        updateAvailableRow(version: newVersion)
-                        SettingsDivider()
-
-                        if let notes = updateManager.availableUpdateReleaseNotes, !notes.isEmpty {
-                            releaseNotesRow(notes: notes, version: newVersion)
-                            SettingsDivider()
-                        }
-                    }
-
                     SettingsToggleRow(
                         title: "Automatically Download Updates",
                         isOn: $updateManager.automaticallyDownloadsUpdates
@@ -53,33 +42,20 @@ struct AboutTab: View {
 
                     SettingsRow(
                         title: "Check for Updates",
-                        subtitle: updateChannelSubtitle ?? lastCheckedSubtitle
+                        subtitle: updateStatusSubtitle
                     ) {
-                        HStack(spacing: 10) {
-                            Picker("", selection: $updateManager.updateChannel) {
-                                Text("Stable").tag(UpdateChannel.stable)
-                                Text("Beta").tag(UpdateChannel.beta)
-                            }
-                            .labelsHidden()
-                            .pickerStyle(.segmented)
-                            .frame(width: 150)
-                            .accessibilityLabel("Update Channel")
-
-                            Button {
-                                updateManager.checkForUpdates()
-                            } label: {
-                                Image(systemName: "arrow.triangle.2.circlepath")
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(SettingsDesignTokens.primaryText)
-                                    .frame(width: 24, height: 24)
-                            }
-                            .buttonStyle(.plain)
-                            .settingsGlassCircle()
-                            .contentShape(Circle())
-                            .disabled(!updateManager.canCheckForUpdates)
-                            .accessibilityLabel("Check Now")
-                            .help("Check Now")
+                        Button(String(localized: "Check Now")) {
+                            updateManager.checkForUpdates()
                         }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundStyle(SettingsDesignTokens.primaryText)
+                        .padding(.horizontal, 10)
+                        .frame(height: 24)
+                        .settingsGlassCapsule()
+                        .contentShape(Capsule())
+                        .disabled(!updateManager.canCheckForUpdates)
+                        .accessibilityLabel("Check Now")
                     }
                 }
 
@@ -184,84 +160,14 @@ struct AboutTab: View {
         .padding(.bottom, 12)
     }
 
-    private func updateAvailableRow(version newVersion: String) -> some View {
-        SettingsRow(
-            title: updateManager.isUpdateStagedForQuitInstall
-                ? "Update Ready"
-                : "Update Available",
-            subtitle: LocalizedStringKey("Version \(newVersion)")
-        ) {
-            HStack(spacing: 10) {
-                if #available(macOS 26.0, *) {
-                    Button(String(localized: "Update Now")) {
-                        updateManager.installUpdateNow()
-                    }
-                    .buttonStyle(.plain)
-                    .font(.system(size: 11.5, weight: .medium))
-                    .foregroundStyle(SettingsDesignTokens.glassButtonBlue)
-                    .padding(.horizontal, 10)
-                    .frame(height: 24)
-                    .background(.ultraThinMaterial, in: .capsule)
-                    .glassEffect(.regular.tint(SettingsDesignTokens.glassButtonBlue.opacity(0.18)).interactive(), in: .capsule)
-                    .contentShape(Capsule())
-
-                    Button(String(localized: "On Quit")) {
-                        updateManager.installUpdateOnQuit()
-                    }
-                    .buttonStyle(.plain)
-                    .font(.system(size: 11.5, weight: .medium))
-                    .foregroundStyle(SettingsDesignTokens.primaryText)
-                    .padding(.horizontal, 10)
-                    .frame(height: 24)
-                    .settingsGlassCapsule()
-                    .contentShape(Capsule())
-                } else {
-                    Button("Update Now") {
-                        updateManager.installUpdateNow()
-                    }
-                    .buttonStyle(.borderedProminent)
-
-                    Button("On Quit") {
-                        updateManager.installUpdateOnQuit()
-                    }
-                }
-            }
+    private var updateStatusSubtitle: LocalizedStringKey? {
+        if let newVersion = updateManager.availableUpdateVersion {
+            return LocalizedStringKey("Version \(newVersion)")
         }
-    }
-
-    private func releaseNotesRow(notes: String, version: String) -> some View {
-        SettingsRow(title: "Release Notes", subtitle: LocalizedStringKey("Version \(version)")) {
-            Button {
-                isReleaseNotesPopoverPresented = true
-            } label: {
-                Label("View Notes", systemImage: "doc.text")
-                    .font(.system(size: 11.5, weight: .medium))
-                    .foregroundStyle(SettingsDesignTokens.primaryText)
-                    .padding(.horizontal, 10)
-                    .frame(height: 24)
-                    .settingsGlassCapsule()
-                    .contentShape(Capsule())
-            }
-            .buttonStyle(.plain)
-            .popover(isPresented: $isReleaseNotesPopoverPresented, arrowEdge: .trailing) {
-                ReleaseNotesPopover(
-                    notes: notes,
-                    format: updateManager.availableUpdateReleaseNotesFormat,
-                    version: version
-                )
-            }
+        guard let lastCheck = updateManager.lastUpdateCheckDate else {
+            return nil
         }
-    }
-
-    private var lastCheckedSubtitle: LocalizedStringKey? {
-        guard let lastCheck = updateManager.lastUpdateCheckDate else { return nil }
-        return LocalizedStringKey("Last checked \(Self.shortTimeAgo(lastCheck))")
-    }
-
-    private var updateChannelSubtitle: LocalizedStringKey? {
-        updateManager.updateChannel == .beta
-            ? "Beta builds include features that are still being tested."
-            : nil
+        return LocalizedStringKey("Last checked: \(Self.shortTimeAgo(lastCheck))")
     }
 
     private func linkRow(_ title: LocalizedStringKey, systemImage: String, url: String) -> some View {
@@ -332,76 +238,3 @@ struct AboutTab: View {
     }
 }
 
-private struct ReleaseNotesPopover: View {
-    let notes: String
-    let format: String?
-    let version: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Release Notes")
-                    .font(.headline)
-                Text("Version \(version)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            SettingsDivider()
-
-            ScrollView {
-                Text(formattedNotes)
-                    .font(.callout)
-                    .lineSpacing(3)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.bottom, 4)
-            }
-            .frame(maxHeight: 300)
-        }
-        .padding(16)
-        .frame(width: 380, alignment: .leading)
-    }
-
-    private var formattedNotes: AttributedString {
-        switch format?.lowercased() {
-        case "plain-text":
-            return AttributedString(notes)
-        case "html":
-            return htmlAttributedNotes
-        case "markdown", nil:
-            return (try? AttributedString(markdown: notes, options: .init(interpretedSyntax: .full)))
-                ?? AttributedString(notes)
-        default:
-            return AttributedString(notes)
-        }
-    }
-
-    private var htmlAttributedNotes: AttributedString {
-        let document = """
-        <meta charset="utf-8"><style>
-        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 13px; }
-        h1, h2, h3 { margin: 0 0 8px; }
-        p, ul, ol { margin: 0 0 8px; }
-        ul, ol { padding-left: 20px; }
-        </style>\(notes)
-        """
-        let options: [NSAttributedString.DocumentReadingOptionKey: Any] = [
-            .documentType: NSAttributedString.DocumentType.html,
-            .characterEncoding: String.Encoding.utf8.rawValue
-        ]
-        guard let imported = try? NSAttributedString(
-            data: Data(document.utf8),
-            options: options,
-            documentAttributes: nil
-        ) else {
-            return AttributedString(notes)
-        }
-
-        let readable = NSMutableAttributedString(attributedString: imported)
-        if readable.length > 0 {
-            readable.addAttribute(.foregroundColor, value: NSColor.labelColor, range: NSRange(location: 0, length: readable.length))
-        }
-        return AttributedString(readable)
-    }
-}
