@@ -200,7 +200,7 @@ final class RuleEngineTests: XCTestCase {
 
         let ghosttyContext = RuleEngine.shared.resolvePolicies(for: "com.mitchellh.ghostty")
         XCTAssertTrue(ghosttyContext.denyPaste)
-        XCTAssertEqual(ghosttyContext.retrievalMode, .keyboardCopy)
+        XCTAssertEqual(ghosttyContext.retrievalMode, .menuCopy)
     }
 
     @MainActor

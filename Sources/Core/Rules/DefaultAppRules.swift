@@ -117,7 +117,6 @@ public enum DefaultAppRules: Sendable {
         // Code Editors & IDEs
         "com.apple.Terminal",
         "com.googlecode.iterm2",
-        "com.mitchellh.ghostty",
         "com.microsoft.VSCode",
         "com.microsoft.VSCodeInsiders",
         "com.vscodium",
@@ -191,6 +190,7 @@ public enum DefaultAppRules: Sendable {
     ]
     
     public static let menuCopyApps: [String] = [
+        "com.mitchellh.ghostty",
         "org.alacritty",
         "net.kovidgoyal.kitty",
         "co.zeit.hyper",
