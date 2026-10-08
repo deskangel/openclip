@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Ask a question (or claim an issue)
+  - name: Ask a question
     url: https://github.com/ganeshmshetty/openclip/discussions
-    about: General questions, workflow ideas, and "I'd like to work on this" — comment `/claim` on the issue itself to be assigned.
+    about: General questions and workflow ideas. To volunteer for an issue, comment on that issue; claiming is optional.
   - name: Propose, report, or fix an extension
     url: https://github.com/ganeshmshetty/openclip-extensions/issues/new/choose
     about: New extension ideas and bugs in existing extensions belong in the openclip-extensions catalog repo, not here.

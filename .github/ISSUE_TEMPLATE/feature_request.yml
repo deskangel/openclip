@@ -1,18 +1,16 @@
 name: Feature Request
 description: Suggest an idea, enhancement, or new native capability for OpenClip.
 title: "[Feature]: "
-labels: ["enhancement", "status:needs-triage"]
+labels: ["enhancement"]
 body:
   - type: markdown
     attributes:
       value: |
-        **Before you file:** search [open issues and discussions](https://github.com/ganeshmshetty/openclip/issues?q=is%3Aissue+) — an
-        existing discussion may already have shaped this.
+        Please search [existing issues](https://github.com/ganeshmshetty/openclip/issues) before submitting.
+        For ideas about a specific community extension, use the
+        [extension catalog's issue tracker](https://github.com/ganeshmshetty/openclip-extensions/issues).
 
-        Want to add or fix an *extension*? That belongs in
-        [openclip-extensions](https://github.com/ganeshmshetty/openclip-extensions) — the catalog is a
-        separate repository, and most feature requests are better solved as a package than as a
-        change to the app.
+        Want to work on this? Mention it below or comment `/claim` after submitting. Claiming is optional.
 
   - type: textarea
     id: problem
@@ -30,53 +28,13 @@ body:
       description: The behavior or UI you are imagining. Rough is fine.
       placeholder: I would expect it to ...
     validations:
-      required: true
-
-  # Identical wording to the same dropdown in bug_report.yml on purpose: .github/workflows/intake.yml
-  # maps this answer to an `area:*` label, and one shared mapping table only works if both forms
-  # offer the same eight options.
-  - type: dropdown
-    id: area
-    attributes:
-      label: Affected area
-      description: Picks the `area:*` label so this can be filtered and routed.
-      options:
-        - Floating Popup Bar / Positioning
-        - Action-Search Palette (Opt+Cmd+C)
-        - Built-in Actions (Search, Calculate, Calendar, Transform)
-        - AI Assistant and Providers (Apple Intelligence, Ollama, Cloud)
-        - Extension Runtime Engine (JS Host, AppleScript, Shell Runner)
-        - Preferences and Appearance
-        - Accessibility and Performance
-        - CLI / Developer Tooling
-    validations:
-      required: true
-
-  - type: dropdown
-    id: involvement
-    attributes:
-      label: How do you want to be involved?
-      options:
-        - Just reporting — no code changes planned
-        - Happy to reproduce and confirm this
-        - I'd like to work on this
-        - I'll send a pull request
-    validations:
-      required: true
-
-  - type: textarea
-    id: alternatives
-    attributes:
-      label: Alternatives you have tried
-      description: Other macOS utilities that do this, or workarounds you have settled for.
-      placeholder: Currently I use ... because ...
-    validations:
       required: false
 
   - type: textarea
     id: additional-context
     attributes:
-      label: Mockups, links, or anything else
-      placeholder: Screenshots, gists, related issues.
+      label: Examples, workarounds, or screenshots
+      description: Anything that helps explain your use case.
+      placeholder: Currently I use ...; here is an example of what would help.
     validations:
       required: false

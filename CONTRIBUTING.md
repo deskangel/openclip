@@ -102,8 +102,9 @@ Keep messages focused and lowercase-scope where applicable (e.g. `feat(extension
 
 ## Submitting changes
 
-1. **Open an issue first** for behavioral changes or anything design-sensitive;
-   small fixes and docs can go straight to a PR.
+1. **Small fixes, documentation, translations, and small improvements can go straight to a PR.**
+   For new features, substantial UI changes, or architecture changes, open an issue first
+   to agree on scope before implementing.
 2. **Add tests** when you change behavior, and make sure the quick build gate and
    full suite pass before pushing.
 3. **Keep PRs focused** on a single concern. Rebase onto `main` before submitting.
@@ -120,25 +121,50 @@ authoritative version is the `AGENTS.md` at the root of
 
 Issues are the front door, so it's worth knowing what happens after you file one.
 
-**What happens when you file an issue.** The form asks which subsystem is affected and how you
-want to be involved. An automated pass applies an `area:*` label from that answer, flags the issue
-for triage, greets you if this is your first issue, and — if the title is close enough to an
-existing one — leaves a pointer to the possible duplicate. It does not close anything: duplicate
-suggestions are hints, not verdicts.
+**What happens when you file an issue.** Bug reports ask what happened, how to reproduce it,
+and your OpenClip and macOS versions. If reproduction is intermittent or unknown, say so.
+The affected app, expected behavior, chip architecture, screenshots, and logs are optional.
+Feature requests require only the problem you want to solve; a proposed solution and examples
+are optional. The forms apply `bug` or `enhancement`; maintainers add other labels during triage.
+An automated pass greets first-time contributors and may suggest a possible duplicate. Those
+suggestions are hints, not verdicts, and do not automatically close your issue.
 
-**How to work on one.**
+**How to work on one.** Say “I'd like to work on this” in a comment. Claiming is optional:
+`/claim` requests assignment and adds `status:claimed`. Check existing assignments before starting
+substantial work and coordinate with anyone already working on it. If you stop, leave a comment
+so the maintainer can release the assignment. Maintainers may check in and release inactive claims.
 
-- Comment `/claim` on the issue. You'll be assigned and the issue gets a `claimed` label. One
-  claim per issue — if someone beats you to it, you'll be told and invited to pair.
-- Claims do **not** expire. If you stall, say so in a comment so someone else can take it, or ask a
-  maintainer to release it.
-- Saying "I'll send a pull request" or "I'd like to work on this" in the form gets the issue
-  labelled accordingly, so the maintainer can see who wants to help before you start.
+**Before you open the pull request.** Explain what changed, why, and how you verified it.
+Issue links are optional: use `Fixes #<number>` for a complete resolution or `Related to #<number>`
+for partial work. `Build & Tests` performs verification. `PR Intake` only reminds authors about
+empty descriptions; it does not require an issue or repeat verification claims in bot comments.
 
-**Before you open the pull request.** `main` requires two checks to pass: `Build & Tests` and
-`PR Intake`. The second one wants two things from you — a description that says what changed and
-why, and a `Fixes #<number>` line. Your own description's verification checkboxes are treated as
-claims, not results; the build is the actual gate.
+## Contribution scope and review
+
+OpenClip focuses on selected-text actions and reliable native macOS behavior. Specialized
+integrations generally belong in extensions. Discuss large features first; experiments can be
+shared as drafts. A working feature may be declined if its scope or ongoing maintenance cost
+is too large for the project.
+
+Review comments should distinguish required fixes (correctness, privacy, compatibility, or
+maintainability), optional suggestions, and minor nits. Only required fixes block approval.
+Review timing depends on maintainer availability; there is no guaranteed response deadline.
+When declining a contribution, explain the reason and close it rather than leaving it pending.
+
+## Issue labels
+
+Use a small active set:
+
+- `bug`, `enhancement`, `documentation`: the kind of work.
+- `good first issue`, `help wanted`: work ready for contributors.
+- `status:needs-info`: waiting on specific information from the reporter.
+- `status:claimed`: an optional assignment, maintained by `/claim`.
+- `duplicate`: links a report to an existing issue.
+
+Retire `area:*`, `involvement:*`, `status:needs-triage`, `status:confirmed`, `invalid`,
+`question`, and `wontfix` from active use. Use the issue conversation for confirmation,
+questions, and reasons for closing. Historical labels may remain on older issues to preserve
+context; the intake workflow does not add or remove them.
 
 ## Code of Conduct
 

@@ -3,14 +3,11 @@ name: Issue & PR Intake
 # Everything here is intake bookkeeping, not verification. `ci.yml` builds and tests the app;
 # this workflow makes issues and PRs routable, greets newcomers, and hands work to contributors.
 #
-# The load-bearing assumption is that `.github/ISSUE_TEMPLATE/*.yml` render into a Markdown body
-# with `### <field label>` headings. Each job that reads a form field parses it with the same
-# `field_value` helper and *warns loudly* when a heading goes missing, so renaming a form label
-# surfaces as an annotation instead of quietly stopping auto-labeling forever.
+# Issue forms apply bug/enhancement labels. Maintainers handle further classification.
 
 on:
   issues:
-    types: [opened, edited, labeled, unlabeled, reopened]
+    types: [opened]
   issue_comment:
     types: [created]
   pull_request:
@@ -23,162 +20,20 @@ permissions:
   issues: write
   pull-requests: write
 
-# One label change re-triggers this workflow, which is why every job below is written to be
-# idempotent: it reads current state, computes the difference, and only calls the API when there
-# is one. A non-idempotent job here loops until the run limit.
-
 jobs:
-  # ---------------------------------------------------------------------------------------------
-  # Auto-label by subsystem, plus the triage queue.
-  #
-  # These are one job on purpose. Both need the same parsed form body, and the heading contract
-  # with the issue forms is the fragile part of this workflow — parsing it once means there is
-  # exactly one place where it can break.
-  # ---------------------------------------------------------------------------------------------
-  triage-labels:
-    name: Triage Labels
-    runs-on: ubuntu-latest
-    steps:
-      - name: Reconcile area and involvement labels
-        id: labels
-        env:
-          GH_TOKEN: ${{ github.token }}
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
-          REPO: ${{ github.event.repository }}
-          EVENT: ${{ github.event.action }}
-        run: |
-          set -euo pipefail
-
-          # Reads the first non-empty line after `### <heading>` in the rendered issue body.
-          # Skips the form's own `<!-- id: ... -->` metadata, stops at the next heading, and
-          # tolerates trailing whitespace / CRLF so a form edit can't silently break the match.
-          field_value() {
-            local file="$1" heading="$2"
-            awk -v want="### ${heading}" '
-              { sub(/\r$/, "") }
-              {
-                line = $0
-                sub(/[ \t]+$/, "", line)
-                if (!grab && line == want) { grab = 1; next }
-              }
-              grab && /^### / { exit }
-              grab && /^<!--/ { next }
-              grab && /[^ \t]/ { print; exit }
-            ' "$file"
-          }
-
-          body="$(mktemp)"
-          gh api "repos/${REPO}/issues/${ISSUE_NUMBER}" --jq '.body // ""' > "$body"
-
-          area_answer="$(field_value "$body" "Affected area")"
-          involvement_answer="$(field_value "$body" "How do you want to be involved?")"
-
-          # --- area -> area:* -----------------------------------------------------------------
-          # These eight strings must stay byte-identical to the `Affected area` dropdown options
-          # in both bug_report.yml and feature_request.yml. They are exact matches, not globs, on
-          # purpose: a glob would keep working after someone edits the form wording, which is
-          # exactly the drift this mapping exists to catch.
-          area_label=""
-          case "$area_answer" in
-            "Floating Popup Bar / Positioning")                   area_label="area:popup" ;;
-            "Action-Search Palette (Opt+Cmd+C)")                 area_label="area:action-search" ;;
-            "Built-in Actions (Search, Calculate, Calendar, Transform)")
-                                                                   area_label="area:actions" ;;
-            "AI Assistant and Providers (Apple Intelligence, Ollama, Cloud)")
-                                                                   area_label="area:ai" ;;
-            "Extension Runtime Engine (JS Host, AppleScript, Shell Runner)")
-                                                                   area_label="area:extensions" ;;
-            "Preferences and Appearance")                         area_label="area:preferences" ;;
-            "Accessibility and Performance")                      area_label="area:accessibility" ;;
-            "CLI / Developer Tooling")                            area_label="area:build" ;;
-            "")
-              echo "::warning title=Form layout changed::Could not find an 'Affected area' answer in issue #${ISSUE_NUMBER}. Auto-labeling is off until the form heading and .github/workflows/intake.yml agree again."
-              ;;
-            *)
-              echo "::warning title=Unrecognized area::'${area_answer}' is not in this workflow's area mapping. Add it to triage-labels, or fix the answer in issue #${ISSUE_NUMBER}."
-              ;;
-          esac
-
-          # --- involvement -> involvement:* -----------------------------------------------
-          involvement_label=""
-          case "$involvement_answer" in
-            "Happy to reproduce and confirm this")         involvement_label="involvement:reproduce" ;;
-            "I'll send a pull request"|"I'd like to work on this")
-                                                       involvement_label="involvement:will-pr" ;;
-            "Just reporting"*)                             involvement_label="" ;;
-            "")
-              echo "::warning title=Form layout changed::Could not find a 'How do you want to be involved?' answer in issue #${ISSUE_NUMBER}."
-              ;;
-            *)
-              echo "::warning title=Unrecognized involvement::'${involvement_answer}' is not in this workflow's mapping."
-              ;;
-          esac
-
-          # --- reconcile ---------------------------------------------------------------------
-          # Managed labels are the whole `area:` and `involvement:` namespaces plus the queue
-          # status. Desired state comes from the form; anything else on the issue is left alone.
-          current="$(gh api "repos/${REPO}/issues/${ISSUE_NUMBER}" --jq '[.labels[].name] | join("\n")')"
-
-          managed_add=""
-          managed_remove=""
-          while IFS= read -r label; do
-            [ -n "$label" ] || continue
-            case "$label" in
-              area:*|involvement:*) managed_remove="${managed_remove}${label}," ;;
-            esac
-          done <<< "$current"
-
-          for wanted in "$area_label" "$involvement_label"; do
-            [ -n "$wanted" ] || continue
-            printf '%s\n' "$current" | grep -qxF "$wanted" || managed_add="${managed_add}${wanted},"
-            managed_remove="${managed_remove//${wanted},/}"
-          done
-
-          managed_add="${managed_add%,}"
-          managed_remove="${managed_remove%,}"
-
-          # --- triage queue ------------------------------------------------------------------
-          # `status:needs-triage` is applied by the form's own `labels:` key on creation. It is
-          # cleared once the issue is routed (has an area) and someone has picked it up
-          # (confirmed, marked help wanted, or assigned). Anything else stays in the queue.
-          clear_queue=""
-          if printf '%s\n' "$current" | grep -qxF "status:needs-triage"; then
-            has_area=no
-            printf '%s\n' "$current" | grep -q "^area:" && has_area=yes
-            picked_up=no
-            printf '%s\n' "$current" | grep -qxF "status:confirmed" && picked_up=yes
-            printf '%s\n' "$current" | grep -qxF "help wanted" && picked_up=yes
-            [ "$(gh api "repos/${REPO}/issues/${ISSUE_NUMBER}" --jq '.assignees | length')" -gt 0 ] && picked_up=yes
-            if [ "$has_area" = yes ] && [ "$picked_up" = yes ]; then
-              clear_queue="status:needs-triage"
-            fi
-          fi
-
-          args=()
-          [ -n "$managed_add" ] && args+=(--add-label "$managed_add")
-          [ -n "$managed_remove" ] && args+=(--remove-label "$managed_remove")
-          [ -n "$clear_queue" ] && args+=(--remove-label "$clear_queue")
-
-          if [ "${#args[@]}" -gt 0 ]; then
-            gh issue edit "$ISSUE_NUMBER" "${args[@]}"
-            echo "Applied: ${args[*]}"
-          else
-            echo "Labels already correct; nothing to do."
-          fi
-
   # ---------------------------------------------------------------------------------------------
   # First-time contributor welcome.
   # ---------------------------------------------------------------------------------------------
   welcome:
     name: Welcome
     if: >-
-      github.event_name == 'issues' || github.event_name == 'pull_request'
+      (github.event_name == 'issues' || github.event_name == 'pull_request') && github.event.action == 'opened'
     runs-on: ubuntu-latest
     steps:
       - name: Greet first-time contributors
         env:
           GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.event.repository }}
+          REPO: ${{ github.repository }}
           ACTOR: ${{ github.actor }}
           ASSOCIATION: ${{ github.event.issue.author_association || github.event.pull_request.author_association }}
           TARGET: >-
@@ -200,14 +55,12 @@ jobs:
 
           A few things that will speed it up:
 
-          - **Logs answer most "nothing happened" reports.** Reproduce it, then run
-            `/Applications/OpenClip.app/Contents/MacOS/OpenClip --dump-logs --level=error`.
-            Add `--category=extensions` or `--category=ai` to filter by subsystem.
+          - **Logs can help diagnose bugs.** You can export them from Preferences → About
+            and attach them to the issue.
           - **Extension bugs belong elsewhere.** Issues about a specific community extension go to
             [openclip-extensions](https://github.com/ganeshmshetty/openclip-extensions/issues).
-          - **You can work on this.** Comment `/claim` on the issue and you'll be assigned. If you
-            said you'd send a PR in the form, you don't need to — just open it and reference the
-            issue with `Fixes #<number>`.
+          - **Want to help?** Say so in a comment. You can also use `/claim` on an issue to
+            request assignment.
 
           Working on the code? The architecture rules are in
           [AGENTS.md](https://github.com/ganeshmshetty/openclip/blob/main/AGENTS.md) and the
@@ -228,7 +81,7 @@ jobs:
       - name: Look for likely duplicates
         env:
           GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.event.repository }}
+          REPO: ${{ github.repository }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           TITLE: ${{ github.event.issue.title }}
         run: |
@@ -311,13 +164,13 @@ jobs:
   # ---------------------------------------------------------------------------------------------
   claim:
     name: Claim
-    if: github.event_name == 'issue_comment' && github.event.action == 'created'
+    if: github.event_name == 'issue_comment' && github.event.action == 'created' && !github.event.issue.pull_request
     runs-on: ubuntu-latest
     steps:
       - name: Handle /claim
         env:
           GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.event.repository }}
+          REPO: ${{ github.repository }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           STATE: ${{ github.event.issue.state }}
           ACTOR: ${{ github.event.comment.user.login }}
@@ -365,8 +218,8 @@ jobs:
 
           Worth knowing before you start:
 
-          - Claim an issue before writing code, not after. If someone else claims it first you'll
-            get a heads-up rather than two parallel implementations.
+          - Claiming is optional. For substantial work, coordinate in the issue before starting
+            so contributors do not duplicate effort.
           - Set up with \`git clone\` + \`xcodegen generate\`. The Xcode project is generated from
             \`project.yml\` — never edit \`OpenClip.xcodeproj\` by hand.
           - Before pushing: \`./scripts/test.sh core\` for a sub-second gate, then
@@ -374,10 +227,11 @@ jobs:
           - The architecture hard rules are in
             [AGENTS.md](https://github.com/ganeshmshetty/openclip/blob/main/AGENTS.md) — especially
             Core purity, \`SettingsStore\` over \`UserDefaults\`, and the logging rules.
-          - Claims do not expire. If you stall, say so in a comment so someone else can pick it up,
-            and a maintainer can hand it back.
+          - If you stop working on this, leave a comment so a maintainer can release the assignment.
+            Maintainers may check in and release inactive assignments.
 
-          Open the PR with \`Fixes #${ISSUE_NUMBER}\` and it will link automatically.
+          Issue links are optional. Use \`Fixes #${ISSUE_NUMBER}\` if the PR resolves the issue,
+          or \`Related to #${ISSUE_NUMBER}\` if it addresses only part of it.
           EOF
 
   # ---------------------------------------------------------------------------------------------
@@ -389,94 +243,13 @@ jobs:
     if: github.event_name == 'pull_request' && (github.event.action == 'opened' || github.event.action == 'edited')
     runs-on: ubuntu-latest
     steps:
-      - name: Check the PR description
-        id: check
+      - name: Remind authors to describe their changes
         env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.event.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
           set -euo pipefail
-
-          # Strip the template's own HTML comments before measuring. GitHub pre-fills the template
-          # verbatim, so an untouched body is mostly `<!-- guidance -->` plus a stub or two.
-          prose="$(printf '%s' "$PR_BODY" \
-            | perl -0pe 's/<!--.*?-->//gs' \
-            | tr -d '[:space:]#*_`>-' \
-            | wc -c | tr -d ' ')"
-
-          links_issue=no
-          if printf '%s' "$PR_BODY" | grep -qiE '\b(fixes|closes|resolves)[[:space:]]+#[0-9]+'; then
-            links_issue=yes
+          # Ignore template guidance and headings. This is a reminder, not a merge gate.
+          prose="$(printf '%s' "$PR_BODY" | perl -0pe 's/<!--.*?-->//gs' | sed '/^[[:space:]]*#/d' | tr -d '[:space:]')"
+          if [ -z "$prose" ]; then
+            echo "::warning title=PR description::Please explain what changed, why, and how you verified it. Issue links are optional."
           fi
-
-          # The bare `Fixes #` stub the templates ship with, still carrying no number. A
-          # prose-length test cannot detect an untouched template here — the templates have
-          # plenty of literal text outside their HTML comments — but every untouched one has
-          # this exact line, so matching it is precise.
-          stub_left=no
-          if printf '%s' "$PR_BODY" | grep -qiE '^[[:space:]]*#*[[:space:]]*(fixes|closes|resolves)[[:space:]]*#*[[:space:]]*$'; then
-            stub_left=yes
-          fi
-
-          echo "prose_chars=${prose}" >> "$GITHUB_OUTPUT"
-          echo "links_issue=${links_issue}" >> "$GITHUB_OUTPUT"
-          echo "stub_left=${stub_left}" >> "$GITHUB_OUTPUT"
-
-          # Reported before the missing-link error, because an untouched template contains a bare
-          # `Fixes #` with no number and would otherwise be reported as an unlinked PR —
-          # technically true, but it points the author at the wrong problem.
-          if [ "$stub_left" = yes ]; then
-            echo "::error title=Template not filled in::This description still has the template's placeholder \`Fixes #\` with no issue number. Fill in the template and point it at a real issue — see .github/PULL_REQUEST_TEMPLATE/."
-            exit 1
-          fi
-          if [ "${prose}" -lt 40 ]; then
-            echo "::error title=Empty description::Say what changed and why in your own words — see .github/PULL_REQUEST_TEMPLATE/."
-            exit 1
-          fi
-          if [ "$links_issue" = no ]; then
-            echo "::error title=Unlinked PR::Add \`Fixes #<number>\` to the description so this PR closes its issue."
-            exit 1
-          fi
-
-      - name: Report claimed verification
-        if: always()
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.event.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
-          PR_BODY: ${{ github.event.pull_request.body }}
-        run: |
-          set -euo pipefail
-
-          # Echo back what the PR says it ran. A claim in the description, not a re-run — the
-          # real gate is the Build & Tests check. This exists so a reviewer can tell "I ran the
-          # full suite" from silence without hunting through the diff.
-          checked=""
-          missing=""
-          for cmd in './scripts/test.sh core' './scripts/test.sh' './scripts/dev_run.sh'; do
-            if printf '%s' "$PR_BODY" | grep -qF -- "$cmd"; then
-              checked="${checked}- \`${cmd}\`\n"
-            else
-              missing="${missing}- \`${cmd}\`\n"
-            fi
-          done
-
-          # Built with printf rather than a multi-line shell string: a literal newline inside a
-          # double-quoted assignment would have to be written at column 0 to keep the shell
-          # happy, and a column-0 line terminates this YAML block scalar outright.
-          {
-            printf "Checked in this PR's description:\n\n"
-            if [ -n "$checked" ]; then
-              printf '%b' "$checked"
-            else
-              printf '_Nothing listed._\n'
-            fi
-            if [ -n "$missing" ]; then
-              printf '\nNot mentioned:\n%b' "$missing"
-            fi
-            printf '\n_Unticked boxes are claims, not verified results. `Build & Tests` is the real gate; if a command is missing because the change genuinely does not need it, say so._\n'
-          } | gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file -
