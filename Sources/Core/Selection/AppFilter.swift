@@ -12,6 +12,8 @@ public struct AppFilter: Sendable {
         "com.apple.CharacterPaletteIM",
         "com.apple.dock",
         "com.apple.iphonesimulator",
+        "com.google.android.emulator",
+        "com.android.emulator",
         "com.apple.systemuiserver",
         "com.blizzard.*",
         "com.codeweavers.*",
