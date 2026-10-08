@@ -766,5 +766,6 @@
   "Contextual Pill": "Pastille contextuelle",
   "Show contextual actions to the left or right of the main bar. Auto follows the horizontal position.": "Afficher les actions contextuelles à gauche ou à droite de la barre principale. Auto suit la position horizontale.",
   "Contextual Pill Position": "Position de la pastille contextuelle",
-  "Rename": "Renommer"
+  "Rename": "Renommer",
+  "%lld extensions": "%lld extensions"
 }

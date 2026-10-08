@@ -117,7 +117,7 @@ public struct PreferencesView: View {
             }
             syncToolbar()
             Task {
-                await storeViewModel.resetAndFetch(limit: 100)
+                await storeViewModel.loadAll(limit: Constants.storeFullCatalogLimit)
                 await ExtensionUpdateManager.shared.checkForUpdates()
             }
         }
@@ -134,7 +134,7 @@ public struct PreferencesView: View {
             syncToolbar()
             if newPath.last == .store && storeViewModel.extensions.isEmpty {
                 Task {
-                    await storeViewModel.resetAndFetch(limit: 100)
+                    await storeViewModel.loadAll(limit: Constants.storeFullCatalogLimit)
                 }
             }
         }
@@ -732,7 +732,7 @@ public struct PreferencesView: View {
                     .focused($isStoreSearchFocused)
                     .onSubmit {
                         Task {
-                            await storeViewModel.resetAndFetch(limit: 100, keepPrevious: true)
+                            await storeViewModel.loadAll(limit: Constants.storeFullCatalogLimit, keepPrevious: true)
                         }
                     }
                     .onKeyPress(.escape) {

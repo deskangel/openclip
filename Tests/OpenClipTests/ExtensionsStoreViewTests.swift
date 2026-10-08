@@ -529,6 +529,106 @@ final class ExtensionsStoreViewTests: XCTestCase {
         XCTAssertFalse(viewModel.isFeatured(ext2))
     }
 
+    // MARK: - Whole-catalogue load & the New filter
+
+    /// `loadAll` must page until the server reports the last page, so nothing is left out and the
+    /// client-side sort/filter/count run over the complete catalogue.
+    @MainActor
+    func testLoadAllFetchesEveryPage() async {
+        let api = PagedStoreAPI(total: 5)
+        let viewModel = ExtensionsStoreViewModel(api: api)
+
+        await viewModel.loadAll(limit: 2)
+
+        XCTAssertEqual(viewModel.extensions.map(\.id),
+                       ["ext-0", "ext-1", "ext-2", "ext-3", "ext-4"])
+        XCTAssertFalse(viewModel.isLoading)
+        let requested = await api.requestedPages()
+        XCTAssertEqual(requested, [1, 2, 3], "pages are fetched until the last one")
+    }
+
+    @MainActor
+    func testFlatNewPageUsesTheNewSelectionNotTheWholeCatalogue() {
+        let viewModel = ExtensionsStoreViewModel(api: RecordingStoreAPI())
+        var items: [ExtensionItem] = []
+        for i in 0..<20 {
+            let added = i < 2 ? "2026-10-06T00:00:00Z" : "2026-08-01T00:00:00Z"
+            items.append(ExtensionItem(id: "ext-\(i)", name: "Ext \(i)", description: "", author: "",
+                                       icon: "", downloadCount: 0, downloadURL: "",
+                                       version: "1.0.0", addedAt: added))
+        }
+        viewModel.extensions = items
+
+        viewModel.selectedSort = .recentlyAdded
+        XCTAssertEqual(viewModel.flatDisplayedExtensions.count, 12,
+                       "the New page is the floored selection, not the whole catalogue")
+        XCTAssertTrue(viewModel.flatDisplayedExtensions.contains { $0.id == "ext-0" })
+
+        viewModel.selectedSort = .downloads
+        XCTAssertEqual(viewModel.flatDisplayedExtensions.count, 20,
+                       "every other page keeps the full set, reordered")
+    }
+
+    /// The New selection keeps a recent extension even after it is updated, and tops the list up to
+    /// the floor so a quiet catalogue never shows an empty New tab.
+    @MainActor
+    func testNewSelectionUsesWindowWithFloor() throws {
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-10-08T00:00:00Z"))
+        func item(_ id: String, added: String, version: String?) -> ExtensionItem {
+            ExtensionItem(id: id, name: id, description: "", author: "", icon: "",
+                          downloadCount: 0, downloadURL: "", version: version, addedAt: added)
+        }
+        // One genuine recent addition that has already shipped an update, plus old stock.
+        let recentUpdated = item("recent-updated", added: "2026-10-05T00:00:00Z", version: "1.1.0")
+        var pool = [recentUpdated]
+        for i in 0..<20 { pool.append(item("old-\(i)", added: "2026-08-01T00:00:00Z", version: "1.0.0")) }
+
+        let floored = ExtensionsStoreViewModel.newSelection(pool, now: now)
+        XCTAssertEqual(floored.count, 12, "topped up to the floor during a quiet period")
+        XCTAssertEqual(floored.first?.id, "recent-updated", "the genuine recent addition leads")
+        XCTAssertTrue(floored.contains { $0.id == "recent-updated" },
+                      "an updated-but-recent extension stays New")
+
+        // When the window already holds at least the floor, only windowed items are returned.
+        var manyRecent: [ExtensionItem] = []
+        for i in 0..<15 { manyRecent.append(item("r-\(i)", added: "2026-10-07T00:00:00Z", version: "1.0.0")) }
+        XCTAssertEqual(ExtensionsStoreViewModel.newSelection(manyRecent, now: now).count, 15)
+    }
+
+    @MainActor
+    func testIsNewIsExactFirstRelease() {
+        func item(_ version: String?) -> ExtensionItem {
+            ExtensionItem(id: "x", name: "X", description: "", author: "", icon: "",
+                          downloadCount: 0, downloadURL: "", version: version)
+        }
+        // Legacy snapshots without `addedAt` fall back to the first-release heuristic.
+        XCTAssertTrue(ExtensionsStoreViewModel.isNew(item("1.0.0")))
+        XCTAssertTrue(ExtensionsStoreViewModel.isNew(item(nil)), "a snapshot without a version is new")
+        XCTAssertFalse(ExtensionsStoreViewModel.isNew(item("1.0.1")))
+        XCTAssertFalse(ExtensionsStoreViewModel.isNew(item("1.0.0-beta")), "only the exact first release")
+    }
+
+    /// "New" rides the stable first-added date, not the version: an update must not nuke a genuinely
+    /// new extension, and `publishedAt` (last release) must not revive an old one.
+    @MainActor
+    func testIsNewUsesStableAddedDateAcrossUpdates() throws {
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-10-08T00:00:00Z"))
+        func item(_ id: String, version: String?, added: String?) -> ExtensionItem {
+            ExtensionItem(id: id, name: id, description: "", author: "", icon: "",
+                          downloadCount: 0, downloadURL: "", version: version, addedAt: added)
+        }
+        XCTAssertTrue(ExtensionsStoreViewModel.isNew(
+            item("fresh-updated", version: "1.2.0", added: "2026-10-05T00:00:00Z"), now: now),
+            "added 3 days ago and since updated is still new")
+        XCTAssertTrue(ExtensionsStoreViewModel.isNew(
+            item("fresh", version: "1.0.0", added: "2026-10-07T00:00:00Z"), now: now))
+        XCTAssertFalse(ExtensionsStoreViewModel.isNew(
+            item("old-updated", version: "1.2.0", added: "2026-08-01T00:00:00Z"), now: now),
+            "an old extension is not revived by a recent update")
+        XCTAssertFalse(ExtensionsStoreViewModel.isNew(
+            item("old", version: "1.0.0", added: "2026-09-01T00:00:00Z"), now: now))
+    }
+
     // MARK: - Helpers
 
     @MainActor
@@ -625,5 +725,30 @@ private actor RefreshTrackingStoreAPI: ExtensionStoreFetching {
 
     func invalidateCache() async {
         invalidateCount += 1
+    }
+}
+
+/// Immediate-response fetcher that behaves like a real paginated catalogue: `total` items split
+/// across `ceil(total / limit)` pages, recording which pages were asked for.
+private actor PagedStoreAPI: ExtensionStoreFetching {
+    private let total: Int
+    private var pages: [Int] = []
+
+    init(total: Int) { self.total = total }
+
+    func requestedPages() -> [Int] { pages }
+
+    func fetchExtensions(query: String, page: Int, limit: Int) async throws -> ExtensionsPageResponse {
+        pages.append(page)
+        let start = (page - 1) * limit
+        let end = min(start + limit, total)
+        let items = start < total
+            ? (start..<end).map {
+                ExtensionItem(id: "ext-\($0)", name: "Ext \($0)", description: "", author: "",
+                              icon: "", downloadCount: 0, downloadURL: "")
+            }
+            : []
+        let totalPages = max(1, Int(ceil(Double(total) / Double(limit))))
+        return ExtensionsPageResponse(extensions: items, page: page, totalPages: totalPages, totalCount: total)
     }
 }

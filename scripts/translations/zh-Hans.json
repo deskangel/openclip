@@ -766,5 +766,6 @@
   "Contextual Pill": "上下文胶囊",
   "Show contextual actions to the left or right of the main bar. Auto follows the horizontal position.": "在主栏的左侧或右侧显示上下文操作。“自动”会跟随水平位置。",
   "Contextual Pill Position": "上下文胶囊位置",
-  "Rename": "重命名"
+  "Rename": "重命名",
+  "%lld extensions": "%lld 个扩展"
 }

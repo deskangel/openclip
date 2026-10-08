@@ -766,5 +766,6 @@
   "Contextual Pill": "コンテキストピル",
   "Show contextual actions to the left or right of the main bar. Auto follows the horizontal position.": "コンテキストアクションをメインバーの左側または右側に表示します。自動では水平位置に合わせます。",
   "Contextual Pill Position": "コンテキストピルの位置",
-  "Rename": "名前を変更"
+  "Rename": "名前を変更",
+  "%lld extensions": "%lld個の拡張機能"
 }

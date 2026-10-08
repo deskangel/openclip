@@ -71,7 +71,7 @@ public struct RecommendedExtensionsView: View {
             }
         }
         .task {
-            await viewModel.resetAndFetch(limit: 100)
+            await viewModel.loadAll(limit: Constants.storeFullCatalogLimit)
         }
     }
 }

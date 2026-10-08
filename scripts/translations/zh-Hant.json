@@ -766,5 +766,6 @@
   "Contextual Pill": "情境膠囊",
   "Show contextual actions to the left or right of the main bar. Auto follows the horizontal position.": "在主列的左側或右側顯示情境動作。「自動」會跟隨水平位置。",
   "Contextual Pill Position": "情境膠囊位置",
-  "Rename": "重新命名"
+  "Rename": "重新命名",
+  "%lld extensions": "%lld 個擴充功能"
 }
