@@ -243,7 +243,7 @@ final class AIProviderTests: XCTestCase {
         let customPrompt = "Translate into pirate English"
         let systemPrompt = AIRequestSupport.systemPrompt(for: customPrompt)
         XCTAssertTrue(systemPrompt.contains("Task:\nTranslate into pirate English"))
-        XCTAssertTrue(systemPrompt.contains("Output ONLY the transformed text"))
+        XCTAssertTrue(systemPrompt.contains("Return only the requested deliverable"))
         XCTAssertTrue(systemPrompt.contains("<result>...</result>"))
 
         let emptyTaskPrompt = AIRequestSupport.systemPrompt(for: "  ")

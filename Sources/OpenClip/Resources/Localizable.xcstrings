@@ -4341,34 +4341,6 @@
         }
       }
     },
-    "Condense this text to be significantly shorter while keeping all essential information, the original language, and the tone. Preserve the overall formatting such as paragraphs and lists": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "大幅精简这段文本，同时保留所有关键信息、原有语言和语气。保持段落、列表等整体格式"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "大幅精簡這段文字，同時保留所有關鍵資訊、原有語言與語氣。保持段落、清單等整體格式"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Condenser ce texte pour le rendre nettement plus court tout en conservant toutes les informations essentielles, la langue d’origine et le ton. Préserver la mise en forme générale (paragraphes, listes)"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "すべての重要な情報、元の言語、トーンを保ちながら、このテキストを大幅に短縮します。段落やリストなどの全体的な書式は保持してください"
-          }
-        }
-      }
-    },
     "Configure": {
       "localizations": {
         "zh-Hans": {
@@ -4953,6 +4925,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "選択したテキストをコピーします。"
+          }
+        }
+      }
+    },
+    "Correct identifiable syntax errors, bugs, and logic mistakes. Preserve the programming language, intended behavior, existing interfaces, and style. Make the smallest necessary changes and avoid unrelated refactoring. Return only the corrected code without markdown code fences or explanations. If a reliable fix requires essential missing context, briefly state what is needed instead of inventing code.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "纠正可识别的语法错误、程序缺陷和逻辑错误。保留编程语言、预期行为、现有接口和代码风格。仅做必要的最小修改，避免无关重构。只返回修正后的代码，不要 Markdown 代码块或解释。如果可靠的修复需要缺失的关键上下文，请简要说明需要哪些信息，而不要编造代码。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "修正可識別的語法錯誤、程式缺陷和邏輯錯誤。保留程式語言、預期行為、現有介面和程式碼風格。僅做必要的最小修改，避免無關重構。只回傳修正後的程式碼，不要 Markdown 程式碼區塊或解釋。如果可靠的修復需要缺少的關鍵上下文，請簡要說明需要哪些資訊，而不要編造程式碼。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Corriger les erreurs de syntaxe, les bugs et les erreurs de logique identifiables. Préserver le langage de programmation, le comportement prévu, les interfaces existantes et le style. Effectuer le minimum de modifications nécessaires et éviter les refactorisations sans rapport. Renvoyer uniquement le code corrigé, sans blocs de code Markdown ni explications. Si une correction fiable nécessite un contexte essentiel manquant, indiquer brièvement les informations nécessaires plutôt que d’inventer du code."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "特定できる構文エラー、バグ、論理上の誤りを修正してください。プログラミング言語、意図された動作、既存のインターフェース、コードのスタイルを維持してください。必要最小限の変更にとどめ、無関係なリファクタリングを避けてください。Markdownのコードブロックや説明を付けず、修正したコードのみを返してください。確実な修正に不可欠な情報が不足している場合は、コードをでっち上げずに、必要な情報を簡潔に述べてください。"
+          }
+        }
+      }
+    },
+    "Correct spelling, grammar, and punctuation. Make the smallest necessary changes. Preserve wording, meaning, tone, language, and formatting. Return only the corrected text.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "纠正拼写、语法和标点错误。仅做必要的最小修改。保留原有措辞、含义、语气、语言和格式。只返回纠正后的文本。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "修正拼字、文法和標點錯誤。僅做必要的最小修改。保留原有措辭、含義、語氣、語言和格式。只回傳修正後的文字。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Corriger l’orthographe, la grammaire et la ponctuation avec le minimum de modifications nécessaires. Préserver les formulations, le sens, le ton, la langue et la mise en forme. Renvoyer uniquement le texte corrigé."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "綴り、文法、句読点の誤りを修正してください。必要最小限の変更にとどめ、元の表現、意味、語調、言語、書式を維持してください。修正したテキストのみを返してください。"
           }
         }
       }
@@ -7701,30 +7729,30 @@
         }
       }
     },
-    "Explain what the text means in clear, simple language, in the same language as the text. Cover the core idea and any important details a beginner would need": {
+    "Explain the input in clear language for a beginner. Describe its main idea and important details. For code, explain what it does and how it works. Use the input’s language unless another language is requested.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "用与原文相同的语言，以清晰简单的措辞解释这段文本的含义。涵盖核心概念以及初学者需要了解的重要细节"
+            "value": "用初学者能理解的清晰语言解释输入内容。说明核心思想和重要细节。对于代码，解释其功能和工作原理。除非要求其他语言，否则使用输入文本的语言。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "使用與原文相同的語言，以清晰簡單的文字解釋這段文字的含義。涵蓋核心概念以及初學者需要知道的重要細節"
+            "value": "用初學者能理解的清楚語言解釋輸入內容。說明核心概念和重要細節。對於程式碼，解釋其功能和運作原理。除非要求其他語言，否則使用輸入文字的語言。"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Expliquer ce que signifie le texte dans un langage clair et simple, dans la même langue que le texte. Couvrir l’idée principale et les détails importants qu’un débutant devrait connaître"
+            "value": "Expliquer le contenu dans un langage clair pour un débutant. Décrire l’idée principale et les détails importants. Pour du code, expliquer ce qu’il fait et comment il fonctionne. Utiliser la langue du contenu sauf si une autre langue est demandée."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "テキストと同じ言語で、わかりやすい言葉でテキストの意味を説明します。核心的な考え方と、初心者に必要な重要な詳細をカバーしてください"
+            "value": "初心者にもわかる明確な言葉で入力内容を説明してください。中心となる考えと重要な詳細を述べてください。コードの場合は、その機能と仕組みを説明してください。別の言語が指定されない限り、入力と同じ言語を使ってください。"
           }
         }
       }
@@ -8201,62 +8229,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "コードを修正"
-          }
-        }
-      }
-    },
-    "Fix all spelling, punctuation, and grammar errors with the smallest possible changes. Preserve the original wording, tone, and formatting — do not rewrite or rephrase sentences": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "以尽可能小的改动修正所有拼写、标点和语法错误。保留原文的用词、语气和格式——不要重写或改写句子"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "以盡可能小的改動修正所有拼字、標點符號與文法錯誤。保留原本用詞、語氣與格式——不要重寫或改寫句子"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Corriger toutes les fautes d’orthographe, de ponctuation et de grammaire avec le minimum de modifications. Préserver le texte original, le ton et la mise en forme — ne pas réécrire ni reformuler les phrases"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "可能な限り最小限の変更で、すべてのスペル、句読点、文法のエラーを修正します。元の表現、トーン、書式を保持し、文を書き直したり言い換えたりしないでください"
-          }
-        }
-      }
-    },
-    "Fix bugs, syntax errors, and logic issues in this code. Keep the same programming language, style, and structure, and change as little as possible. Return only the raw working code — no markdown code fences, no explanations": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "修复这段代码中的错误、语法问题和逻辑缺陷。保持相同的编程语言、风格和结构，改动尽可能少。只返回可运行的原始代码——不要 markdown 代码块，不要解释"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "修復這段程式碼中的錯誤、語法問題與邏輯缺陷。保持相同的程式語言、風格與結構，改動盡可能少。只返回可運行的原始程式碼——不要 markdown 程式碼區塊，不要解釋"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Corriger les bugs, les erreurs de syntaxe et les problèmes de logique dans ce code. Conserver le même langage de programmation, le même style et la même structure, avec le minimum de modifications. Renvoyer uniquement le code brut fonctionnel — sans blocs de code markdown ni explications"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "このコードのバグ、構文エラー、論理の問題を修正します。同じプログラミング言語、スタイル、構造を保ち、変更は最小限にしてください。動作する生のコードのみを返してください — markdownのコードブロックや説明は不要です"
           }
         }
       }
@@ -14085,34 +14057,6 @@
         }
       }
     },
-    "Provide a concise bulleted summary of the key points, in the same language as the text. Include only essential information — no introduction or closing remarks": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "用与原文相同的语言，以简洁的要点列表总结关键内容。只保留必要信息——不要开场白或结束语"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "使用與原文相同的語言，以簡潔的條列式摘要列出重點。只保留必要資訊——不要開場白或結語"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fournir un résumé concis des points clés sous forme de liste à puces, dans la même langue que le texte. N’inclure que l’essentiel — sans introduction ni conclusion"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "テキストと同じ言語で、要点を簡潔な箇条書きで要約します。重要な情報のみを含め、導入や結びの言葉は付けないでください"
-          }
-        }
-      }
-    },
     "Provider Settings": {
       "localizations": {
         "zh-Hans": {
@@ -15541,58 +15485,58 @@
         }
       }
     },
-    "Rewrite this text in a polished, professional, and formal tone. Keep the original meaning, language, and formatting; replace slang, contractions, and casual phrasing with formal equivalents": {
+    "Rewrite for clarity and natural flow. Preserve the meaning, factual details, intent, and original language. Do not add new claims. Return only the rewritten text.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "用更得体、专业、正式的语气改写这段文本。保持原意、语言和格式；将俚语、缩写和随意措辞替换为正式表达"
+            "value": "改写文本，使其清晰、自然流畅。保留含义、事实细节、意图和原始语言。不要添加新的主张。只返回改写后的文本。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "以得體、專業且正式的語氣改寫這段文字。保持原意、語言與格式；將俚語、縮寫和隨意措辭替換為正式表達"
+            "value": "改寫文字，使其清楚、自然流暢。保留含義、事實細節、意圖和原始語言。不要加入新的主張。只回傳改寫後的文字。"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Réécrire ce texte dans un ton soigné, professionnel et formel. Conserver le sens, la langue et la mise en forme d’origine ; remplacer l’argot, les contractions et les tournures familières par des équivalents formels"
+            "value": "Réécrire pour améliorer la clarté et la fluidité. Préserver le sens, les détails factuels, l’intention et la langue d’origine. Ne pas ajouter de nouvelles affirmations. Renvoyer uniquement le texte réécrit."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "洗練されたプロフェッショナルでフォーマルなトーンにこのテキストを書き直します。元の意味、言語、書式を保持し、スラング、短縮形、カジュアルな表現をフォーマルな表現に置き換えてください"
+            "value": "明確で自然な流れになるように書き直してください。意味、事実の詳細、意図、元の言語を維持し、新たな主張を加えないでください。書き直したテキストのみを返してください。"
           }
         }
       }
     },
-    "Rewrite to improve clarity, flow, and word choice while keeping the original meaning, tone, language, and formatting": {
+    "Rewrite in a professional, formal tone. Preserve meaning, intent, factual details, and language. Avoid inflated wording and unnecessary length. Return only the rewritten text.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在保持原意、语气、语言和格式的前提下改写，提升清晰度、流畅度和用词"
+            "value": "以专业、正式的语气改写。保留含义、意图、事实细节和语言。避免夸张措辞和不必要的篇幅。只返回改写后的文本。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "在維持原意、語氣、語言與格式的前提下改寫，提升清晰度、流暢度與用詞"
+            "value": "以專業、正式的語氣改寫。保留含義、意圖、事實細節和語言。避免誇大措辭和不必要的篇幅。只回傳改寫後的文字。"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Réécrire pour améliorer la clarté, la fluidité et le choix des mots tout en conservant le sens, le ton, la langue et la mise en forme d’origine"
+            "value": "Réécrire dans un ton professionnel et formel. Préserver le sens, l’intention, les détails factuels et la langue. Éviter les formulations pompeuses et la longueur inutile. Renvoyer uniquement le texte réécrit."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "元の意味、トーン、言語、書式を保ちながら、明瞭さ、文章の流れ、語彙の選択を改善するように書き直します"
+            "value": "専門的でフォーマルな語調に書き直してください。意味、意図、事実の詳細、言語を維持してください。大げさな表現や不要な長さを避けてください。書き直したテキストのみを返してください。"
           }
         }
       }
@@ -17081,6 +17025,34 @@
         }
       }
     },
+    "Shorten the text by removing repetition and unnecessary wording. Preserve essential facts, requests, qualifications, tone, and language. Return only the shortened text.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除重复和不必要的措辞，缩短文本。保留必要事实、请求、限定条件、语气和语言。只返回缩短后的文本。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刪除重複和不必要的措辭，縮短文字。保留必要事實、請求、限定條件、語氣和語言。只回傳縮短後的文字。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Raccourcir le texte en supprimant les répétitions et les formulations inutiles. Préserver les faits essentiels, les demandes, les réserves, le ton et la langue. Renvoyer uniquement le texte raccourci."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "繰り返しや不要な表現を削除してテキストを短くしてください。重要な事実、依頼、条件や留保、語調、言語を維持してください。短くしたテキストのみを返してください。"
+          }
+        }
+      }
+    },
     "Show": {
       "localizations": {
         "zh-Hans": {
@@ -18197,6 +18169,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "要約"
+          }
+        }
+      }
+    },
+    "Summarize the main points in concise bullets, using the input’s language. Preserve important conclusions, decisions, and qualifications. Do not add information absent from the input.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用输入文本的语言，以简洁的要点列表总结主要内容。保留重要结论、决定和限定条件。不要添加输入中没有的信息。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用輸入文字的語言，以簡潔的項目列表摘要主要內容。保留重要結論、決定和限定條件。不要加入輸入中沒有的資訊。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Résumer les points principaux sous forme de puces concises, dans la langue du texte fourni. Préserver les conclusions, décisions et réserves importantes. Ne pas ajouter d’informations absentes du texte."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "入力と同じ言語で、主なポイントを簡潔な箇条書きにまとめてください。重要な結論、決定、条件や留保を維持してください。入力にない情報を加えないでください。"
           }
         }
       }

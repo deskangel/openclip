@@ -7,6 +7,18 @@ areas; stale debt notes are worse than none.
 
 ---
 
+## AI Action Prompting
+
+- `AIRequestSupport.systemPrompt` uses a task-driven deliverable contract for both selected-text
+  and standalone requests. Selected text is source material or context; explanations and examples
+  are allowed when requested. Editing preservation rules apply to edits, not all tasks. Tagged
+  (`result` / optional `title`) and structured response contracts remain provider-specific.
+- Built-in prompt updates affect defaults. Persisted presets retain their stored prompts, including
+  customized built-ins; no automatic prompt migration is performed. The shared system contract
+  applies to both stored and default presets. Translate still targets English. Fix Code requests minimal corrections preserving intended
+  behavior and interfaces, returns raw corrected code, and permits a brief missing-context response
+  when a reliable fix cannot be determined.
+
 ## Settings Migration (UserDefaults → SettingsStore)
 
 - The typed settings abstraction is `SettingsStore` + `SettingKey<T>` (see `Sources/Core/Settings/`).

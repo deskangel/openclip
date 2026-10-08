@@ -239,14 +239,7 @@
   "Cloud API (OpenAI/Claude)": "雲端 API（OpenAI/Claude）",
   "Browser Redirection": "瀏覽器重新導向",
   "Proofread": "校對",
-  "Fix all spelling, punctuation, and grammar errors with the smallest possible changes. Preserve the original wording, tone, and formatting — do not rewrite or rephrase sentences": "以盡可能小的改動修正所有拼字、標點符號與文法錯誤。保留原本用詞、語氣與格式——不要重寫或改寫句子",
-  "Rewrite to improve clarity, flow, and word choice while keeping the original meaning, tone, language, and formatting": "在維持原意、語氣、語言與格式的前提下改寫，提升清晰度、流暢度與用詞",
-  "Provide a concise bulleted summary of the key points, in the same language as the text. Include only essential information — no introduction or closing remarks": "使用與原文相同的語言，以簡潔的條列式摘要列出重點。只保留必要資訊——不要開場白或結語",
-  "Explain what the text means in clear, simple language, in the same language as the text. Cover the core idea and any important details a beginner would need": "使用與原文相同的語言，以清晰簡單的文字解釋這段文字的含義。涵蓋核心概念以及初學者需要知道的重要細節",
   "Translate the text accurately into natural English, preserving the original meaning, tone, and formatting": "將文字準確翻譯為自然流暢的繁體中文，保留原意、語氣與格式；如果文字已是繁體中文，則翻譯為自然流暢的英文",
-  "Fix bugs, syntax errors, and logic issues in this code. Keep the same programming language, style, and structure, and change as little as possible. Return only the raw working code — no markdown code fences, no explanations": "修復這段程式碼中的錯誤、語法問題與邏輯缺陷。保持相同的程式語言、風格與結構，改動盡可能少。只返回可運行的原始程式碼——不要 markdown 程式碼區塊，不要解釋",
-  "Condense this text to be significantly shorter while keeping all essential information, the original language, and the tone. Preserve the overall formatting such as paragraphs and lists": "大幅精簡這段文字，同時保留所有關鍵資訊、原有語言與語氣。保持段落、清單等整體格式",
-  "Rewrite this text in a polished, professional, and formal tone. Keep the original meaning, language, and formatting; replace slang, contractions, and casual phrasing with formal equivalents": "以得體、專業且正式的語氣改寫這段文字。保持原意、語言與格式；將俚語、縮寫和隨意措辭替換為正式表達",
   "Rewrite": "改寫",
   "Summarize": "摘要",
   "Explain": "解釋",
@@ -767,5 +760,12 @@
   "Show contextual actions to the left or right of the main bar. Auto follows the horizontal position.": "在主列的左側或右側顯示情境動作。「自動」會跟隨水平位置。",
   "Contextual Pill Position": "情境膠囊位置",
   "Rename": "重新命名",
-  "%lld extensions": "%lld 個擴充功能"
+  "%lld extensions": "%lld 個擴充功能",
+  "Correct spelling, grammar, and punctuation. Make the smallest necessary changes. Preserve wording, meaning, tone, language, and formatting. Return only the corrected text.": "修正拼字、文法和標點錯誤。僅做必要的最小修改。保留原有措辭、含義、語氣、語言和格式。只回傳修正後的文字。",
+  "Rewrite for clarity and natural flow. Preserve the meaning, factual details, intent, and original language. Do not add new claims. Return only the rewritten text.": "改寫文字，使其清楚、自然流暢。保留含義、事實細節、意圖和原始語言。不要加入新的主張。只回傳改寫後的文字。",
+  "Summarize the main points in concise bullets, using the input’s language. Preserve important conclusions, decisions, and qualifications. Do not add information absent from the input.": "使用輸入文字的語言，以簡潔的項目列表摘要主要內容。保留重要結論、決定和限定條件。不要加入輸入中沒有的資訊。",
+  "Explain the input in clear language for a beginner. Describe its main idea and important details. For code, explain what it does and how it works. Use the input’s language unless another language is requested.": "用初學者能理解的清楚語言解釋輸入內容。說明核心概念和重要細節。對於程式碼，解釋其功能和運作原理。除非要求其他語言，否則使用輸入文字的語言。",
+  "Shorten the text by removing repetition and unnecessary wording. Preserve essential facts, requests, qualifications, tone, and language. Return only the shortened text.": "刪除重複和不必要的措辭，縮短文字。保留必要事實、請求、限定條件、語氣和語言。只回傳縮短後的文字。",
+  "Rewrite in a professional, formal tone. Preserve meaning, intent, factual details, and language. Avoid inflated wording and unnecessary length. Return only the rewritten text.": "以專業、正式的語氣改寫。保留含義、意圖、事實細節和語言。避免誇大措辭和不必要的篇幅。只回傳改寫後的文字。",
+  "Correct identifiable syntax errors, bugs, and logic mistakes. Preserve the programming language, intended behavior, existing interfaces, and style. Make the smallest necessary changes and avoid unrelated refactoring. Return only the corrected code without markdown code fences or explanations. If a reliable fix requires essential missing context, briefly state what is needed instead of inventing code.": "修正可識別的語法錯誤、程式缺陷和邏輯錯誤。保留程式語言、預期行為、現有介面和程式碼風格。僅做必要的最小修改，避免無關重構。只回傳修正後的程式碼，不要 Markdown 程式碼區塊或解釋。如果可靠的修復需要缺少的關鍵上下文，請簡要說明需要哪些資訊，而不要編造程式碼。"
 }
