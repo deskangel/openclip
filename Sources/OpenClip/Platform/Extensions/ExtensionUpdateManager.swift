@@ -1,7 +1,7 @@
 // ExtensionUpdateManager.swift
 // OpenClip
 //
-// Manual-only update checks for store-sourced extensions. Fetches the store listing, compares
+// Manual and automatic update checks for store-sourced extensions. Fetches the store listing, compares
 // versions via ExtensionUpdatePlanner, and applies updates through RemoteExtensionInstaller
 // (which re-installs the package under the same id — a store action that re-trusts).
 import Foundation
@@ -18,7 +18,57 @@ public final class ExtensionUpdateManager: ObservableObject {
     /// this to surface a summary toast (X succeeded, Y failed).
     @Published public private(set) var lastBatchResult: ExtensionUpdateBatchResult?
 
-    private init() {}
+    private let settings: any SettingsStore
+    private var automaticUpdateTask: Task<Void, Never>?
+    private var isUpdating = false
+    private var updatingPackageIDs: Set<String> = []
+
+    @Published public var automaticallyUpdatesExtensions: Bool {
+        didSet {
+            settings.set(.automaticallyUpdatesExtensions, value: automaticallyUpdatesExtensions)
+        }
+    }
+
+    init(settings: any SettingsStore = DefaultSettingsStore.shared) {
+        self.settings = settings
+        automaticallyUpdatesExtensions = settings.get(.automaticallyUpdatesExtensions)
+    }
+
+    /// Checks at launch and every six hours while the app is running.
+    public func startAutomaticUpdates() {
+        guard automaticUpdateTask == nil else { return }
+        automaticUpdateTask = Task { [weak self] in
+            while !Task.isCancelled {
+                await self?.performAutomaticUpdate()
+                do {
+                    try await Task.sleep(for: .seconds(6 * 60 * 60))
+                } catch { return }
+            }
+        }
+    }
+
+    public func stopAutomaticUpdates() {
+        automaticUpdateTask?.cancel()
+        automaticUpdateTask = nil
+    }
+
+    func performAutomaticUpdate() async {
+        guard automaticallyUpdatesExtensions, !isChecking, !isUpdating else { return }
+        await checkForUpdates()
+        guard automaticallyUpdatesExtensions, !Task.isCancelled else { return }
+        isUpdating = true
+        defer { isUpdating = false }
+        for id in updatablePackageIDs {
+            guard automaticallyUpdatesExtensions, !Task.isCancelled else { break }
+            // Never replace developer or sideloaded packages, even if their id is in the store.
+            guard settings.get(.extensionSources)[id] == "store" else { continue }
+            do {
+                try await update(packageID: id)
+            } catch {
+                Log.extensions.error("Failed to automatically update extension '\(id, privacy: .public)': \(error.localizedDescription, privacy: .public)")
+            }
+        }
+    }
 
     /// Gathers installed store-package versions and asks the store for each page, then computes
     /// the updatable set. Idempotent; safe to call from the Reload button and Store tab.
@@ -27,7 +77,6 @@ public final class ExtensionUpdateManager: ObservableObject {
         isChecking = true
         defer { isChecking = false }
 
-        let settings = DefaultSettingsStore.shared
         let sources = settings.get(.extensionSources)
 
         // Check all extensions present in the extensions directory + known store sources
@@ -78,11 +127,15 @@ public final class ExtensionUpdateManager: ObservableObject {
     /// revoked — a revoked package stays revoked. If the reinstall fails, the pre-update trust
     /// state and recorded hash are restored so the package isn't left in the intermediate seen state.
     public func update(packageID: String) async throws {
+        guard updatingPackageIDs.insert(packageID).inserted else {
+            throw NSError(domain: "ExtensionUpdateManager", code: 409,
+                          userInfo: [NSLocalizedDescriptionKey: "An update is already in progress for \(packageID)."])
+        }
+        defer { updatingPackageIDs.remove(packageID) }
         guard let item = await storeItem(for: packageID), let url = URL(string: item.downloadURL) else {
             throw NSError(domain: "ExtensionUpdateManager", code: 404,
                           userInfo: [NSLocalizedDescriptionKey: "No store listing for \(packageID)."])
         }
-        let settings = DefaultSettingsStore.shared
         let wasRevoked = settings.get(.extensionTrust)[packageID] == ExtensionTrustState.revoked.rawValue
         let originalTrust = settings.get(.extensionTrust)[packageID]
         let originalHash = settings.get(.extensionTrustHashes)[packageID]

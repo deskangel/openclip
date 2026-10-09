@@ -12,6 +12,7 @@ import Core
 @MainActor
 struct AboutTab: View {
     @State private var isExporting = false
+    @ObservedObject private var extensionUpdateManager = ExtensionUpdateManager.shared
     @ObservedObject private var updateManager = AppUpdateManager.shared
 
     private var version: String {
@@ -57,6 +58,13 @@ struct AboutTab: View {
                         .disabled(!updateManager.canCheckForUpdates)
                         .accessibilityLabel("Check Now")
                     }
+                }
+
+                SettingsCard("Extension Updates") {
+                    SettingsToggleRow(
+                        title: "Automatically Update Extensions",
+                        isOn: $extensionUpdateManager.automaticallyUpdatesExtensions
+                    )
                 }
 
                 // Links

@@ -7,6 +7,14 @@ areas; stale debt notes are worse than none.
 
 ---
 
+## Extension Automatic Updates
+
+- About → Extension Updates contains a persisted toggle, enabled by default. The app checks
+  at launch and every six hours while running, and applies updates only to store-sourced
+  packages through the existing installer/trust flow. Revoked packages stay revoked.
+- Turning the toggle off prevents subsequent automatic installs; an install already in progress
+  finishes. Manual update controls remain available. Local and sideloaded packages are excluded.
+
 ## AI Action Prompting
 
 - `AIRequestSupport.systemPrompt` uses a task-driven deliverable contract for both selected-text
@@ -527,7 +535,10 @@ replace a newer popup.
   `toggleClickThrough: false`: with no monitor to notice pointer re-entry, toggling
   `ignoresMouseEvents` would strand the panel under the cursor. The monitors remain the source of
   click/scroll/key dismissal. Panel `mouseExited` updates hover and sub-bar grace; it does not
-  dismiss the main popup. Pointer-distance dismissal in fullscreen remains dependent on monitor
+  dismiss the main popup. Group and AI Tools buttons route SwiftUI `.onHover` solely through
+  the local fallback; it cannot start or cancel dwell while cursor tracking owns hover. Both
+  paths use the same target-transition handler, so duplicate entries and stale local exits cannot
+  restart dwell or cancel a different group's timer. Pointer-distance dismissal in fullscreen remains dependent on monitor
   delivery and is not supplied by this tracking-area path.
 - **Automatic reads are tied to the selection source process.** The monitor uses the activated app
   from the workspace notification and cancels pending reads and clears the cached selection on a

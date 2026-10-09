@@ -2661,6 +2661,34 @@
         }
       }
     },
+    "Automatically Update Extensions": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动更新扩展"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自動更新擴充功能"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mettre à jour automatiquement les extensions"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拡張機能を自動更新"
+          }
+        }
+      }
+    },
     "Available": {
       "localizations": {
         "zh-Hans": {
@@ -7949,6 +7977,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "拡張機能を削除しました"
+          }
+        }
+      }
+    },
+    "Extension Updates": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "扩展更新"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "擴充功能更新"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mises à jour des extensions"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拡張機能のアップデート"
           }
         }
       }
