@@ -4,6 +4,21 @@ All notable user-facing changes to OpenClip.
 
 ---
 
+## v1.8.1 - 2026-10-09
+
+### Features & Improvements
+- **Automatic extension updates**: Store-installed extensions update at launch and every six hours while OpenClip is running. Control this with the new **About → Extension Updates → Automatically Update Extensions** toggle, enabled by default. Disabled extensions stay disabled, and developer and sideloaded packages are excluded.
+- **Extension store improvements**: The New section uses first-publish dates, the store displays the full catalogue total, and search and update lifecycle handling are improved.
+- **Task-focused AI prompts**: AI actions follow the selected task more closely, including translation, code fixes, and editing.
+- **Simpler update preferences**: Software updates use the stable channel with streamlined About settings.
+- Added Android emulators to the app exclusion filter and moved Ghostty to menu-based copy handling.
+
+### Fixes & Stability
+- Fixed group and AI Tools sub-bars failing to open when delayed SwiftUI hover events cancelled the opening timer. Hover tracking now uses a shared target-transition handler.
+- Restored popup hover highlights, tooltips, and sub-bars over other apps' fullscreen Spaces.
+
+---
+
 ## v1.8.0 - 2026-10-07
 
 ### Features & Improvements
