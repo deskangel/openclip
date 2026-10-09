@@ -17,6 +17,9 @@ All notable user-facing changes to OpenClip.
 - Fixed group and AI Tools sub-bars failing to open when delayed SwiftUI hover events cancelled the opening timer. Hover tracking now uses a shared target-transition handler.
 - Restored popup hover highlights, tooltips, and sub-bars over other apps' fullscreen Spaces.
 
+### Contributors
+Thanks to @deskangel for improving Ghostty copy handling and adding Android emulator exclusions!
+
 ---
 
 ## v1.8.0 - 2026-10-07
