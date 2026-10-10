@@ -75,6 +75,8 @@ struct AboutTab: View {
                     SettingsDivider()
                     linkRow("Support", systemImage: "questionmark.circle", url: "https://www.getopenclip.app/support")
                     SettingsDivider()
+                    linkRow("Discord", systemImage: "bubble.left.and.bubble.right", url: "https://discord.gg/acYYdzM7jR")
+                    SettingsDivider()
                     linkRow("GitHub", systemImage: "chevron.left.forwardslash.chevron.right", url: "https://github.com/ganeshmshetty/openclip")
                     SettingsDivider()
                     linkRow("Report an Issue", systemImage: "ant", url: "https://github.com/ganeshmshetty/openclip/issues")

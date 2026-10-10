@@ -293,7 +293,7 @@ Thanks to @md786-dotcom and @vynexor for their contributions to this release!
 - Release notes in update prompts; settings preserved across updates.
 
 ### Community
-- Join our [Discord community](https://discord.gg/sy4MeFxf8).
+- Join our [Discord community](https://discord.gg/acYYdzM7jR).
 
 ---
 
