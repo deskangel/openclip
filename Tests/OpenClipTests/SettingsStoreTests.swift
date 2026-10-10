@@ -19,6 +19,24 @@ final class SettingsStoreTests: XCTestCase {
     }
 
     @MainActor
+    func testExtensionAutomaticUpdatesDefaultAndPersistence() async {
+        let settings = MemorySettingsStore()
+        let manager = ExtensionUpdateManager(settings: settings)
+        XCTAssertTrue(manager.automaticallyUpdatesExtensions)
+
+        manager.automaticallyUpdatesExtensions = false
+        XCTAssertFalse(settings.get(.automaticallyUpdatesExtensions))
+        let restored = ExtensionUpdateManager(settings: settings)
+        XCTAssertFalse(restored.automaticallyUpdatesExtensions)
+        await restored.performAutomaticUpdate()
+        XCTAssertFalse(restored.isChecking)
+        XCTAssertTrue(restored.updatablePackageIDs.isEmpty)
+
+        restored.automaticallyUpdatesExtensions = true
+        XCTAssertTrue(ExtensionUpdateManager(settings: settings).automaticallyUpdatesExtensions)
+    }
+
+    @MainActor
     func testTypedSettingReadWrite() {
         XCTAssertEqual(store.get(.actionOrder), [])
         store.set(.actionOrder, value: ["builtin.copy", "builtin.paste"])

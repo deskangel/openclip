@@ -43,6 +43,12 @@ public enum Constants {
     public static let manifestFileName: String = "openclip.json"
     public static let legacyManifestFileName: String = "manifest.json"
     public static let storePageLimit: Int = 12
+    /// Per-request limit when a store surface wants the *whole* catalogue up front. The catalogue is
+    /// small (hundreds of items, well under 1 MB), so the store fetches it in as few requests as
+    /// possible and derives New/Popular/All and their counts client-side — no per-scroll pagination
+    /// that could leave items out or count only the fetched subset. If the catalogue ever exceeds
+    /// this, `loadAll` keeps paging until the server says it is done.
+    public static let storeFullCatalogLimit: Int = 500
     public static let extKeyIdentifier: String = "Identifier"
     public static let extKeyName: String = "Name"
     public static let extKeyActions: String = "Actions"

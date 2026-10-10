@@ -126,7 +126,10 @@ public struct GroupSubActionBarView: View {
     }
 
     private var maxSubBarBudget: CGFloat {
+        // Reserve the row's end inset so a page packed to the budget still fits once the padding is
+        // applied (the padding is added to the rendered HStack but not to the estimator).
         (screenWidth ?? NSScreen.main?.visibleFrame.width ?? 1440.0) * PopupMetrics.maxScreenFraction
+            - 2 * PopupMetrics.subBarEndInset * scale
     }
 
     private var pages: [[any Action]] {
@@ -185,6 +188,7 @@ public struct GroupSubActionBarView: View {
                 }
             }
         }
+        .padding(.horizontal, PopupMetrics.subBarEndInset * scale)
         .fixedSize()
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .onChange(of: totalPages) { _, count in

@@ -20,6 +20,10 @@ public final class SubBarPanelController {
     public var panelFrame: NSRect { panel.frame }
     /// Called when the sub-bar hides so parent state (like active button highlight) is dismissed immediately.
     public var onDismiss: (@MainActor @Sendable () -> Void)?
+    /// Hover from the sub-bar's own `.activeAlways` tracking area. Set by the popup controller so
+    /// the same hover pipeline runs when the event monitors cannot see the pointer (inactive app over
+    /// another app's fullscreen Space).
+    public var onTrackingMouseMoved: (@MainActor @Sendable () -> Void)?
     /// The screen-space hover-tooltip surface shared with PopupWindowController. Injected for tests.
     public let tooltipController: TooltipPanelController
     /// The main bar panel's screen frame for the current show, used as the tooltip avoidance rect
@@ -114,6 +118,7 @@ public final class SubBarPanelController {
         )
 
         let hosting = SubBarPanel.ContentView(rootView: AnyView(contentView))
+        hosting.onMouseMoved = { [weak self] in self?.onTrackingMouseMoved?() }
         self.hostingView = hosting
         panel.appearance = NSAppearance(named: effectiveColorScheme == .dark ? .darkAqua : .aqua)
         panel.contentView = hosting

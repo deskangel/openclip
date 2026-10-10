@@ -181,6 +181,11 @@ public class PopupWindowController {
             self?.modeStore.activeSubGroupID = nil
         }
 
+        // The sub-bar's own `NSTrackingArea` feeds hover when the event monitors can't see the
+        // pointer (inactive app over another app's fullscreen Space). Route it through the same
+        // pipeline the `.mouseMoved` monitor path uses.
+        self.subBarController.onTrackingMouseMoved = { [weak self] in self?.handleTrackingMouseMoved() }
+
         modeStore.$isSubBarActive.sink { [weak self] _ in
             guard let self, let panel = self.panel else { return }
             if self.modeStore.mode == .actions {
@@ -419,7 +424,9 @@ public class PopupWindowController {
             }
         )
         syncPanelAppearance(panel)
-        panel.contentView = PopupPanel.ContentView(rootView: rootView)
+        let hosting = PopupPanel.ContentView(rootView: rootView)
+        hosting.onMouseMoved = { [weak self] in self?.handleTrackingMouseMoved() }
+        panel.contentView = hosting
         panel.contentView?.layoutSubtreeIfNeeded()
         let size = sanitizedPopupSize(panel.contentView?.fittingSize)
 
@@ -1510,7 +1517,7 @@ public class PopupWindowController {
         return contentView.bounds.contains(contentPoint)
     }
 
-    func updatePopupHover(at screenLocation: CGPoint) {
+    func updatePopupHover(at screenLocation: CGPoint, toggleClickThrough: Bool = true) {
         guard let panel, panel.isVisible, let contentView = panel.contentView else {
             PopupHoverState.shared.location = nil
             return
@@ -1521,8 +1528,10 @@ public class PopupWindowController {
         // global monitor still observes them and dismisses the popup). Gated on global monitoring:
         // without it the local monitor is the only way to notice the pointer re-entering the
         // content area, and ignoring events would strand the panel permanently inert.
+        // The tracking-area path passes `toggleClickThrough: false` for the same reason: there is no
+        // monitor to notice re-entry while inactive/fullscreen, so the panel must stay event-visible.
         let overContent = isOverPanelContent(screenLocation)
-        if PopupHoverState.shared.usesGlobalMouseMonitoring, !panel.isUserDragging {
+        if toggleClickThrough, PopupHoverState.shared.usesGlobalMouseMonitoring, !panel.isUserDragging {
             panel.ignoresMouseEvents = !overContent
         }
         if overContent {
@@ -1545,7 +1554,7 @@ public class PopupWindowController {
         PopupHoverState.shared.location = point
     }
 
-    func updateSubBarHover(at screenLocation: CGPoint) {
+    func updateSubBarHover(at screenLocation: CGPoint, toggleClickThrough: Bool = true) {
         guard subBarController.isShowing else {
             SubBarHoverState.shared.location = nil
             return
@@ -1558,7 +1567,7 @@ public class PopupWindowController {
         }
 
         let overContent = subBarController.isOverContent(screenLocation)
-        if SubBarHoverState.shared.usesGlobalMouseMonitoring {
+        if toggleClickThrough, SubBarHoverState.shared.usesGlobalMouseMonitoring {
             subPanel.ignoresMouseEvents = !overContent
         }
         if overContent {
@@ -1605,6 +1614,21 @@ public class PopupWindowController {
             // Pointer has left both the sub-bar and the main bar (moving across the gap or away)
             subBarController.startGrace()
         }
+    }
+
+    /// Feeds the hover pipeline from the panels' `.activeAlways` tracking areas. This is the path
+    /// that keeps hover/tooltips/group sub-bars alive while OpenClip is inactive — in particular
+    /// with the popup floating over another app's fullscreen Space, where the global monitor gets no
+    /// own-window events, the local monitor gets none (panel not key), and SwiftUI `.onHover` does
+    /// not fire. It is also called on tracking `mouseEntered`/`mouseExited`: a SwiftUI relayout can
+    /// remove and re-add the tracking area, emitting a spurious exit while the pointer is still on
+    /// the bar, so hover is always recomputed from the live cursor instead of blind-cleared.
+    /// Click-through toggling is skipped here: with no monitor to notice re-entry, making the panel
+    /// ignore events would strand it under the cursor.
+    func handleTrackingMouseMoved() {
+        let cursorLoc = NSEvent.mouseLocation
+        updatePopupHover(at: cursorLoc, toggleClickThrough: false)
+        updateSubBarHover(at: cursorLoc, toggleClickThrough: false)
     }
 
     private func handleCancelSubBarDwell() {

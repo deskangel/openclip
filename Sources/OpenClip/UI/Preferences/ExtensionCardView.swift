@@ -84,8 +84,9 @@ struct ExtensionCardView: View {
         } else if item.downloadCount > 1 {
             parts.append(String(localized: "\(formattedDownloadCount(item.downloadCount)) downloads"))
         }
-        if let published = item.publishedDate {
-            parts.append(String(localized: "Added \(published.formatted(.dateTime.day().month(.abbreviated).year()))"))
+        // Prefer the stable first-added date; fall back to the last-release date for older snapshots.
+        if let added = item.addedDate ?? item.publishedDate {
+            parts.append(String(localized: "Added \(added.formatted(.dateTime.day().month(.abbreviated).year()))"))
         }
         return parts.joined(separator: " · ")
     }

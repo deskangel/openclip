@@ -17,7 +17,11 @@ public struct ExtensionItem: Sendable, Codable, Identifiable {
     /// by the extensions publish pipeline; absent for older catalog snapshots.
     public let iconURL: String?
     /// ISO 8601 publication or release timestamp from catalog.json; nil if unavailable.
+    /// This is the **last** commit that touched the package, so it moves on every release.
     public let publishedAt: String?
+    /// ISO 8601 timestamp of when the package first appeared (stable across releases). Absent in
+    /// older catalog snapshots, which predate the field; callers fall back to `publishedAt`/version.
+    public let addedAt: String?
 
     public init(
         id: String,
@@ -29,7 +33,8 @@ public struct ExtensionItem: Sendable, Codable, Identifiable {
         downloadURL: String,
         version: String? = nil,
         iconURL: String? = nil,
-        publishedAt: String? = nil
+        publishedAt: String? = nil,
+        addedAt: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -41,11 +46,17 @@ public struct ExtensionItem: Sendable, Codable, Identifiable {
         self.version = version
         self.iconURL = iconURL
         self.publishedAt = publishedAt
+        self.addedAt = addedAt
     }
 
     /// `publishedAt` as a date, or nil when the catalogue did not carry one.
     public var publishedDate: Date? {
         Self.parsePublishedAt(publishedAt)
+    }
+
+    /// `addedAt` as a date, or nil when the catalogue did not carry one (older snapshots).
+    public var addedDate: Date? {
+        Self.parsePublishedAt(addedAt)
     }
 
     /// The catalogue writes an internet timestamp with an offset ("2026-08-20T22:00:51+05:30");

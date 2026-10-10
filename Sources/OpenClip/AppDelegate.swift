@@ -34,6 +34,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
 
     func applicationWillTerminate(_ notification: Notification) {
         captureTextController?.cancel()
+        ExtensionUpdateManager.shared.stopAutomaticUpdates()
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -167,6 +168,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
             // appear without relaunching. Started after loadInitialState so the
             // onRegister/onUnregister registry wiring is already in place.
             startExtensionWatcher()
+            if NSClassFromString("XCTestCase") == nil {
+                ExtensionUpdateManager.shared.startAutomaticUpdates()
+            }
         }
         
         guard NSClassFromString("XCTestCase") == nil else { return }

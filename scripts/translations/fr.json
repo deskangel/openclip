@@ -1,4 +1,5 @@
 {
+  "Discord": "Discord",
   "Preview truncated": "Aperçu tronqué",
   "Add": "Ajouter",
   "All": "Tout",
@@ -239,14 +240,7 @@
   "Cloud API (OpenAI/Claude)": "API Cloud (OpenAI/Claude)",
   "Browser Redirection": "Redirection vers le navigateur",
   "Proofread": "Corriger",
-  "Fix all spelling, punctuation, and grammar errors with the smallest possible changes. Preserve the original wording, tone, and formatting — do not rewrite or rephrase sentences": "Corriger toutes les fautes d’orthographe, de ponctuation et de grammaire avec le minimum de modifications. Préserver le texte original, le ton et la mise en forme — ne pas réécrire ni reformuler les phrases",
-  "Rewrite to improve clarity, flow, and word choice while keeping the original meaning, tone, language, and formatting": "Réécrire pour améliorer la clarté, la fluidité et le choix des mots tout en conservant le sens, le ton, la langue et la mise en forme d’origine",
-  "Provide a concise bulleted summary of the key points, in the same language as the text. Include only essential information — no introduction or closing remarks": "Fournir un résumé concis des points clés sous forme de liste à puces, dans la même langue que le texte. N’inclure que l’essentiel — sans introduction ni conclusion",
-  "Explain what the text means in clear, simple language, in the same language as the text. Cover the core idea and any important details a beginner would need": "Expliquer ce que signifie le texte dans un langage clair et simple, dans la même langue que le texte. Couvrir l’idée principale et les détails importants qu’un débutant devrait connaître",
   "Translate the text accurately into natural English, preserving the original meaning, tone, and formatting": "Traduire fidèlement le texte dans un français naturel, en préservant le sens, le ton et la mise en forme d’origine ; si le texte est déjà en français, le traduire dans un anglais naturel",
-  "Fix bugs, syntax errors, and logic issues in this code. Keep the same programming language, style, and structure, and change as little as possible. Return only the raw working code — no markdown code fences, no explanations": "Corriger les bugs, les erreurs de syntaxe et les problèmes de logique dans ce code. Conserver le même langage de programmation, le même style et la même structure, avec le minimum de modifications. Renvoyer uniquement le code brut fonctionnel — sans blocs de code markdown ni explications",
-  "Condense this text to be significantly shorter while keeping all essential information, the original language, and the tone. Preserve the overall formatting such as paragraphs and lists": "Condenser ce texte pour le rendre nettement plus court tout en conservant toutes les informations essentielles, la langue d’origine et le ton. Préserver la mise en forme générale (paragraphes, listes)",
-  "Rewrite this text in a polished, professional, and formal tone. Keep the original meaning, language, and formatting; replace slang, contractions, and casual phrasing with formal equivalents": "Réécrire ce texte dans un ton soigné, professionnel et formel. Conserver le sens, la langue et la mise en forme d’origine ; remplacer l’argot, les contractions et les tournures familières par des équivalents formels",
   "Rewrite": "Réécrire",
   "Summarize": "Résumer",
   "Explain": "Expliquer",
@@ -766,5 +760,15 @@
   "Contextual Pill": "Pastille contextuelle",
   "Show contextual actions to the left or right of the main bar. Auto follows the horizontal position.": "Afficher les actions contextuelles à gauche ou à droite de la barre principale. Auto suit la position horizontale.",
   "Contextual Pill Position": "Position de la pastille contextuelle",
-  "Rename": "Renommer"
+  "Rename": "Renommer",
+  "%lld extensions": "%lld extensions",
+  "Correct spelling, grammar, and punctuation. Make the smallest necessary changes. Preserve wording, meaning, tone, language, and formatting. Return only the corrected text.": "Corriger l’orthographe, la grammaire et la ponctuation avec le minimum de modifications nécessaires. Préserver les formulations, le sens, le ton, la langue et la mise en forme. Renvoyer uniquement le texte corrigé.",
+  "Rewrite for clarity and natural flow. Preserve the meaning, factual details, intent, and original language. Do not add new claims. Return only the rewritten text.": "Réécrire pour améliorer la clarté et la fluidité. Préserver le sens, les détails factuels, l’intention et la langue d’origine. Ne pas ajouter de nouvelles affirmations. Renvoyer uniquement le texte réécrit.",
+  "Summarize the main points in concise bullets, using the input’s language. Preserve important conclusions, decisions, and qualifications. Do not add information absent from the input.": "Résumer les points principaux sous forme de puces concises, dans la langue du texte fourni. Préserver les conclusions, décisions et réserves importantes. Ne pas ajouter d’informations absentes du texte.",
+  "Explain the input in clear language for a beginner. Describe its main idea and important details. For code, explain what it does and how it works. Use the input’s language unless another language is requested.": "Expliquer le contenu dans un langage clair pour un débutant. Décrire l’idée principale et les détails importants. Pour du code, expliquer ce qu’il fait et comment il fonctionne. Utiliser la langue du contenu sauf si une autre langue est demandée.",
+  "Shorten the text by removing repetition and unnecessary wording. Preserve essential facts, requests, qualifications, tone, and language. Return only the shortened text.": "Raccourcir le texte en supprimant les répétitions et les formulations inutiles. Préserver les faits essentiels, les demandes, les réserves, le ton et la langue. Renvoyer uniquement le texte raccourci.",
+  "Rewrite in a professional, formal tone. Preserve meaning, intent, factual details, and language. Avoid inflated wording and unnecessary length. Return only the rewritten text.": "Réécrire dans un ton professionnel et formel. Préserver le sens, l’intention, les détails factuels et la langue. Éviter les formulations pompeuses et la longueur inutile. Renvoyer uniquement le texte réécrit.",
+  "Correct identifiable syntax errors, bugs, and logic mistakes. Preserve the programming language, intended behavior, existing interfaces, and style. Make the smallest necessary changes and avoid unrelated refactoring. Return only the corrected code without markdown code fences or explanations. If a reliable fix requires essential missing context, briefly state what is needed instead of inventing code.": "Corriger les erreurs de syntaxe, les bugs et les erreurs de logique identifiables. Préserver le langage de programmation, le comportement prévu, les interfaces existantes et le style. Effectuer le minimum de modifications nécessaires et éviter les refactorisations sans rapport. Renvoyer uniquement le code corrigé, sans blocs de code Markdown ni explications. Si une correction fiable nécessite un contexte essentiel manquant, indiquer brièvement les informations nécessaires plutôt que d’inventer du code.",
+  "Extension Updates": "Mises à jour des extensions",
+  "Automatically Update Extensions": "Mettre à jour automatiquement les extensions"
 }

@@ -7,6 +7,34 @@ areas; stale debt notes are worse than none.
 
 ---
 
+## Extension Automatic Updates
+
+- About → Extension Updates contains a persisted toggle, enabled by default. The app checks
+  at launch and every six hours while running, and applies updates only to store-sourced
+  packages through the existing installer/trust flow. Revoked packages stay revoked.
+- Turning the toggle off prevents subsequent automatic installs; an install already in progress
+  finishes. Manual update controls remain available. Local and sideloaded packages are excluded.
+
+## AI Action Prompting
+
+- `AIRequestSupport.systemPrompt` uses a task-driven deliverable contract for both selected-text
+  and standalone requests. Selected text is source material or context; explanations and examples
+  are allowed when requested. Editing preservation rules apply to edits, not all tasks. Tagged
+  (`result` / optional `title`) and structured response contracts remain provider-specific.
+- Built-in prompt updates affect defaults. Persisted presets retain their stored prompts, including
+  customized built-ins; no automatic prompt migration is performed. The shared system contract
+  applies to both stored and default presets. Translate still targets English. Fix Code requests minimal corrections preserving intended
+  behavior and interfaces, returns raw corrected code, and permits a brief missing-context response
+  when a reliable fix cannot be determined.
+
+## Manual Update Window Activation
+
+- Manual Sparkle checks share `AppActivationPolicy` with Settings. A single activation lease spans
+  the update flow and is released by `didFinishUpdateCycleFor`, including cancellation, errors, and
+  no-update outcomes. Repeated checks during a session do not acquire extra leases. The last lease
+  restores the original activation policy once no regular windows remain visible; a Settings window
+  opened during the check keeps its own lease.
+
 ## Settings Migration (UserDefaults → SettingsStore)
 
 - The typed settings abstraction is `SettingsStore` + `SettingKey<T>` (see `Sources/Core/Settings/`).
@@ -495,6 +523,23 @@ replace a newer popup.
   approach. Recovery is restricted to action mode. The content view and frame survive; recovery never activates OpenClip or makes the panel key. The second check logs
   unresolved placement. Automated tests verify the guards and bounded retry; actual
   fullscreen placement still requires WindowServer validation on the affected machine.
+- **Hover over fullscreen rides the panels' `.activeAlways` tracking areas, not the event
+  monitors.** While OpenClip is inactive over another app's fullscreen Space, the global monitor
+  receives no own-window `mouseMoved` events (they are not "global"), the local monitor gets none
+  (the non-activating panel is not key and the app is not active), and SwiftUI `.onHover` does not
+  fire for an inactive non-key window — so hover highlights, tooltips, and the group sub-bar dwell
+  all died in fullscreen. `PopupPanel.ContentView` and `SubBarPanel.ContentView` now install
+  `.activeAlways` + `.mouseMoved` tracking areas (AppKit delivers these regardless of app/key
+  status) and forward mouse movement, entry, and exit to `PopupWindowController.handleTrackingMouseMoved`,
+  which drive the same `updatePopupHover`/`updateSubBarHover` pipeline. That path deliberately passes
+  `toggleClickThrough: false`: with no monitor to notice pointer re-entry, toggling
+  `ignoresMouseEvents` would strand the panel under the cursor. The monitors remain the source of
+  click/scroll/key dismissal. Panel `mouseExited` updates hover and sub-bar grace; it does not
+  dismiss the main popup. Group and AI Tools buttons route SwiftUI `.onHover` solely through
+  the local fallback; it cannot start or cancel dwell while cursor tracking owns hover. Both
+  paths use the same target-transition handler, so duplicate entries and stale local exits cannot
+  restart dwell or cancel a different group's timer. Pointer-distance dismissal in fullscreen remains dependent on monitor
+  delivery and is not supplied by this tracking-area path.
 - **Automatic reads are tied to the selection source process.** The monitor uses the activated app
   from the workspace notification and cancels pending reads and clears the cached selection on a
   switch away from the source. Queued notifications for apps no longer frontmost, activation of

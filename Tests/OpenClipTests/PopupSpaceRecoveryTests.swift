@@ -89,4 +89,29 @@ final class PopupSpaceRecoveryTests: XCTestCase {
         XCTAssertFalse(controller.recoverPopupSpaceIfNeeded(for: currentAttempt, frontmostPID: 99999))
         XCTAssertTrue(panel.ordering.isEmpty)
     }
+
+    /// Regression: the panels' `.activeAlways` tracking area feeds hover while OpenClip is inactive
+    /// (floating over another app's fullscreen Space), where no event monitor sees the pointer. That
+    /// path must not toggle click-through (`ignoresMouseEvents`), or the panel would stop receiving
+    /// its own tracking events and strand hover/tooltips/sub-bars.
+    func testTrackingHoverDoesNotToggleClickThrough() {
+        let (controller, panel) = fixture()
+        panel.contentView = NSView(frame: NSRect(x: 0, y: 0, width: 200, height: 80))
+        panel.setFrame(NSRect(x: 300, y: 300, width: 200, height: 80), display: false)
+        PopupHoverState.shared.usesGlobalMouseMonitoring = true
+        defer {
+            PopupHoverState.shared.usesGlobalMouseMonitoring = false
+            PopupHoverState.shared.location = nil
+        }
+        let outside = CGPoint(x: panel.frame.maxX + 40, y: panel.frame.maxY + 40)
+
+        panel.ignoresMouseEvents = false
+        controller.updatePopupHover(at: outside, toggleClickThrough: false)
+        XCTAssertFalse(panel.ignoresMouseEvents)
+
+        // The event-monitor path keeps its click-through behavior.
+        controller.updatePopupHover(at: outside, toggleClickThrough: true)
+        XCTAssertTrue(panel.ignoresMouseEvents)
+        controller.hide()
+    }
 }

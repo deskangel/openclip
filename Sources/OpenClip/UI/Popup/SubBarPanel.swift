@@ -75,6 +75,10 @@ public final class SubBarPanel: NSPanel {
     public final class ContentView: NSHostingView<AnyView> {
         private var trackingAreaRef: NSTrackingArea?
 
+        /// See `PopupPanel.ContentView.onMouseMoved`: an `.activeAlways` tracking area is the only
+        /// source of hover events while the app is inactive over another app's fullscreen Space.
+        var onMouseMoved: (() -> Void)?
+
         public static func isInsideClickableRegion(point: NSPoint, bounds: NSRect) -> Bool {
             bounds.insetBy(dx: PopupMetrics.popupShadowInset, dy: PopupMetrics.popupShadowInset).contains(point)
         }
@@ -90,7 +94,7 @@ public final class SubBarPanel: NSPanel {
             }
             let area = NSTrackingArea(
                 rect: bounds,
-                options: [.cursorUpdate, .activeAlways, .inVisibleRect, .mouseEnteredAndExited],
+                options: [.cursorUpdate, .activeAlways, .inVisibleRect, .mouseEnteredAndExited, .mouseMoved],
                 owner: self,
                 userInfo: nil
             )
@@ -105,6 +109,17 @@ public final class SubBarPanel: NSPanel {
         public override func mouseEntered(with event: NSEvent) {
             super.mouseEntered(with: event)
             NSCursor.arrow.set()
+            onMouseMoved?()
+        }
+
+        public override func mouseMoved(with event: NSEvent) {
+            super.mouseMoved(with: event)
+            onMouseMoved?()
+        }
+
+        public override func mouseExited(with event: NSEvent) {
+            super.mouseExited(with: event)
+            onMouseMoved?()
         }
 
         public override func resetCursorRects() {
