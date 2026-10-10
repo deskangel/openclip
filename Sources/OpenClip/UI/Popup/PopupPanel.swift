@@ -105,6 +105,19 @@ public class PopupPanel: NSPanel {
     public final class ContentView: NSHostingView<PopupView> {
         private var trackingAreaRef: NSTrackingArea?
 
+        /// Hover tracking for the case the event monitors cannot cover: while OpenClip is inactive
+        /// (notably with the popup floating over *another* app's fullscreen Space) neither the global
+        /// monitor (own-window events are not "global") nor the local monitor (the app is not active
+        /// and the panel is not key) delivers `mouseMoved`, and SwiftUI `.onHover` does not fire for
+        /// an inactive non-key window either. An `.activeAlways` tracking area still delivers
+        /// moved/entered/exited to the view, so the controller routes these into the same hover
+        /// pipeline and the sub-bar/tooltips come back. Enter/exit also route here: a SwiftUI relayout
+        /// can remove and re-add the tracking area, emitting a spurious exit while the cursor is still
+        /// on the bar, so the controller must recompute from the live pointer rather than blind-clear.
+        /// Click-through toggling is skipped on this path (see `handleTrackingMouseMoved`) because
+        /// there is no monitor to notice re-entry.
+        var onMouseMoved: (() -> Void)?
+
         /// Pure hit-test rule (unit-testable without a live SwiftUI tree): only the area inside the
         /// shadow ring belongs to the popup.
         public static func isInsideClickableRegion(point: NSPoint, bounds: NSRect) -> Bool {
@@ -129,7 +142,7 @@ public class PopupPanel: NSPanel {
             }
             let area = NSTrackingArea(
                 rect: bounds,
-                options: [.cursorUpdate, .activeAlways, .inVisibleRect, .mouseEnteredAndExited],
+                options: [.cursorUpdate, .activeAlways, .inVisibleRect, .mouseEnteredAndExited, .mouseMoved],
                 owner: self,
                 userInfo: nil
             )
@@ -144,6 +157,17 @@ public class PopupPanel: NSPanel {
         public override func mouseEntered(with event: NSEvent) {
             super.mouseEntered(with: event)
             NSCursor.arrow.set()
+            onMouseMoved?()
+        }
+
+        public override func mouseMoved(with event: NSEvent) {
+            super.mouseMoved(with: event)
+            onMouseMoved?()
+        }
+
+        public override func mouseExited(with event: NSEvent) {
+            super.mouseExited(with: event)
+            onMouseMoved?()
         }
 
         public override func resetCursorRects() {

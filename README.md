@@ -7,7 +7,7 @@
     <a href="https://github.com/ganeshmshetty/openclip/releases"><img src="https://img.shields.io/badge/macOS-14.0+-black?style=flat-square&logo=apple&logoColor=white" alt="macOS 14+" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL_3.0-blue?style=flat-square" alt="License" /></a>
     <a href="https://github.com/ganeshmshetty/homebrew-tap"><img src="https://img.shields.io/badge/brew-openclip-ffcc00?style=flat-square&logo=homebrew&logoColor=black" alt="Homebrew" /></a>
-    <a href="https://discord.gg/sy4MeFxf8"><img src="https://img.shields.io/badge/discord-join-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord" /></a>
+    <a href="https://discord.gg/acYYdzM7jR"><img src="https://img.shields.io/badge/discord-join-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord" /></a>
   </p>
 
   <p>
@@ -99,7 +99,7 @@ xcodegen generate
 ## Community & Support
 
 - **Docs:** [Documentation Hub](docs/index.md)
-- **Discord:** [Join Community](https://discord.gg/sy4MeFxf8)
+- **Discord:** [Join Community](https://discord.gg/acYYdzM7jR)
 - **Issues:** [Report a bug](https://github.com/ganeshmshetty/openclip/issues)
 - **Sponsor:** [GitHub Sponsors](https://github.com/sponsors/ganeshmshetty) · [Buy Me a Coffee](https://buymeacoffee.com/ganeshmshetty) · [Ko-fi](https://ko-fi.com/ganeshmshetty)
 

@@ -24,6 +24,33 @@ private struct DummyPasteAction: Action, PasteRequiringAction, Sendable {
 
 final class SubBarStateTests: XCTestCase {
     @MainActor
+    func testDelayedLocalHoverExitDoesNotCancelTrackedGroupDwell() async throws {
+        let hover = PopupHoverState()
+        hover.usesGlobalMouseMonitoring = true
+        let group = GroupAction(id: "group.hover", title: "Group", icon: .symbol("folder"),
+                                chrome: ActionChrome(popupBehavior: .showSubActions))
+        let subBar = SubBarPanelController()
+        defer { subBar.hide() }
+        var opened = false
+        var localDwellRequests = 0
+        let view = PopupView(
+            actions: [group], context: ActionContext(selection: SelectionContext(text: "test")),
+            hoverState: hover, onResult: { _ in },
+            onRequestSubBarDwell: { _, _, _ in localDwellRequests += 1 },
+            onCancelSubBarDwell: { subBar.cancelDwell() }
+        )
+
+        // The cursor-tracking path has already started the timer. SwiftUI relayout then
+        // reports an exit and re-entry, despite the pointer remaining over this group.
+        subBar.startDwell { opened = true }
+        view.useLocalHoverFallback(for: .action(0), isHovering: false)
+        view.useLocalHoverFallback(for: .action(0), isHovering: true)
+        try await Task.sleep(for: .milliseconds(250))
+        XCTAssertTrue(opened, "A delayed SwiftUI exit must not cancel the tracked hover timer")
+        XCTAssertEqual(localDwellRequests, 0, "Local re-entry must not restart a tracked dwell")
+    }
+
+    @MainActor
     func testActiveSubGroupStateEquality() {
         let a = ActiveSubGroupState(
             groupID: "group.dev-tools",

@@ -13,8 +13,12 @@ import Core
 @MainActor
 public enum AppActivationPolicy {
     private static var count = 0
+    private static var previousPolicy: NSApplication.ActivationPolicy?
 
     public static func enter() {
+        if count == 0 && previousPolicy == nil {
+            previousPolicy = NSApp.activationPolicy()
+        }
         count += 1
         if NSApp.activationPolicy() != .regular {
             NSApp.setActivationPolicy(.regular)
@@ -23,15 +27,19 @@ public enum AppActivationPolicy {
     }
 
     public static func leave() {
-        count = max(0, count - 1)
+        guard count > 0 else { return }
+        count -= 1
         guard count == 0 else { return }
         Task { @MainActor in
-            // Return to accessory mode when no regular windows remain visible
+            // Another window may have entered before this deferred cleanup runs.
+            guard count == 0 else { return }
+            // Restore the original policy when no regular windows remain visible
             let hasVisibleRegularWindows = NSApp.windows.contains {
                 $0.isVisible && $0.level == .normal && !($0.className.contains("Popup") || $0.className.contains("Panel"))
             }
             if !hasVisibleRegularWindows {
-                NSApp.setActivationPolicy(.accessory)
+                NSApp.setActivationPolicy(previousPolicy ?? .accessory)
+                previousPolicy = nil
             }
         }
     }

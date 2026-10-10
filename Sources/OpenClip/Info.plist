@@ -83,7 +83,7 @@
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2026 Ganesh M and OpenClip Contributors. AGPL-3.0 licensed.</string>
 	<key>SUAutomaticallyUpdate</key>
-	<true/>
+	<false/>
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
 	<key>SUFeedURL</key>

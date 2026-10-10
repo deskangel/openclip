@@ -931,12 +931,6 @@ public struct PopupView: View {
                     .popupHoverTarget(.action(index))
                 .onHover { isHovering in
                     useLocalHoverFallback(for: .action(index), isHovering: isHovering)
-                    if isHovering {
-                        let frame = hoverFrames[.action(index)] ?? .zero
-                        onRequestSubBarDwell?(action, index, frame)
-                    } else {
-                        onCancelSubBarDwell?()
-                    }
                 }
             case .perform:
                 if action.chrome.launchesAI {
@@ -954,12 +948,6 @@ public struct PopupView: View {
                     .popupHoverTarget(.action(index))
                     .onHover { isHovering in
                         useLocalHoverFallback(for: .action(index), isHovering: isHovering)
-                        if isHovering {
-                            let frame = hoverFrames[.action(index)] ?? .zero
-                            onRequestSubBarDwell?(action, index, frame)
-                        } else {
-                            onCancelSubBarDwell?()
-                        }
                     }
                 } else {
                     // Leaf actions use their existing execution flow.
@@ -1071,6 +1059,12 @@ public struct PopupView: View {
         let target = location.flatMap { point in
             hoverFrames.first(where: { $0.value.contains(point) })?.key
         }
+        setHoveredTarget(target)
+    }
+
+    /// Both cursor tracking and the local fallback use target transitions to own dwell timing.
+    /// Repeated entries and stale exits must not restart or cancel another target's timer.
+    private func setHoveredTarget(_ target: PopupHoverTarget?) {
         guard target != hoveredTarget else { return }
         let oldTarget = hoveredTarget
         hoveredTarget = target
@@ -1103,15 +1097,14 @@ public struct PopupView: View {
         onHoveredActionChanged?(action)
     }
 
-    private func useLocalHoverFallback(for target: PopupHoverTarget, isHovering: Bool) {
+    func useLocalHoverFallback(for target: PopupHoverTarget, isHovering: Bool) {
+        // The location-driven path owns highlights AND dwell when tracking is available.
+        // SwiftUI can emit an exit during highlight relayout while the cursor is still here.
         guard !isStatic, !hoverState.usesGlobalMouseMonitoring else { return }
         if isHovering {
-            guard hoveredTarget != target else { return }
-            hoveredTarget = target
-            reportHoveredAction()
+            setHoveredTarget(target)
         } else if hoveredTarget == target {
-            hoveredTarget = nil
-            reportHoveredAction()
+            setHoveredTarget(nil)
         }
     }
 

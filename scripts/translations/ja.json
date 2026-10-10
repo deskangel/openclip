@@ -1,4 +1,5 @@
 {
+  "Discord": "Discord",
   "Preview truncated": "プレビューは省略されています",
   "Add": "追加",
   "All": "すべて",
@@ -239,14 +240,7 @@
   "Cloud API (OpenAI/Claude)": "クラウドAPI (OpenAI/Claude)",
   "Browser Redirection": "ブラウザリダイレクト",
   "Proofread": "校正",
-  "Fix all spelling, punctuation, and grammar errors with the smallest possible changes. Preserve the original wording, tone, and formatting — do not rewrite or rephrase sentences": "可能な限り最小限の変更で、すべてのスペル、句読点、文法のエラーを修正します。元の表現、トーン、書式を保持し、文を書き直したり言い換えたりしないでください",
-  "Rewrite to improve clarity, flow, and word choice while keeping the original meaning, tone, language, and formatting": "元の意味、トーン、言語、書式を保ちながら、明瞭さ、文章の流れ、語彙の選択を改善するように書き直します",
-  "Provide a concise bulleted summary of the key points, in the same language as the text. Include only essential information — no introduction or closing remarks": "テキストと同じ言語で、要点を簡潔な箇条書きで要約します。重要な情報のみを含め、導入や結びの言葉は付けないでください",
-  "Explain what the text means in clear, simple language, in the same language as the text. Cover the core idea and any important details a beginner would need": "テキストと同じ言語で、わかりやすい言葉でテキストの意味を説明します。核心的な考え方と、初心者に必要な重要な詳細をカバーしてください",
   "Translate the text accurately into natural English, preserving the original meaning, tone, and formatting": "テキストを自然な日本語に正確に翻訳し、元の意味、トーン、書式を保持してください。テキストがすでに日本語の場合は、自然な英語に翻訳してください",
-  "Fix bugs, syntax errors, and logic issues in this code. Keep the same programming language, style, and structure, and change as little as possible. Return only the raw working code — no markdown code fences, no explanations": "このコードのバグ、構文エラー、論理の問題を修正します。同じプログラミング言語、スタイル、構造を保ち、変更は最小限にしてください。動作する生のコードのみを返してください — markdownのコードブロックや説明は不要です",
-  "Condense this text to be significantly shorter while keeping all essential information, the original language, and the tone. Preserve the overall formatting such as paragraphs and lists": "すべての重要な情報、元の言語、トーンを保ちながら、このテキストを大幅に短縮します。段落やリストなどの全体的な書式は保持してください",
-  "Rewrite this text in a polished, professional, and formal tone. Keep the original meaning, language, and formatting; replace slang, contractions, and casual phrasing with formal equivalents": "洗練されたプロフェッショナルでフォーマルなトーンにこのテキストを書き直します。元の意味、言語、書式を保持し、スラング、短縮形、カジュアルな表現をフォーマルな表現に置き換えてください",
   "Rewrite": "リライト",
   "Summarize": "要約",
   "Explain": "説明",
@@ -766,5 +760,15 @@
   "Contextual Pill": "コンテキストピル",
   "Show contextual actions to the left or right of the main bar. Auto follows the horizontal position.": "コンテキストアクションをメインバーの左側または右側に表示します。自動では水平位置に合わせます。",
   "Contextual Pill Position": "コンテキストピルの位置",
-  "Rename": "名前を変更"
+  "Rename": "名前を変更",
+  "%lld extensions": "%lld個の拡張機能",
+  "Correct spelling, grammar, and punctuation. Make the smallest necessary changes. Preserve wording, meaning, tone, language, and formatting. Return only the corrected text.": "綴り、文法、句読点の誤りを修正してください。必要最小限の変更にとどめ、元の表現、意味、語調、言語、書式を維持してください。修正したテキストのみを返してください。",
+  "Rewrite for clarity and natural flow. Preserve the meaning, factual details, intent, and original language. Do not add new claims. Return only the rewritten text.": "明確で自然な流れになるように書き直してください。意味、事実の詳細、意図、元の言語を維持し、新たな主張を加えないでください。書き直したテキストのみを返してください。",
+  "Summarize the main points in concise bullets, using the input’s language. Preserve important conclusions, decisions, and qualifications. Do not add information absent from the input.": "入力と同じ言語で、主なポイントを簡潔な箇条書きにまとめてください。重要な結論、決定、条件や留保を維持してください。入力にない情報を加えないでください。",
+  "Explain the input in clear language for a beginner. Describe its main idea and important details. For code, explain what it does and how it works. Use the input’s language unless another language is requested.": "初心者にもわかる明確な言葉で入力内容を説明してください。中心となる考えと重要な詳細を述べてください。コードの場合は、その機能と仕組みを説明してください。別の言語が指定されない限り、入力と同じ言語を使ってください。",
+  "Shorten the text by removing repetition and unnecessary wording. Preserve essential facts, requests, qualifications, tone, and language. Return only the shortened text.": "繰り返しや不要な表現を削除してテキストを短くしてください。重要な事実、依頼、条件や留保、語調、言語を維持してください。短くしたテキストのみを返してください。",
+  "Rewrite in a professional, formal tone. Preserve meaning, intent, factual details, and language. Avoid inflated wording and unnecessary length. Return only the rewritten text.": "専門的でフォーマルな語調に書き直してください。意味、意図、事実の詳細、言語を維持してください。大げさな表現や不要な長さを避けてください。書き直したテキストのみを返してください。",
+  "Correct identifiable syntax errors, bugs, and logic mistakes. Preserve the programming language, intended behavior, existing interfaces, and style. Make the smallest necessary changes and avoid unrelated refactoring. Return only the corrected code without markdown code fences or explanations. If a reliable fix requires essential missing context, briefly state what is needed instead of inventing code.": "特定できる構文エラー、バグ、論理上の誤りを修正してください。プログラミング言語、意図された動作、既存のインターフェース、コードのスタイルを維持してください。必要最小限の変更にとどめ、無関係なリファクタリングを避けてください。Markdownのコードブロックや説明を付けず、修正したコードのみを返してください。確実な修正に不可欠な情報が不足している場合は、コードをでっち上げずに、必要な情報を簡潔に述べてください。",
+  "Extension Updates": "拡張機能のアップデート",
+  "Automatically Update Extensions": "拡張機能を自動更新"
 }
