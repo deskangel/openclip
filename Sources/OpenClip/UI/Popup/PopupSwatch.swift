@@ -16,7 +16,7 @@ import Core
 struct PopupSwatch: View {
     /// The canonical action set the preview shows, independent of the user's own bar so the
     /// preview is about appearance, not content. Has enough actions (13) to exercise pagination
-    /// across the full 2–12 Actions Per Page slider range.
+    /// for the Actions Per Page preference.
     static let actions: [any Action] = [
         CalculateAction(),
         CustomAction(id: "swatch.search", title: "Search", iconName: "magnifyingglass", type: .textSnippet(template: "")),

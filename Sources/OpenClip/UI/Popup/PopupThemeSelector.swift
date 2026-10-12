@@ -16,6 +16,7 @@ struct PopupThemeSelector: View {
     @Setting(SettingKey.popupThemeColor) private var themeColor
     @Setting(SettingKey.popupScale) private var popupScale
     @Setting(SettingKey.popupPageSize) private var pageSize
+    @Setting(SettingKey.popupFitToWidth) private var fitToWidth
     @Setting(SettingKey.showSearchAllActions) private var showSearchAllActions
     @Setting(SettingKey.popupAlignment) private var popupAlignment
     @Setting(SettingKey.popupVerticalPosition) private var popupVerticalPosition
@@ -74,6 +75,7 @@ struct PopupThemeSelector: View {
         themeColor == SettingKey.popupThemeColor.defaultValue &&
         popupScale == SettingKey.popupScale.defaultValue &&
         pageSize == SettingKey.popupPageSize.defaultValue &&
+        fitToWidth == SettingKey.popupFitToWidth.defaultValue &&
         showSearchAllActions == SettingKey.showSearchAllActions.defaultValue &&
         popupAlignment == SettingKey.popupAlignment.defaultValue &&
         popupVerticalPosition == SettingKey.popupVerticalPosition.defaultValue &&
@@ -87,6 +89,7 @@ struct PopupThemeSelector: View {
         themeColor = SettingKey.popupThemeColor.defaultValue
         popupScale = SettingKey.popupScale.defaultValue
         pageSize = SettingKey.popupPageSize.defaultValue
+        fitToWidth = SettingKey.popupFitToWidth.defaultValue
         showSearchAllActions = SettingKey.showSearchAllActions.defaultValue
         popupAlignment = SettingKey.popupAlignment.defaultValue
         popupVerticalPosition = SettingKey.popupVerticalPosition.defaultValue
@@ -183,19 +186,19 @@ struct PopupThemeSelector: View {
 
                 SettingsDivider()
 
-                SettingsRow(
-                    title: "Actions Per Page"
-                ) {
-                    stepSlider(
-                        value: Binding(
-                            get: { pageSize },
-                            set: { pageSize = $0 }
-                        ),
-                        range: 2...12,
-                        accessibilityLabel: "Actions Per Page",
-                        labelText: "\(pageSize)"
-                    )
+                SettingsRow(title: "Fit to width") {
+                    Toggle("Fit to width", isOn: $fitToWidth)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
                 }
+
+                if !fitToWidth {
+                    SettingsDivider()
+                    SettingsRow(title: "Actions Per Page") {
+                        pageSizeStepper
+                    }
+                }
+
             }
 
             SettingsCard("Behavior") {
@@ -335,6 +338,39 @@ struct PopupThemeSelector: View {
         .padding(.vertical, SettingsDesignTokens.sectionCardPaddingV)
         .frame(minHeight: 34)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var pageSizeStepper: some View {
+        HStack(spacing: 0) {
+            Button {
+                pageSize = max(2, min(24, pageSize - 1))
+            } label: {
+                Image(systemName: "minus")
+                    .frame(width: 30, height: 28)
+                    .contentShape(Rectangle())
+            }
+            .disabled(pageSize <= 2)
+            .accessibilityLabel("Decrease actions per page")
+
+            Text("\(pageSize)")
+                .monospacedDigit()
+                .frame(minWidth: 30)
+                .accessibilityLabel("Actions Per Page")
+
+            Button {
+                pageSize = min(24, max(2, pageSize + 1))
+            } label: {
+                Image(systemName: "plus")
+                    .frame(width: 30, height: 28)
+                    .contentShape(Rectangle())
+            }
+            .disabled(pageSize >= 24)
+            .accessibilityLabel("Increase actions per page")
+        }
+        .buttonStyle(.plain)
+        .buttonRepeatBehavior(.enabled)
+        .settingsGlassCapsule()
+        .onAppear { pageSize = max(2, min(24, pageSize)) }
     }
 
     private func stepSlider(

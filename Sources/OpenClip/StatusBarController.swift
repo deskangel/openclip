@@ -12,7 +12,7 @@ import KeyboardShortcuts
 
 /// Manages the menu bar status icon for OpenClip.
 @MainActor
-class StatusBarController: NSObject, NSMenuDelegate {
+class StatusBarController: NSObject, NSMenuDelegate, NSMenuItemValidation {
     private let settingsStore: any SettingsStore
     private let notificationCenter: NotificationCenter
     private var statusItem: NSStatusItem?
@@ -94,6 +94,14 @@ class StatusBarController: NSObject, NSMenuDelegate {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.updateUpdateMenuItem(version: AppUpdateManager.shared.availableUpdateVersion)
+            }
+            .store(in: &cancellables)
+
+        AppUpdateManager.shared.$hasUpdateReminder
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.updateStatusIcon(isEnabled: self.settingsStore.get(.isAppEnabled))
             }
             .store(in: &cancellables)
 
@@ -303,6 +311,7 @@ class StatusBarController: NSObject, NSMenuDelegate {
             updateMenuItem.title = String(localized: "Check for Updates…")
         }
         updateMenuItem.image = nil
+        updateMenuItem.isEnabled = AppUpdateManager.shared.updatesEnabled
     }
 
     var updateMenuItemTitle: String? {
@@ -381,6 +390,13 @@ class StatusBarController: NSObject, NSMenuDelegate {
     }
 
     // MARK: - NSMenuDelegate
+
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(checkForUpdates) {
+            return AppUpdateManager.shared.updatesEnabled
+        }
+        return menuItem.isEnabled
+    }
 
     func menuWillOpen(_ menu: NSMenu) {
         if menu === rootMenu {
@@ -702,9 +718,14 @@ class StatusBarController: NSObject, NSMenuDelegate {
         if let button = statusItem?.button {
             button.image = NSImage(named: "MenuBarIcon") ?? NSImage(systemSymbolName: "paperclip", accessibilityDescription: "OpenClip")
             button.image?.isTemplate = true
+            let hasReminder = AppUpdateManager.shared.hasUpdateReminder
+            button.title = hasReminder ? "•" : ""
+            button.font = .systemFont(ofSize: 9, weight: .bold)
+            button.imagePosition = .imageLeft
+            button.toolTip = hasReminder ? String(localized: "OpenClip Update Available") : "OpenClip"
             button.alphaValue = effectiveEnabled ? 1.0 : 0.45
             // The enabled state must be legible beyond the purely visual alpha dimming.
-            button.setAccessibilityLabel("OpenClip")
+            button.setAccessibilityLabel(hasReminder ? String(localized: "OpenClip Update Available") : "OpenClip")
             if isPaused {
                 button.setAccessibilityValue(String(localized: "OpenClip is paused"))
             } else {

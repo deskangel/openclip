@@ -29,7 +29,22 @@ areas; stale debt notes are worse than none.
 
 ## Manual Update Window Activation
 
-- Manual Sparkle checks share `AppActivationPolicy` with Settings. A single activation lease spans
+- Production builds use Sparkle's standard UI and daily scheduler, with no forced launch check.
+  Development/unknown bundle IDs never create an updater. The standard user-driver delegate adds
+  a menu bar dot and one quiet optional notification per version, persisted only after delivery.
+  Attention clears the dot/notification; session completion clears unstaged availability and
+  releases activation. Staged-on-quit updates retain the existing menu/settings entry.
+  Silent staging on quit also creates a reminder without announcing the same version twice.
+  Each notification task owns a unique request ID; a late canceled delivery only removes its own
+  request and cannot overwrite the newer announcement history. AppKit menu validation enforces
+  the development-build restriction even when automatic item enabling runs.
+  Settings shows “View Update…” for available updates. Notifications remain supplementary;
+  Sparkle retains its normal presentation, skip, download, verification and relaunch behavior.
+  The app does not retain/use the immediate-install callback while returning `false` from
+  `willInstallUpdateOnQuit`; that callback requires taking ownership of installation.
+  Tests cover reminder state, notification history, development gating and overlapping activation
+  leases. A signed two-version installation/relaunch smoke test remains a release validation step.
+- Manual and scheduled Sparkle windows share `AppActivationPolicy` with Settings. A single activation lease spans
   the update flow and is released by `didFinishUpdateCycleFor`, including cancellation, errors, and
   no-update outcomes. Repeated checks during a session do not acquire extra leases. The last lease
   restores the original activation policy once no regular windows remain visible; a Settings window
@@ -77,7 +92,9 @@ areas; stale debt notes are worse than none.
 - **Dynamic action option keys** (`JavaScriptAction`, `AppleScriptAction`): the target pattern is
   `SettingKey<String>("action.<id>.option.<identifier>", defaultValue:)` via `SettingsStore`. The JS
   path already reads through the injected `optionStore` (`OpenClipJSHost` reads options read-only via
-  `ActionOptionReading`); `AppleScriptAction` does not consume options today.
+  `ActionOptionReading`). File-backed `ScriptAction` exposes merged manifest/action options and
+  resolves them through the factory-injected store on each invocation as `OPENCLIP_OPTION_*`
+  environment variables, including secrets; `AppleScriptAction` does not consume options today.
 
 ## Action Seams Already Implemented
 
@@ -119,16 +136,22 @@ areas; stale debt notes are worse than none.
   the host does not call the JavaScript VM for it (issue #40). Uncaught exceptions that escape
   native-to-JS callbacks after initial evaluation (issue #48) reject the promise bridge via a
   per-evaluation `exceptionHandler` and surface as `.toast(.error)` without waiting for the idle
-  watchdog. This does **not** detect detached unhandled promise rejections, and it does not change
-  the retain-cycle residual below. Residual: retain cycles in
-  `JSNativeFetch` (`nativeFetchBlock` → `contextBox`/`context`; `jsonBlock` → `JSContextBox`) and
-  `PromiseState` (`JSValue?` → `JSValue.context`) keep the finished `JSContext` alive — this is
-  **line-cited analysis, not empirically probed**. `PolicySession` does not invalidate its
-  `URLSession`. A guarded `CFRunLoopPerformBlock` can still sit on the shared run loop and hold
-  those references. Do not break a cycle unless the final release of `JSValue`/`JSContext` is
-  guaranteed to land on the JS thread; otherwise an off-thread release becomes a memory-safety
-  hazard.
-- **Custom Action Groups use canonical IDs with dynamic materialization and strict $\ge 2$ member invariant.**
+  watchdog. This does **not** detect detached unhandled promise rejections.
+  **JS bridge lifetime is JS-thread-owned (issues #46/#47).** `PolicySession` invalidates its
+  `URLSession` through `FetchTaskBox.setCloseHandler` when the run ends, instead of leaking one
+  session, delegate, and its worker threads/Mach ports per async action. No block stored on a
+  `JSValue` and no off-thread closure retains a `JSContext`/`JSValue`: `nativeFetchBlock` and
+  `fetchResponse`'s `json()` resolve the context via `JSContext.current()` (the URLSession
+  completion reaches it only through `WeakJSContextBox`), in-flight resolve/reject functions live in
+  a JS-thread-owned `FetchResolvers` registry the completion touches only through `WeakRef` (the
+  host calls `FetchResolvers.clearPending()` in the same run-end `defer`, so a fetch that never
+  settles is dropped too), and `PromiseState.clear()` drops the settled `JSValue`s when the run
+  ends. This keeps the final release
+  of every JavaScript reference on the JS thread, which the off-thread-release hazard requires.
+  `OpenClipJSHostTests.testFetchBridgeDoesNotRetainContextAfterRun` probes the finished `JSContext`
+  deallocating after a fetch that calls `json()` (autorelease pool drained, since JavaScriptCore
+  hands out autoreleased receipts).
+- **Custom Action Groups use canonical IDs with dynamic materialization and folder semantics.**
   User-defined action groups are defined via `ActionGroupDef` (`Sources/Core/Actions/ActionGroupDef.swift`),
   stored as JSON in `SettingKey.actionGroups`. Rather than rewriting action identifiers with virtual ID
   prefixes (e.g. `vgroup.<id>.<actionID>`), grouped actions retain their exact canonical IDs
@@ -136,9 +159,14 @@ areas; stale debt notes are worse than none.
   (`Sources/Core/Actions/CustomGroupAction.swift`, conforming to `Action` and `SubActionProviding`)
   group rows, injecting them contiguously before their member actions in `actions`, while `SettingKey.actionOrder`
   strictly stores real, canonical IDs (excluding synthetic group headers and grouped AI presets). `ActionCoordinator`
-  manages the full group lifecycle (`createGroup`, `updateGroup`, `ungroup`, `removeFromGroup`, `loadGroupDefs`,
-  `pruneOrphans`), automatically enforcing the strict $\ge 2$ member invariant: when members are uninstalled
-  or removed, any group dropping below 2 members is immediately dissolved. Availability resolution in
+  manages the group lifecycle (`createGroup`, `updateGroup`, `ungroup`, `removeFromGroup`, `loadGroupDefs`).
+  The enforced rule is **not** a hard ≥ 2: a group created or saved empty is kept (a folder to fill
+  later), while a group **emptied by a mutation** (`removeFromGroup`, moving its last member into
+  another group, deleting its last member action) is dissolved. Unresolved member IDs are filtered
+  when the group is materialized and on mutating saves, but an existing member that is merely
+  unregistered this session is retained so the group survives an extension reload; `loadGroupDefs`
+  never rewrites the saved configuration, and there is **no `pruneOrphans` boot pass** (an earlier
+  spec claimed one). Availability resolution in
   `ActionRegistry.availableActions(for:)` maps canonical IDs to owning custom groups to hide member actions
   when their parent group is disabled or filtered out.
 
@@ -245,6 +273,12 @@ areas; stale debt notes are worse than none.
   model are gone, and the inline status banner is gone too: every `StatusFeedback` renders as a
   floating toast (`ToastPanelController`) with no queue — a status shows over the card — and
   `showsLoading` actions (manifest `"loading"`) use the early-close spinner toast.
+  All toasts, including cancellable loading pills, reserve `toastShadowInset` inside the
+  window. Cancellable pills use a subtle theme-aware inset rounded hover tint,
+  preserving their outer chrome while displaying an × and “Cancel Task”. Shadows render inside the
+  window so they are not clipped. The container excludes the ring from
+  view hit-testing; true cross-application click-through for interactive toast rings still
+  requires window-level mouse-event routing (returning nil from hit-testing alone is insufficient).
 - **Search and result-card footers share separate theme-aware buttons.**
   `PopupFooterButtonChrome` uses a native `.glassEffect` rounded rectangle for the glass theme on
   macOS 26+, with a material/tint fallback; secondary actions are neutral and the primary action
@@ -639,3 +673,11 @@ and fixed SF Symbol sample actions, with a presenter that ignores saved action c
 Its stable preview viewport pins the contextual island at a left inset as the main bar grows.
 Per-action contextual exclusions do not change the static sample. The main bar's Actions Per Page setting
 and width budget apply to the standard island independently of the contextual island.
+
+## Actions per page ([#148](https://github.com/ganeshmshetty/openclip/issues/148))
+
+Appearance uses a Liquid Glass count stepper (2–24) with native press-and-hold repetition
+and a separate Fit to width toggle.
+Fit to width defaults off and preserves the saved manual count (default 6); both main and
+group bars pass an unlimited count to the existing width-budget layout when enabled.
+Actual capacity depends on the popup display, scale, controls, and rendered action widths.

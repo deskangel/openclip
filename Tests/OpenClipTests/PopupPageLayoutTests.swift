@@ -197,6 +197,27 @@ final class PopupPageLayoutTests: XCTestCase {
         XCTAssertEqual(flat, actions.map(\.id))
     }
 
+    func testFitToWidthExceedsTwelveAndStillPaginatesAtDifferentScales() {
+        let actions = (0..<26).map {
+            StubAction(id: "act.\($0)", title: "Action \($0)", icon: .symbol("star"))
+        }
+        let widePages = PopupPageLayout.computePages(
+            actions: actions, maxBudget: 864, maxItemsPerPage: Int.max)
+        XCTAssertGreaterThan(widePages[0].count, 12)
+        for scale in [CGFloat(0.85), 1.0, 1.22] {
+            let pages = PopupPageLayout.computePages(
+                actions: actions, maxBudget: 300, maxItemsPerPage: Int.max, scale: scale)
+            XCTAssertGreaterThan(pages.count, 1)
+            XCTAssertEqual(pages.flatMap { $0.map(\.id) }, actions.map(\.id))
+            for (index, page) in pages.enumerated() {
+                let chevrons = (index > 0 ? 1 : 0) + (index < pages.count - 1 ? 1 : 0)
+                let width = CGFloat(page.count) * PopupMetrics.actionButtonWidth * scale
+                    + CGFloat(chevrons) * PopupPageLayout.chevronWidth * scale
+                XCTAssertLessThanOrEqual(width, 300)
+            }
+        }
+    }
+
     func testComputePagesClampsZeroOrNegativeMaxItemsPerPage() {
         let actions = (0..<4).map {
             StubAction(id: "act.\($0)", title: "Action \($0)", icon: .symbol("star"))

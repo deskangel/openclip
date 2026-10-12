@@ -67,11 +67,16 @@ struct ToastView: View {
     var body: some View {
         let isInteractive = feedback.isLoading && onCancel != nil
         let formattedMessage = Self.formatMessage(feedback.message)
-        let displayedMessage = (isInteractive && isHovered) ? String(localized: "Cancel Task") : formattedMessage
-        let activeForeground: Color = (isInteractive && isHovered) ? .white : textColor
+        let isCancelHovered = isInteractive && isHovered
+        let displayedMessage = isCancelHovered ? String(localized: "Cancel Task") : formattedMessage
+        let activeForeground = textColor
 
         let content = HStack(spacing: 6 * scale) {
-            if feedback.isLoading {
+            if isCancelHovered {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10 * scale, weight: .medium))
+                    .frame(width: 16 * scale, height: 16 * scale)
+            } else if feedback.isLoading {
                 ToastSpinnerView(color: activeForeground, scale: scale)
             } else if let symbol = feedback.symbolName {
                 Image(systemName: symbol)
@@ -87,77 +92,58 @@ struct ToastView: View {
         .padding(.horizontal, 11 * scale)
         .padding(.vertical, 5 * scale)
         .frame(minWidth: reservedWidth, alignment: .leading)
+        .background {
+            RoundedRectangle(cornerRadius: max(0, cornerRadius - 2 * scale), style: .continuous)
+                .fill(effectiveColorScheme == .dark ? Color.white.opacity(0.10) : Color.black.opacity(0.06))
+                .padding(2 * scale)
+                .opacity(isCancelHovered ? 1 : 0)
+                .allowsHitTesting(false)
+        }
 
         Group {
             if isGlass {
                 let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 content
                     .background(
-                        Group {
-                            if isInteractive && isHovered {
-                                shape.fill(Color.accentColor)
-                            } else {
-                                LayeredGlassBackground(cornerRadius: cornerRadius, colorScheme: effectiveColorScheme)
-                            }
-                        }
+                        LayeredGlassBackground(cornerRadius: cornerRadius, colorScheme: effectiveColorScheme)
                     )
                     .clipShape(shape)
                     .overlay(
-                        Group {
-                            if isInteractive && isHovered {
-                                shape.stroke(Color.accentColor, lineWidth: 1.0)
-                            } else {
-                                LayeredGlassBorder(cornerRadius: cornerRadius, colorScheme: effectiveColorScheme)
-                            }
-                        }
+                        LayeredGlassBorder(cornerRadius: cornerRadius, colorScheme: effectiveColorScheme)
                     )
                     .shadow(color: Color.black.opacity(effectiveColorScheme == .dark ? 0.25 : 0.15), radius: 4, x: 0, y: 1)
             } else {
                 let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 content
                     .background(
-                        Group {
-                            if isInteractive && isHovered {
-                                shape.fill(Color.accentColor)
-                            } else {
-                                PopupThemeModel.classicSurfaceBackground(for: effectiveColorScheme, in: shape)
-                            }
-                        }
+                        PopupThemeModel.classicSurfaceBackground(for: effectiveColorScheme, in: shape)
                     )
                     .clipShape(shape)
                     .overlay(
                         shape.stroke(
-                            (isInteractive && isHovered)
-                                ? AnyShapeStyle(Color.accentColor)
-                                : AnyShapeStyle(
-                                    LinearGradient(
-                                        colors: effectiveColorScheme == .dark
-                                            ? [Color.white.opacity(0.20), Color.white.opacity(0.08)]
-                                            : [Color.black.opacity(0.18), Color.black.opacity(0.08)],
-                                        startPoint: .top,
-                                        endPoint: .bottom
-                                    )
-                                ),
+                            LinearGradient(
+                                colors: effectiveColorScheme == .dark
+                                    ? [Color.white.opacity(0.20), Color.white.opacity(0.08)]
+                                    : [Color.black.opacity(0.18), Color.black.opacity(0.08)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
                             lineWidth: 1.0
                         )
                     )
                     .overlay(
-                        Group {
-                            if !(isInteractive && isHovered) {
-                                shape.inset(by: 0.5).stroke(
-                                    LinearGradient(
-                                        colors: [
-                                            Color.white.opacity(effectiveColorScheme == .dark ? 0.32 : 0.65),
-                                            Color.white.opacity(0.0)
-                                        ],
-                                        startPoint: .top,
-                                        endPoint: .bottom
-                                    ),
-                                    lineWidth: 1.0
-                                )
-                                .allowsHitTesting(false)
-                            }
-                        }
+                        shape.inset(by: 0.5).stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(effectiveColorScheme == .dark ? 0.32 : 0.65),
+                                    Color.white.opacity(0.0)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
+                            lineWidth: 1.0
+                        )
+                        .allowsHitTesting(false)
                     )
                     .shadow(color: Color.black.opacity(effectiveColorScheme == .dark ? 0.28 : 0.12), radius: 4, x: 0, y: 1.5)
             }

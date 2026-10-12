@@ -5657,6 +5657,34 @@
         }
       }
     },
+    "Decrease actions per page": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "减少每页动作数"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "減少每頁動作數"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réduire le nombre d’actions par page"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1ページあたりのアクション数を減らす"
+          }
+        }
+      }
+    },
     "DeepSeek": {
       "localizations": {
         "zh-Hans": {
@@ -8289,6 +8317,34 @@
         }
       }
     },
+    "Fit to width": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "适应宽度"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "配合寬度"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adapter à la largeur"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "幅に合わせる"
+          }
+        }
+      }
+    },
     "Fix Code": {
       "localizations": {
         "zh-Hans": {
@@ -9377,6 +9433,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "⌘、⌥、⌃ のいずれかを含めてください"
+          }
+        }
+      }
+    },
+    "Increase actions per page": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "增加每页动作数"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "增加每頁動作數"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Augmenter le nombre d’actions par page"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1ページあたりのアクション数を増やす"
           }
         }
       }
@@ -20329,6 +20413,34 @@
         }
       }
     },
+    "Updates are disabled in development builds.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开发版本中已禁用更新。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開發版本中已停用更新。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les mises à jour sont désactivées dans les versions de développement."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開発ビルドではアップデートが無効になっています。"
+          }
+        }
+      }
+    },
     "Updating…": {
       "localizations": {
         "zh-Hans": {
@@ -20717,6 +20829,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "README を表示"
+          }
+        }
+      }
+    },
+    "View Update…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查看更新…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查看更新…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voir la mise à jour…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アップデートを表示…"
           }
         }
       }

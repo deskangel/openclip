@@ -220,3 +220,10 @@ over the selection. ⏎ on an empty field pastes as before.
 
 ### AI Settings Channel
 AI settings are managed through `AIServiceManager` and isolated to ensure security and privacy.
+
+## Actions per page
+
+In Appearance, use the minus/plus stepper to choose 2–24 actions per page (default 6).
+Enable **Fit to width** to let the popup fill the available width instead. This applies to
+the main bar and group bars; turning it off restores your saved count. Wide actions and
+smaller displays may still cause pagination before the chosen count is reached.

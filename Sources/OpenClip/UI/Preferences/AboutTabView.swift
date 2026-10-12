@@ -31,6 +31,7 @@ struct AboutTab: View {
                         title: "Automatically Download Updates",
                         isOn: $updateManager.automaticallyDownloadsUpdates
                     )
+                    .disabled(!updateManager.updatesEnabled)
 
                     SettingsDivider()
 
@@ -38,6 +39,7 @@ struct AboutTab: View {
                         title: "Notify on Update",
                         isOn: $updateManager.notifyOnUpdate
                     )
+                    .disabled(!updateManager.updatesEnabled)
 
                     SettingsDivider()
 
@@ -45,7 +47,7 @@ struct AboutTab: View {
                         title: "Check for Updates",
                         subtitle: updateStatusSubtitle
                     ) {
-                        Button(String(localized: "Check Now")) {
+                        Button(updateActionTitle) {
                             updateManager.checkForUpdates()
                         }
                         .buttonStyle(.plain)
@@ -55,8 +57,8 @@ struct AboutTab: View {
                         .frame(height: 24)
                         .settingsGlassCapsule()
                         .contentShape(Capsule())
-                        .disabled(!updateManager.canCheckForUpdates)
-                        .accessibilityLabel("Check Now")
+                        .disabled(!updateManager.canPresentUpdate)
+                        .accessibilityLabel(updateActionTitle)
                     }
                 }
 
@@ -170,7 +172,16 @@ struct AboutTab: View {
         .padding(.bottom, 12)
     }
 
+    private var updateActionTitle: String {
+        updateManager.availableUpdateVersion == nil
+            ? String(localized: "Check Now")
+            : String(localized: "View Update…")
+    }
+
     private var updateStatusSubtitle: LocalizedStringKey? {
+        guard updateManager.updatesEnabled else {
+            return "Updates are disabled in development builds."
+        }
         if let newVersion = updateManager.availableUpdateVersion {
             return LocalizedStringKey("Version \(newVersion)")
         }

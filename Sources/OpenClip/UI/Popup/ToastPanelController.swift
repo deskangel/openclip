@@ -109,10 +109,9 @@ public final class ToastPanelController {
             fit = hostingView.fittingSize
         }
 
-        // When interactive, size the panel directly to the bubble (inset = 0) so clicks in the
-        // shadow ring genuinely pass through to underlying applications without being swallowed.
-        // For passive toasts (ignoresMouseEvents = true), inflate by toastShadowInset for the drop shadow.
-        let inset = isInteractive ? 0 : PopupMetrics.toastShadowInset
+        // Every toast needs transparent space inside the window for its SwiftUI shadow,
+        // including cancellable loading pills. Interactivity must not shrink that space.
+        let inset = PopupMetrics.toastShadowInset
         hostingView.frame = NSRect(x: inset, y: inset, width: fit.width, height: fit.height)
         panel.contentView?.frame = NSRect(origin: .zero,
                                           size: NSSize(width: fit.width + inset * 2,
@@ -194,7 +193,7 @@ public final class ToastPanelController {
 
     /// Centers the toast directly over the anchored popup frame (horizontally and vertically),
     /// clamped to the visible frame. `size` is the bubble's size; the window frame adds the
-    /// `toastShadowInset` ring around it when non-interactive.
+    /// `toastShadowInset` ring around it.
     private func place(at size: CGSize, inset: CGFloat) {
         guard let anchor = _lastAnchorFrame else {
             centerOnScreen(size: size, inset: inset)
@@ -229,13 +228,12 @@ public final class ToastPanelController {
     }
 }
 
-/// Plain container view hosting the toast view. Insets hit-testing so clicks in the shadow ring
-/// fall through to underlying applications.
+/// Plain container view hosting the toast view. Excludes the shadow ring from view hit-testing.
 final class ToastContainerView: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? {
         let view = super.hitTest(point)
         // If the hit point is this container itself (outside any subviews in the shadow inset ring),
-        // return nil so clicks pass through to underlying windows.
+        // return nil so the ring does not activate the toast.
         if view === self {
             return nil
         }
