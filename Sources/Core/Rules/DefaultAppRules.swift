@@ -251,6 +251,11 @@ public enum DefaultAppRules: Sendable {
         "extraterm"
     ]
     
+    public static let disabledApps: [String] = [
+        DefaultAppRules.processNamePrefix + "qemu-system-aarch64",
+        DefaultAppRules.processNamePrefix + "qemu-system-x86_64"
+    ]
+
     public static let catalog: [AppRule] = [
         AppRule(
             bundleIdentifiers: nativeApps,
@@ -283,6 +288,10 @@ public enum DefaultAppRules: Sendable {
         AppRule(
             bundleIdentifiers: denyPasteApps,
             denyPaste: true
+        ),
+        AppRule(
+            bundleIdentifiers: disabledApps,
+            disabled: true
         )
     ]
 }
