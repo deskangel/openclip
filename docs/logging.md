@@ -178,6 +178,11 @@ Two session-scoped checks run 150 ms and 750 ms after ordering. Occlusion/dismis
 events log only for an off-Space or recovering panel. These are bounded checks, not
 continuous polling. Window metadata does not prove that pixels reached the display.
 
+Toast windows have the same fullscreen eligibility as the main popup. If a toast is invisible
+or off the active Space after its bounded visibility check, `Recovering toast window` records
+visibility and Space membership at notice level under `presentation`. It contains no feedback
+message or captured text. Recovery replaces the window once without resetting its dismissal timer.
+
 For an off-Space or recovering panel, `hide()` records its caller function and line
 (or explicit reason) before clearing the session. The first delayed check
 attempts one guarded Space-membership recovery when a visible non-key action popup remains off the active Space with its source still frontmost.

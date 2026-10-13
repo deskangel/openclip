@@ -21,6 +21,18 @@ struct ToastView: View {
     @Setting(SettingKey.popupScale) private var popupScale
     @Environment(\.colorScheme) private var colorScheme
 
+    init(feedback: StatusFeedback, onCancel: (() -> Void)? = nil,
+         reservedWidth: CGFloat? = nil, onHover: ((Bool) -> Void)? = nil,
+         settingsStore: SettingsStore = DefaultSettingsStore.shared) {
+        self.feedback = feedback
+        self.onCancel = onCancel
+        self.reservedWidth = reservedWidth
+        self.onHover = onHover
+        _selectedTheme = Setting(SettingKey.popupTheme, store: settingsStore)
+        _themeColor = Setting(SettingKey.popupThemeColor, store: settingsStore)
+        _popupScale = Setting(SettingKey.popupScale, store: settingsStore)
+    }
+
     /// Visual multiplier derived from the user's Popup Scale level (1...5) so the toast keeps pace
     /// with the popup bar it attaches to — same scale factor `PopupView` applies to the bar.
     private var scale: CGFloat { PopupMetrics.scaleMultiplier(for: popupScale) }

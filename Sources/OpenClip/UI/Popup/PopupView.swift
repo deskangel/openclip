@@ -175,6 +175,7 @@ public struct PopupView: View {
 
     @MainActor
     public init(
+        settingsStore: SettingsStore = DefaultSettingsStore.shared,
         actions: [any Action],
         allActions: [any Action]? = nil,
         context: ActionContext,
@@ -219,6 +220,17 @@ public struct PopupView: View {
         onShowTooltip: (@MainActor (String, CGRect, String, Bool) -> Void)? = nil,
         onHideTooltip: (@MainActor () -> Void)? = nil
     ) {
+        _selectedTheme = Setting(SettingKey.popupTheme, store: settingsStore)
+        _themeColor = Setting(SettingKey.popupThemeColor, store: settingsStore)
+        _popupScale = Setting(SettingKey.popupScale, store: settingsStore)
+        _pageSize = Setting(SettingKey.popupPageSize, store: settingsStore)
+        _fitToWidth = Setting(SettingKey.popupFitToWidth, store: settingsStore)
+        _showSearchAllActions = Setting(SettingKey.showSearchAllActions, store: settingsStore)
+        _contextualActionsEnabled = Setting(SettingKey.contextualActionsEnabled, store: settingsStore)
+        _disabledContextualIDs = Setting(SettingKey.disabledContextualActionIDs, store: settingsStore)
+        _contextualPillPosition = Setting(SettingKey.contextualPillPosition, store: settingsStore)
+        _popupAlignment = Setting(SettingKey.popupAlignment, store: settingsStore)
+        _completionCopyToClipboard = Setting(SettingKey.completionCopyToClipboard, store: settingsStore)
         self.actions = actions
         self.allActions = allActions ?? actions
         self.context = context
@@ -747,7 +759,7 @@ public struct PopupView: View {
                 let index = contextualIslandTrailing ? pagedStandardActions.count + offset : offset
                 let isDirectlyHovered = hoveredTarget == .action(index)
                 let isActiveParent = modeStore.activeSubGroupID == action.id && !isDirectlyHovered
-                actionButton(action: action, index: index, isHovered: isDirectlyHovered, isActiveParent: isActiveParent, leadingEdge: index == 0, trailingEdge: index == contextualActions.count - 1)
+                actionButton(action: action, index: index, isHovered: isDirectlyHovered, isActiveParent: isActiveParent, leadingEdge: offset == 0, trailingEdge: offset == contextualActions.count - 1)
             }
         }
         .fixedSize()

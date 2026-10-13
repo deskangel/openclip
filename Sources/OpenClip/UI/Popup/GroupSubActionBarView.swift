@@ -43,6 +43,7 @@ public struct GroupSubActionBarView: View {
     public let screenWidth: CGFloat?
 
     public init(
+        settingsStore: SettingsStore = DefaultSettingsStore.shared,
         subActions: [any Action],
         currentPage: Binding<Int>,
         hoverState: SubBarHoverState = .shared,
@@ -62,6 +63,8 @@ public struct GroupSubActionBarView: View {
         scale: CGFloat,
         screenWidth: CGFloat? = nil
     ) {
+        _pageSize = Setting(SettingKey.popupPageSize, store: settingsStore)
+        _fitToWidth = Setting(SettingKey.popupFitToWidth, store: settingsStore)
         self.subActions = subActions
         self._currentPage = currentPage
         self.hoverState = hoverState
@@ -216,7 +219,7 @@ public struct GroupSubActionBarView: View {
                     .frame(maxWidth: PopupMetrics.inlineResultMaxWidth * scale)
                     .padding(.horizontal, PopupMetrics.inlineResultHorizontalPadding * scale)
                     .frame(minWidth: buttonWidth, minHeight: barButtonHeight)
-                    .popupBarHighlight(backgroundColor, scale: scale, isText: true, leadingEdge: index == 0, trailingEdge: index == pagedSubActions.count - 1 && !hasLeftChevron && !hasRightChevron, isHovered: isHovered, namespace: hoverHighlightNamespace)
+                    .popupBarHighlight(backgroundColor, scale: scale, isText: true, leadingEdge: index == 0, trailingEdge: index == pagedSubActions.count - 1 && !hasLeftChevron && !hasRightChevron, outerInset: 3 - PopupMetrics.subBarEndInset, isHovered: isHovered, namespace: hoverHighlightNamespace)
                     .transition(.opacity)
             } else {
                 ActionIconView(icon: action.displayIcon(using: presenter), size: 15.5, scale: scale)
@@ -226,7 +229,7 @@ public struct GroupSubActionBarView: View {
                         return 0.0
                     }())
                     .frame(minWidth: buttonWidth, maxWidth: 150 * scale, minHeight: barButtonHeight)
-                    .popupBarHighlight(backgroundColor, scale: scale, isText: { if case .text = action.displayIcon(using: presenter) { return true }; return false }(), leadingEdge: index == 0, trailingEdge: index == pagedSubActions.count - 1 && !hasLeftChevron && !hasRightChevron, isHovered: isHovered, namespace: hoverHighlightNamespace)
+                    .popupBarHighlight(backgroundColor, scale: scale, isText: { if case .text = action.displayIcon(using: presenter) { return true }; return false }(), leadingEdge: index == 0, trailingEdge: index == pagedSubActions.count - 1 && !hasLeftChevron && !hasRightChevron, outerInset: 3 - PopupMetrics.subBarEndInset, isHovered: isHovered, namespace: hoverHighlightNamespace)
                     .transition(.opacity)
             }
         }
@@ -326,7 +329,7 @@ public struct GroupSubActionBarView: View {
                 .font(.system(size: 12.5 * scale, weight: .semibold))
                 .foregroundColor(isHovered ? .white : restForeground)
                 .frame(width: PopupPageLayout.chevronWidth * scale, height: barButtonHeight)
-                .popupBarHighlight(isHovered ? PopupThemeModel.barHoverFill : .clear, scale: scale, trailingEdge: systemImage == "chevron.right" || !hasRightChevron, isHovered: isHovered, namespace: hoverHighlightNamespace)
+                .popupBarHighlight(isHovered ? PopupThemeModel.barHoverFill : .clear, scale: scale, trailingEdge: systemImage == "chevron.right" || !hasRightChevron, outerInset: 3 - PopupMetrics.subBarEndInset, isHovered: isHovered, namespace: hoverHighlightNamespace)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

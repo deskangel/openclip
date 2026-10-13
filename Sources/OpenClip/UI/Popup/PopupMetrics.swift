@@ -21,10 +21,8 @@ public enum PopupMetrics {
     public static let inlineResultMaxWidth: CGFloat = 172.0
     /// Horizontal padding (pt at 1.0 scale) inside an expanded inline result button.
     public static let inlineResultHorizontalPadding: CGFloat = 9.0
-    /// Breathing room (pt at 1.0 scale) at each end of a group sub-bar's button row so the first/last
-    /// button's hover highlight is not flush against the rounded card edge. The main bar gets this
-    /// visually from its end icon buttons (centered glyph in a `actionButtonWidth` slot); the sub-bar's
-    /// end buttons are often text labels whose highlight would otherwise sit ~2 pt from the edge.
+    /// Row inset at each end of a group sub-bar. The highlight subtracts this from its outer
+    /// inset so the total gap to the card edge stays equal to the main bar's 3 pt gap.
     public static let subBarEndInset: CGFloat = 1.0
     /// Cross-fade duration (seconds) between button rest icon/text and computed result.
     /// Benchmark (Tier 1 p95=0.01ms, Tier 2 p50=12.9ms): perceptual floor of 0.20s
@@ -74,6 +72,10 @@ public enum PopupMetrics {
     public static let toastMaxCharacterLength: Int = 40
     /// Gap between a toast bubble and the popup edge it attaches to.
     public static let toastAnchorGap: CGFloat = 8.0
+    /// Prefer clearing the action/group bar above, without moving feedback far past a tall card.
+    public static let toastPreferredAboveDistance: CGFloat = 140.0
+    /// Separation between the OCR toast window and the visible action bar.
+    public static let captureStatusGap: CGFloat = 6.0
     /// Transparent ring (pt) around the toast bubble inside the panel frame: the controller centers
     /// the bubble in a window inflated by this amount so its SwiftUI drop shadow (radius 4, y 1)
     /// renders instead of being clipped at the window edge — worst at the rounded corners, where the

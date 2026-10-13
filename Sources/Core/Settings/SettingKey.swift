@@ -72,15 +72,6 @@ public enum UpdateChannel: String, Codable, CaseIterable, Sendable {
     case beta
 }
 
-/// Required modifier key when selecting text to trigger the popup ("none" | "option" | "shift" | "control" | "command").
-public enum SelectionModifier: String, Codable, CaseIterable, Sendable {
-    case none
-    case option
-    case shift
-    case control
-    case command
-}
-
 public extension SettingKey where Value == [String] {
     static var actionOrder: SettingKey<[String]> { SettingKey<[String]>("action.order", defaultValue: []) }
 }
@@ -122,6 +113,7 @@ public extension SettingKey where Value == Bool {
     /// has been dismissed by any path — it never shows again for this install.
     static var hasDismissedPostOnboardingCoachMark: SettingKey<Bool> { SettingKey<Bool>("hasDismissedPostOnboardingCoachMark", defaultValue: false) }
     static var startAtLogin: SettingKey<Bool> { SettingKey<Bool>("startAtLogin", defaultValue: false) }
+    static var captureTextAutoCopy: SettingKey<Bool> { SettingKey<Bool>("captureTextAutoCopy", defaultValue: true) }
     static var completionCopyToClipboard: SettingKey<Bool> { SettingKey<Bool>("completionCopyToClipboard", defaultValue: false) }
     /// True once the one-time migration (auto-trust existing installs) has run.
     static var extensionTrustMigrated: SettingKey<Bool> { SettingKey<Bool>("extension.trustMigrated", defaultValue: false) }
@@ -183,9 +175,6 @@ public extension SettingKey where Value == String {
 
     /// Which update feed the app follows: `UpdateChannel.stable` (default) or `UpdateChannel.beta`.
     static var updateChannel: SettingKey<String> { SettingKey<String>("updates.channel", defaultValue: UpdateChannel.stable.rawValue) }
-
-    /// Required modifier key when selecting text to trigger the popup ("none" | "option" | "shift" | "control" | "command").
-    static var selectionModifier: SettingKey<String> { SettingKey<String>("selectionModifier", defaultValue: SelectionModifier.none.rawValue) }
 
     /// Per-action option value key. The key name matches the legacy `action.<id>.option.<optID>`
     /// convention so existing stored values migrate over with zero data changes.

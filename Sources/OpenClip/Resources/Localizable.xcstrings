@@ -4817,6 +4817,62 @@
         }
       }
     },
+    "Copy captured text automatically": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动复制捕获的文本"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自動複製擷取的文字"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copier automatiquement le texte capturé"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "キャプチャしたテキストを自動的にコピー"
+          }
+        }
+      }
+    },
+    "Copy recognized text to the clipboard. The action popup still opens.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将识别的文本复制到剪贴板。操作弹窗仍会打开。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "將辨識的文字複製到剪貼簿。動作彈出視窗仍會開啟。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copier le texte reconnu dans le presse-papiers. La fenêtre d’actions s’ouvre toujours."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "認識したテキストをクリップボードにコピーします。アクションポップアップも開きます。"
+          }
+        }
+      }
+    },
     "Copy response and close": {
       "localizations": {
         "zh-Hans": {
@@ -4953,6 +5009,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "選択したテキストをコピーします。"
+          }
+        }
+      }
+    },
+    "Copy to Clipboard Automatically": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动复制到剪贴板"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自動複製到剪貼簿"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copier automatiquement dans le presse-papiers"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "クリップボードに自動的にコピー"
           }
         }
       }
@@ -16717,6 +16801,34 @@
         }
       }
     },
+    "Select a screen region to extract text.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择屏幕区域以提取文本。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選取螢幕區域以擷取文字。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sélectionnez une zone de l’écran pour en extraire le texte."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "画面上の範囲を選択してテキストを抽出します。"
+          }
+        }
+      }
+    },
     "Select actions in the Actions list first to start the group with them.": {
       "localizations": {
         "zh-Hans": {
@@ -18649,6 +18761,62 @@
         }
       }
     },
+    "Text captured": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文本已捕获"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文字已擷取"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Texte capturé"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "テキストをキャプチャしました"
+          }
+        }
+      }
+    },
+    "Text copied": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文本已复制"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文字已複製"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Texte copié"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "テキストをコピーしました"
+          }
+        }
+      }
+    },
     "Text glyph “%@” — click to replace with an icon": {
       "localizations": {
         "zh-Hans": {
@@ -18785,6 +18953,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "アクションはポップアップバーとパレットから削除されます。"
+          }
+        }
+      }
+    },
+    "The action popup still opens after capture.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "捕获后仍会打开操作弹窗。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "擷取後仍會開啟動作彈出視窗。"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La fenêtre d’actions s’ouvre toujours après la capture."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "キャプチャ後もアクションポップアップが開きます。"
           }
         }
       }

@@ -6,7 +6,7 @@
 import AppKit
 
 @MainActor
-public final class ToastPanel: NSPanel {
+public class ToastPanel: NSPanel {
     public init() {
         super.init(
             contentRect: .zero,
@@ -15,7 +15,8 @@ public final class ToastPanel: NSPanel {
             defer: false
         )
         self.level = .popUpMenu
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
+        // Match the main popup's eligibility for another application's fullscreen Space.
+        self.collectionBehavior = [.canJoinAllSpaces, .canJoinAllApplications, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         self.backgroundColor = .clear
         self.isOpaque = false
         self.hasShadow = false

@@ -890,8 +890,8 @@ final class ActionResultDeliveryTests: XCTestCase {
     }
 
     /// Every `.toast` result routes to the toast (the single status surface). A test session has
-    /// no panel window (`startTestSession` creates none), so the toast falls back to deterministic
-    /// main-screen centering — the contract forbids any pointer fallback.
+    /// no panel window (`startTestSession` creates none), so the toast uses cursor-relative
+    /// placement without inventing a popup anchor.
     @MainActor
     func testToastRoutesToToast() async throws {
         let toast = ToastPanelController()

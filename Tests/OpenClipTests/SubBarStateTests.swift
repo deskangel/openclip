@@ -23,6 +23,7 @@ private struct DummyPasteAction: Action, PasteRequiringAction, Sendable {
 }
 
 final class SubBarStateTests: XCTestCase {
+
     @MainActor
     func testDelayedLocalHoverExitDoesNotCancelTrackedGroupDwell() async throws {
         let hover = PopupHoverState()

@@ -8,6 +8,8 @@ import Vision
 @MainActor
 final class CaptureTextController {
     private weak var popupController: PopupWindowController?
+    private let settingsStore: SettingsStore
+    private let resultHandler: DefaultActionResultHandler
     private var panels: [RegionSelectionPanel] = []
     private var captureTask: Task<Void, Never>?
     private let cursorLease = CaptureCursorLease()
@@ -15,8 +17,29 @@ final class CaptureTextController {
     private var sourceApp: NSRunningApplication?
     private var activationObserver: NSObjectProtocol?
 
-    init(popupController: PopupWindowController) {
+    init(popupController: PopupWindowController, settingsStore: SettingsStore = DefaultSettingsStore.shared,
+         resultHandler: DefaultActionResultHandler = DefaultActionResultHandler()) {
         self.popupController = popupController
+        self.settingsStore = settingsStore
+        self.resultHandler = resultHandler
+    }
+
+    /// Shared completion path: never copy empty, cancelled, or superseded recognition results.
+    func deliverRecognizedText(_ text: String, isCurrent: @escaping @MainActor () -> Bool,
+                               showPopup: @MainActor (StatusFeedback) -> Void) async throws {
+        try Task.checkCancellation()
+        guard isCurrent(), !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let autoCopy = settingsStore.get(.captureTextAutoCopy)
+        if autoCopy {
+            guard try await resultHandler.copyText(text, isCurrent: isCurrent) else { return }
+        }
+        try Task.checkCancellation()
+        guard isCurrent() else { return }
+        showPopup(StatusFeedback(
+            message: autoCopy ? String(localized: "Text copied") : String(localized: "Text captured"),
+            style: .success,
+            symbolName: "checkmark.circle.fill"
+        ))
     }
 
     var isCapturing: Bool { requestID != nil }
@@ -134,8 +157,14 @@ final class CaptureTextController {
                         isEditable: false,
                         pasteTargetAvailable: false
                     )
-                    self.popupController?.previousFrontmostApp = self.sourceApp
-                    self.popupController?.show(for: context, pasteAvailable: false)
+                    try await self.deliverRecognizedText(text, isCurrent: { [weak self] in
+                        guard let self else { return false }
+                        return self.requestID == id && self.isSourceAppStillActive
+                            && HotkeyManager.triggerAllowed(frontmost: self.sourceApp)
+                    }) { feedback in
+                        self.popupController?.previousFrontmostApp = self.sourceApp
+                        self.popupController?.show(for: context, pasteAvailable: false, captureFeedback: feedback)
+                    }
                 } catch is CancellationError {
                     return
                 } catch {
@@ -454,11 +483,6 @@ private final class RegionSelectionView: NSView {
             path.stroke()
             NSColor.white.withAlphaComponent(0.16).setFill()
             path.fill()
-        } else {
-            let text = String(localized: "Drag to capture text · Esc to cancel")
-            let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 16, weight: .medium), .foregroundColor: NSColor.white]
-            let size = text.size(withAttributes: attrs)
-            text.draw(at: CGPoint(x: (bounds.width - size.width) / 2, y: (bounds.height - size.height) / 2), withAttributes: attrs)
         }
     }
 

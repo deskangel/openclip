@@ -40,7 +40,6 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
     internal var mouseHoldTask: Task<Void, Never>?
     private var mouseDownLocation: CGPoint?
     private var mouseDownWindow: SelectionGestureWindow?
-    private var mouseDownModifierFlags: NSEvent.ModifierFlags?
     /// Whether the press that started the current gesture landed on system chrome. Gate on this
     /// (the press), not on where the pointer is released: a drag that begins in a window and
     /// overshoots onto the menu bar or Dock is still a selection, while one that begins on chrome is not.
@@ -169,15 +168,14 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
             }
         }
 
-        mouseDownMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] event in
+        mouseDownMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] _ in
             let point = NSEvent.mouseLocation
-            let flags = event.modifierFlags
             // Global monitors run on the main thread. Creating `Task { @MainActor in }` here
             // makes the compiler emit an executor-isolation check that crashes in
             // swift_task_isCurrentExecutorWithFlagsImpl after long uptime (known Swift 6 runtime
             // bug); MainActor.assumeIsolated avoids that path.
             MainActor.assumeIsolated {
-                self?.handleMouseDown(at: point, modifierFlags: flags)
+                self?.handleMouseDown(at: point)
             }
         }
 
@@ -192,9 +190,8 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
             guard let app = NSWorkspace.shared.frontmostApplication else { return }
             let cursor = NSEvent.mouseLocation
             let clickCount = event.clickCount
-            let flags = event.modifierFlags
             MainActor.assumeIsolated {
-                self?.handleMouseUp(app: app, cursor: cursor, clickCount: clickCount, modifierFlags: flags)
+                self?.handleMouseUp(app: app, cursor: cursor, clickCount: clickCount)
             }
         }
         
@@ -210,7 +207,7 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
     internal func handleKeyDown(keyCode: UInt16, flags: NSEvent.ModifierFlags) {
         if Self.isSelectionTrigger(keyCode: keyCode, flags: flags) {
             let isSelectAll = Self.isSelectAllKey(keyCode: keyCode, flags: flags)
-            handleSelectionTrigger(isSelectAll: isSelectAll, flags: flags)
+            handleSelectionTrigger(isSelectAll: isSelectAll)
         } else if Self.isSelectionClearingKey(keyCode: keyCode, flags: flags) {
             debounceTask?.cancel()
             debounceTask = nil
@@ -307,25 +304,6 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
         OpenSelectionMonitor.isSelectionClearingKey(keyCode: keyCode, flags: flags)
     }
 
-    internal func isModifierSatisfied(flags: NSEvent.ModifierFlags) -> Bool {
-        let modifierRaw = settingsStore.get(.selectionModifier)
-        guard let modifier = SelectionModifier(rawValue: modifierRaw), modifier != .none else {
-            return true
-        }
-        switch modifier {
-        case .none:
-            return true
-        case .option:
-            return flags.contains(.option)
-        case .shift:
-            return flags.contains(.shift)
-        case .control:
-            return flags.contains(.control)
-        case .command:
-            return flags.contains(.command)
-        }
-    }
-    
     // MARK: - Event handling
 
     /// A new press or application activation invalidates any earlier automatic copy attempt.
@@ -336,7 +314,6 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
         mouseHoldTask = nil
         triggeredByHold = false
         selectionSourceApp = nil
-        mouseDownModifierFlags = nil
         clearSelection()
     }
 
@@ -380,9 +357,8 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
         return await AutomaticCopyCapture.captureResponse(request: request)
     }
 
-    internal func handleMouseDown(at point: CGPoint, modifierFlags: NSEvent.ModifierFlags = NSEvent.modifierFlags) {
+    internal func handleMouseDown(at point: CGPoint) {
         cancelPendingSelection()
-        mouseDownModifierFlags = modifierFlags
         selectionSourceApp = frontmostAppProvider()
         mouseDownWindow = nil
         if isSystemChromeAt(point) {
@@ -561,8 +537,7 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
     internal func handleMouseUp(
         app: NSRunningApplication,
         cursor: CGPoint,
-        clickCount: Int,
-        modifierFlags: NSEvent.ModifierFlags = NSEvent.modifierFlags
+        clickCount: Int
     ) {
         selectionSourceApp = app
         let gestureWindow = mouseDownWindow
@@ -588,9 +563,6 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
 
         let downPoint = mouseDownLocation
         mouseDownLocation = nil
-
-        let capturedDownFlags = mouseDownModifierFlags
-        mouseDownModifierFlags = nil
 
         // If hold-to-popup delivered (or is delivering) this press's popup, don't duplicate on release.
         guard !wasHold else { return }
@@ -625,9 +597,6 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
             return
         }
 
-        let activeFlags = modifierFlags.union(capturedDownFlags ?? []).union(NSEvent.modifierFlags)
-        let modifierSatisfied = isModifierSatisfied(flags: activeFlags)
-
         debounceTask = Task { @MainActor in
             guard self.isSelectionSourceActive(app) else {
                 self.recordRead(.init(status: Task.isCancelled ? .cancelled : .targetChanged)); return
@@ -646,11 +615,10 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
             // Keep monitoring (so `latestSelection` stays warm for ⌥⌘C) but never post a synthetic
             // ⌘C when:
             // 1. "Appear Automatically" is disabled (passive background caching must stay non-invasive)
-            // 2. The required selection modifier is not satisfied (passive background caching must stay non-invasive)
-            // 3. The app has `hotkeyOnly` policy
-            // 4. A foreign overlay owns the key window
+            // 2. The app has `hotkeyOnly` policy
+            // 3. A foreign overlay owns the key window
             let isAutoEnabled = self.settingsStore.get(.isAppEnabled)
-            let allowCopyFallback = isAutoEnabled && modifierSatisfied && !policy.hotkeyOnly && !self.isOverlayPresent(cursor)
+            let allowCopyFallback = isAutoEnabled && !policy.hotkeyOnly && !self.isOverlayPresent(cursor)
             // Direct AX check executed IMMEDIATELY (0ms delay) for instant smooth opening
             let response = await retriever.retrieveResponse(
                 for: appIdentity,
@@ -667,8 +635,7 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
                 policy: policy,
                 cursor: cursor,
                 mouseDownLocation: downPoint,
-                probeTask: probeTask,
-                modifierSatisfied: modifierSatisfied
+                probeTask: probeTask
             )
         }
     }
@@ -677,12 +644,11 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
     /// (a ⌘A/⇧+arrow in one app followed by a switch during the debounce window must target the
     /// now-frontmost app). `isSelectAll` marks a whole-container gesture (⌘A / ⌘L), which retrieval
     /// refuses on a row/list container (row selection in Finder/Mail/table views).
-    internal func handleSelectionTrigger(isSelectAll: Bool, flags: NSEvent.ModifierFlags = NSEvent.modifierFlags) {
+    internal func handleSelectionTrigger(isSelectAll: Bool) {
         selectionSourceApp = frontmostAppProvider()
         debounceTask?.cancel()
         guard settingsStore.get(.pauseUntilTimestamp) <= Date().timeIntervalSince1970 else { return }
         guard !shouldSuppress() else { return }
-        let modifierSatisfied = isModifierSatisfied(flags: flags)
         debounceTask = Task { @MainActor in
             do {
                 try await Task.sleep(nanoseconds: UInt64(Constants.keyboardSelectionDebounceInterval * 1_000_000_000))
@@ -708,13 +674,13 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
             let appIdentity = AppIdentity(app)
             let probeTask = self.preparePasteProbe?(app, policy)
             // Match the mouse-up path: passive caching stays AX-only when automatic appearance
-            // is disabled, modifier is not satisfied, this app is hotkey-only, or a foreign overlay owns the key window.
+            // is disabled, this app is hotkey-only, or a foreign overlay owns the key window.
             let response = await retriever.retrieveResponse(
                 for: appIdentity,
                 policy: policy,
                 cursor: self.currentCursorProvider(),
                 isSelectAll: isSelectAll,
-                allowCopyFallback: self.settingsStore.get(.isAppEnabled) && modifierSatisfied && !policy.hotkeyOnly
+                allowCopyFallback: self.settingsStore.get(.isAppEnabled) && !policy.hotkeyOnly
                     && !self.isOverlayPresent(self.currentMouseLocation()),
                 requireCopyEvidence: false,
                 trigger: .keyboardShortcut
@@ -732,8 +698,7 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
                 policy: policy,
                 cursor: anchor,
                 mouseDownLocation: nil,
-                probeTask: probeTask,
-                modifierSatisfied: modifierSatisfied
+                probeTask: probeTask
             )
         }
     }
@@ -753,8 +718,7 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
         policy: AppPolicyContext,
         cursor: CGPoint,
         mouseDownLocation: CGPoint?,
-        probeTask: Task<Bool?, Never>?,
-        modifierSatisfied: Bool = true
+        probeTask: Task<Bool?, Never>?
     ) async {
         guard isSelectionSourceActive(app) else {
             recordRead(.init(status: Task.isCancelled ? .cancelled : .targetChanged, traceID: response.traceID))
@@ -803,10 +767,10 @@ internal final class MacSelectionMonitor: SelectionMonitoring {
         // while leaving the explicit hold gesture (delivered in `handleMouseDown`, which never
         // routes through here) and the ⌥⌘C hotkey independent. Monitoring still runs, so
         // `latestSelection` stays warm for the hotkey.
-        if !policy.hotkeyOnly, self.settingsStore.get(.isAppEnabled), modifierSatisfied {
+        if !policy.hotkeyOnly, self.settingsStore.get(.isAppEnabled) {
             self.onSelection?(context, canPaste)
         } else {
-            Log.selection.debug("[Trace#\(response.traceID ?? 0, privacy: .public)] presentation blocked hotkeyOnly=\(policy.hotkeyOnly, privacy: .public) enabled=\(self.settingsStore.get(.isAppEnabled), privacy: .public) modifierSatisfied=\(modifierSatisfied, privacy: .public)")
+            Log.selection.debug("[Trace#\(response.traceID ?? 0, privacy: .public)] presentation blocked hotkeyOnly=\(policy.hotkeyOnly, privacy: .public) enabled=\(self.settingsStore.get(.isAppEnabled), privacy: .public)")
         }
     }
 

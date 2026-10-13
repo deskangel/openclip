@@ -113,6 +113,11 @@ public class PopupWindowController {
     /// The floating toast surface for statuses and the paste→copy "Copied" notice. Independent of
     /// the popup panel: it shows whether the popup is up or has already hidden. Injected for tests.
     let toastController: ToastPanelController
+    private var captureToastPresentationID: UUID?
+    private var isCaptureToastCurrent: Bool {
+        guard let captureToastPresentationID else { return false }
+        return toastController.presentationID == captureToastPresentationID
+    }
 
     /// The standalone floating panel hosting group sub-actions and AI tool presets.
     public let subBarController: SubBarPanelController
@@ -179,6 +184,7 @@ public class PopupWindowController {
         self.subBarController.onDismiss = { [weak self] in
             self?.modeStore.isSubBarActive = false
             self?.modeStore.activeSubGroupID = nil
+            self?.updateToastPlacement()
         }
 
         // The sub-bar's own `NSTrackingArea` feeds hover when the event monitors can't see the
@@ -206,11 +212,11 @@ public class PopupWindowController {
         }
     }
 
-    public func show(for context: SelectionContext, pasteAvailable: Bool? = nil, initialMode: PopupMode = .actions) {
-        show(for: context, pasteAvailable: pasteAvailable, preservingSessionID: nil, streamingTask: nil, initialMode: initialMode)
+    public func show(for context: SelectionContext, pasteAvailable: Bool? = nil, initialMode: PopupMode = .actions, captureFeedback: StatusFeedback? = nil) {
+        show(for: context, pasteAvailable: pasteAvailable, preservingSessionID: nil, streamingTask: nil, initialMode: initialMode, captureFeedback: captureFeedback)
     }
 
-    func show(for context: SelectionContext, pasteAvailable: Bool?, preservingSessionID: UUID?, streamingTask: Task<Void, Never>?, initialMode: PopupMode = .actions) {
+    func show(for context: SelectionContext, pasteAvailable: Bool?, preservingSessionID: UUID?, streamingTask: Task<Void, Never>?, initialMode: PopupMode = .actions, captureFeedback: StatusFeedback? = nil) {
         presentationAttemptID = UUID()
         didAttemptSpaceRecovery = false
         let attemptID = presentationAttemptID
@@ -237,6 +243,8 @@ public class PopupWindowController {
             pasteTargetAvailable: PasteAvailability.effective(policy: context.appPolicy, probe: pasteAvailable)
         )
         currentContext = selectionContext
+        if isCaptureToastCurrent { toastController.hide() }
+        captureToastPresentationID = nil
         sessionShowTime = ProcessInfo.processInfo.systemUptime
         distanceDismissGraceUntil = context.source == .ocr
             ? sessionShowTime + PopupMetrics.ocrArrivalDismissalGrace
@@ -324,6 +332,7 @@ public class PopupWindowController {
         }
 
         let rootView = PopupView(
+            settingsStore: settingsStore,
             actions: activeActions,
             allActions: activeActions,
             context: actionContext,
@@ -354,6 +363,7 @@ public class PopupWindowController {
             onContentSizeChange: { [weak self] size in
                 self?.resizePanel(to: size)
                 self?.keepPanelOnScreen()
+                self?.updateToastPlacement()
             },
             onAIStateChange: { [weak self] active, _ in
                 self?.setAIProcessing(active, session: aiSession)
@@ -446,6 +456,11 @@ public class PopupWindowController {
         // placed at its size; its later changes (the list shrinking as a query narrows) must keep
         // the field at the top fixed, so it is not pinned.
         panel.pinBottomEdgeOnResize = initialMode == .search ? false : cardAbove
+        if context.source == .ocr, let captureFeedback {
+            toastController.show(captureFeedback, anchorFrame: panel.frame, placement: .nearCursor(context.cursorPosition))
+            captureToastPresentationID = toastController.presentationID
+            updateToastPlacement()
+        }
         if NSClassFromString("XCTestCase") == nil {
             panel.orderFront(nil)
         }
@@ -1155,6 +1170,7 @@ public class PopupWindowController {
             panel.setFrame(CGRect(x: panel.frame.minX, y: newOriginY,
                                   width: size.width, height: size.height), display: true)
         }
+        updateToastPlacement()
     }
 
     private func syncPanelAppearance(_ targetPanel: NSPanel) {
@@ -1201,9 +1217,11 @@ public class PopupWindowController {
         refiningPrevious = nil
         cardConversation = nil
 
-        if toastController.currentFeedback?.keepVisible == true || toastController.isLoading {
+        if toastController.currentFeedback?.keepVisible == true || toastController.isLoading
+            || isCaptureToastCurrent {
             toastController.hide()
         }
+        captureToastPresentationID = nil
         subBarController.hide()
         tooltipController.hide()
         currentActions = nil
@@ -1710,6 +1728,9 @@ public class PopupWindowController {
         let targetScreenFrame = convertHoverFrameToScreen(localFrame)
         guard !targetScreenFrame.isEmpty else { return }
         var avoidanceRects: [CGRect] = []
+        if toastController.isShowing, toastController.currentPlacement != .overlay {
+            avoidanceRects.append(toastController.panelFrame)
+        }
         if subBarController.isShowing {
             avoidanceRects.append(subBarController.panelFrame)
         }
@@ -1780,7 +1801,7 @@ public class PopupWindowController {
             mainBarScreenFrame: panel?.frame,
             isPinned: isPinned,
             searchResultsAbove: modeStore.searchResultsAbove,
-            mainBarAbove: mainBarAbove,
+            mainBarAbove: currentContext?.source == .ocr ? false : mainBarAbove,
             effectiveTheme: effectiveTheme,
             effectiveColorScheme: effectiveColorScheme,
             scale: scale,
@@ -1827,6 +1848,7 @@ public class PopupWindowController {
             onClickIntent: { [weak self] in self?.pendingClickIntent ?? .primary }
         )
         modeStore.subBarAbove = actuallyAbove
+        updateToastPlacement()
     }
 
     /// The frontmost app at the moment an in-place answer lands — pasting is only safe into the
@@ -2869,22 +2891,23 @@ public class PopupWindowController {
         }
     }
 
-    /// Surfaces a StatusFeedback as the floating toast (the single status renderer). When `point`
-    /// is provided, the toast centers over that point (e.g. mouse cursor); otherwise it attaches
-    /// to the popup panel's live (or last) frame.
-    public func showToast(_ feedback: StatusFeedback, at point: CGPoint? = nil) {
-        let anchor: NSRect?
-        if let point {
-            anchor = NSRect(origin: point, size: CGSize(width: 1, height: 1))
-        } else {
-            anchor = panel?.frame ?? lastPopupFrame
-        }
-        toastController.show(feedback, anchorFrame: anchor)
+    /// Feedback lives in its own window; the action panel never grows or shrinks for it.
+    func updateToastPlacement() {
+        guard toastController.isShowing, toastController.currentPlacement != .overlay, let panel else { return }
+        let avoidance = subBarController.isShowing ? [subBarController.panelFrame] : []
+        toastController.reposition(anchorFrame: panel.frame, avoidanceRects: avoidance)
     }
 
-    /// Surfaces a StatusFeedback as the floating toast (the single status renderer). The toast
-    /// is independent of the popup, so it shows whether the popup stays up or has already hidden;
-    /// it always attaches to the popup's live (or last) frame — never the pointer.
+    /// Shows feedback near an explicit point or the current cursor; popup/group frames are
+    /// avoidance rectangles, not the position of the toast.
+    public func showToast(_ feedback: StatusFeedback, at point: CGPoint? = nil) {
+        let avoidance = subBarController.isShowing ? [subBarController.panelFrame] : []
+        let placement = point.map { ToastPlacement.nearCursor($0) }
+        toastController.show(feedback, anchorFrame: panel?.frame ?? lastPopupFrame,
+                             placement: placement, avoidanceRects: avoidance)
+    }
+
+    /// Status feedback uses its own cursor-relative window even after the popup has hidden.
     private func presentToast(_ feedback: StatusFeedback) {
         showToast(feedback)
     }

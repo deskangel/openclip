@@ -156,36 +156,32 @@ public final class SubBarPanelController {
         let maxX = max(minX, screenBounds.maxX - panelWidth - PopupMetrics.popupPadding)
         let clampedX = max(minX, min(panelX, maxX))
 
-        // Vertical positioning: 6pt visual gap from the main bar's button
-        // Prefers opening in the same direction as the main bar (away from selected text),
-        // but flips if constrained by the screen boundaries.
-        let preferAbove = mainBarAbove ?? searchResultsAbove
-        let yAbove = parentButtonScreenFrame.maxY + 6 - shadowInset
-        let yBelow = parentButtonScreenFrame.minY - 6 + shadowInset - panelHeight
-        let padding = PopupMetrics.popupPadding
-
-        let panelY: CGFloat
-        if preferAbove {
-            if yAbove + panelHeight <= screenBounds.maxY - padding {
-                panelY = yAbove
-            } else if yBelow >= screenBounds.minY + padding {
-                panelY = yBelow
-            } else {
-                panelY = yAbove
-            }
-        } else {
-            if yBelow >= screenBounds.minY + padding {
-                panelY = yBelow
-            } else if yAbove + panelHeight <= screenBounds.maxY - padding {
-                panelY = yAbove
-            } else {
-                panelY = yBelow
-            }
-        }
-
-        panel.setFrame(NSRect(x: clampedX, y: panelY, width: panelWidth, height: panelHeight), display: true)
+        let placement = Self.verticalPlacement(
+            parentButtonFrame: parentButtonScreenFrame,
+            mainBarFrame: mainBarScreenFrame,
+            panelHeight: panelHeight,
+            preferAbove: mainBarAbove ?? searchResultsAbove,
+            screenBounds: screenBounds
+        )
+        panel.setFrame(NSRect(x: clampedX, y: placement.y, width: panelWidth, height: panelHeight), display: true)
         panel.orderFront(nil)
-        return panelY == yAbove
+        return placement.isAbove
+    }
+
+    /// Places the child row outside the parent surface, flipping when the preferred side cannot fit.
+    static func verticalPlacement(parentButtonFrame: CGRect, mainBarFrame: CGRect?,
+                                  panelHeight: CGFloat, preferAbove: Bool,
+                                  screenBounds: CGRect) -> (y: CGFloat, isAbove: Bool) {
+        let shadowInset = PopupMetrics.popupShadowInset
+        let contentTop = max(parentButtonFrame.maxY,
+                             mainBarFrame.map { $0.maxY - shadowInset } ?? parentButtonFrame.maxY)
+        let yAbove = contentTop + 6 - shadowInset
+        let yBelow = parentButtonFrame.minY - 6 + shadowInset - panelHeight
+        let padding = PopupMetrics.popupPadding
+        let fitsAbove = yAbove + panelHeight <= screenBounds.maxY - padding
+        let fitsBelow = yBelow >= screenBounds.minY + padding
+        let above = preferAbove ? (fitsAbove || !fitsBelow) : (!fitsBelow && fitsAbove)
+        return (above ? yAbove : yBelow, above)
     }
 
     /// Presents a sub-bar button's hover tooltip in the screen-space tooltip window, avoiding the

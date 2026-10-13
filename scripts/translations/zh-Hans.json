@@ -775,5 +775,12 @@
   "Decrease actions per page": "减少每页动作数",
   "Increase actions per page": "增加每页动作数",
   "View Update…": "查看更新…",
-  "Updates are disabled in development builds.": "开发版本中已禁用更新。"
+  "Updates are disabled in development builds.": "开发版本中已禁用更新。",
+  "Copy captured text automatically": "自动复制捕获的文本",
+  "Copy recognized text to the clipboard. The action popup still opens.": "将识别的文本复制到剪贴板。操作弹窗仍会打开。",
+  "Select a screen region to extract text.": "选择屏幕区域以提取文本。",
+  "Copy to Clipboard Automatically": "自动复制到剪贴板",
+  "The action popup still opens after capture.": "捕获后仍会打开操作弹窗。",
+  "Text copied": "文本已复制",
+  "Text captured": "文本已捕获"
 }

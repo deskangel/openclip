@@ -155,16 +155,24 @@ public final class DefaultActionResultHandler: ActionResultHandler, Sendable {
         }
     }
 
+    /// Capture can be superseded while waiting for the clipboard lease. Recheck before writing.
+    @discardableResult
+    func copyText(_ text: String, isCurrent: @MainActor () -> Bool = { true }) async throws -> Bool {
+        let session = try await OpenSelection.ClipboardCoordinator.shared.acquireSession(priority: .userAction, pasteboard: pasteboard)
+        defer { session.commitPermanent() }
+        try Task.checkCancellation()
+        guard isCurrent() else { return false }
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
+        return true
+    }
+
     /// The single side-effect body shared by `handle` (throws) and `handleWithoutDismissal`
     /// (swallows). Deliberately no dismissal step — hiding is decided by the presenter, never here.
     private func execute(_ result: ActionResult, in view: NSView?, targetApp: NSRunningApplication? = nil) async throws {
         switch result {
         case .copy(let text):
-            let clipboardSession = try await OpenSelection.ClipboardCoordinator.shared.acquireSession(priority: .userAction, pasteboard: self.pasteboard)
-            defer { clipboardSession.commitPermanent() }
-            let pasteboard = self.pasteboard
-            pasteboard.clearContents()
-            pasteboard.setString(text, forType: .string)
+            try await copyText(text)
 
         case .copyContent(let payload):
             let clipboardSession = try await OpenSelection.ClipboardCoordinator.shared.acquireSession(priority: .userAction, pasteboard: self.pasteboard)

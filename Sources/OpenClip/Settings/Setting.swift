@@ -46,8 +46,8 @@ final class SettingsObservation<T: Sendable>: ObservableObject {
 struct Setting<T: Sendable>: DynamicProperty {
     @StateObject private var observation: SettingsObservation<T>
 
-    init(_ key: SettingKey<T>) {
-        _observation = StateObject(wrappedValue: SettingsObservation(key: key))
+    init(_ key: SettingKey<T>, store: SettingsStore = DefaultSettingsStore.shared) {
+        _observation = StateObject(wrappedValue: SettingsObservation(key: key, store: store))
     }
 
     var wrappedValue: T {

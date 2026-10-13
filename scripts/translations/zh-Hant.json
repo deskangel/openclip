@@ -775,5 +775,12 @@
   "Decrease actions per page": "減少每頁動作數",
   "Increase actions per page": "增加每頁動作數",
   "View Update…": "查看更新…",
-  "Updates are disabled in development builds.": "開發版本中已停用更新。"
+  "Updates are disabled in development builds.": "開發版本中已停用更新。",
+  "Copy captured text automatically": "自動複製擷取的文字",
+  "Copy recognized text to the clipboard. The action popup still opens.": "將辨識的文字複製到剪貼簿。動作彈出視窗仍會開啟。",
+  "Select a screen region to extract text.": "選取螢幕區域以擷取文字。",
+  "Copy to Clipboard Automatically": "自動複製到剪貼簿",
+  "The action popup still opens after capture.": "擷取後仍會開啟動作彈出視窗。",
+  "Text copied": "文字已複製",
+  "Text captured": "文字已擷取"
 }

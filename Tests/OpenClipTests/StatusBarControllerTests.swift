@@ -206,7 +206,7 @@ final class StatusBarControllerTests: XCTestCase {
         XCTAssertTrue(RuleEngine.shared.resolvePolicies(for: "com.google.Chrome").disabled)
     }
 
-    func testAppearOnSelectionMenuItemTogglesState() {
+    func testAppearAutomaticallyMenuItemTogglesState() {
         let store = MemorySettingsStore()
         store.set(.isAppEnabled, value: true)
         let controller = StatusBarController(
@@ -218,56 +218,16 @@ final class StatusBarControllerTests: XCTestCase {
             return XCTFail("Expected toggleEnabledItem to be present")
         }
 
-        XCTAssertEqual(toggleItem.title, "Appear on Selection")
+        XCTAssertEqual(toggleItem.title, "Appear Automatically")
         XCTAssertEqual(toggleItem.state, .on)
 
         store.set(.isAppEnabled, value: false)
         controller.updateStatusItem(isEnabled: false)
         XCTAssertEqual(toggleItem.state, .off)
-    }
 
-    func testAppearOnSelectionSubmenuItemsAndSelection() {
-        let store = MemorySettingsStore()
-        store.set(.isAppEnabled, value: true)
-        store.set(.selectionModifier, value: SelectionModifier.none.rawValue)
-
-        let controller = StatusBarController(
-            settingsStore: store,
-            notificationCenter: NotificationCenter(),
-            rulesSaveURL: tempRulesURL
-        )
-
-        XCTAssertNotNil(controller.appearOnSelectionSubmenu)
-        XCTAssertEqual(controller.toggleEnabledItem?.submenu, controller.appearOnSelectionSubmenu)
-        XCTAssertEqual(controller.appearAlwaysItem?.state, .on)
-        XCTAssertEqual(controller.appearOptionItem?.state, .off)
-        XCTAssertEqual(controller.appearOffItem?.state, .off)
-        XCTAssertEqual(controller.toggleEnabledItem?.state, .on)
-
-        // Select Option mode
-        guard let optionItem = controller.appearOptionItem,
-              let action = optionItem.action else {
-            return XCTFail("Expected appearOptionItem with action")
-        }
-        controller.perform(action, with: optionItem)
-        XCTAssertEqual(store.get(.selectionModifier), SelectionModifier.option.rawValue)
+        controller.toggleEnabled()
         XCTAssertTrue(store.get(.isAppEnabled))
-        XCTAssertEqual(controller.appearOptionItem?.state, .on)
-        XCTAssertEqual(controller.appearAlwaysItem?.state, .off)
-        XCTAssertEqual(controller.appearOffItem?.state, .off)
-        XCTAssertEqual(controller.toggleEnabledItem?.state, .on)
-
-        // Select Off mode
-        guard let offItem = controller.appearOffItem,
-              let offAction = offItem.action else {
-            return XCTFail("Expected appearOffItem with action")
-        }
-        controller.perform(offAction, with: offItem)
-        XCTAssertFalse(store.get(.isAppEnabled))
-        XCTAssertEqual(controller.appearOffItem?.state, .on)
-        XCTAssertEqual(controller.appearOptionItem?.state, .off)
-        XCTAssertEqual(controller.appearAlwaysItem?.state, .off)
-        XCTAssertEqual(controller.toggleEnabledItem?.state, .off)
+        XCTAssertEqual(toggleItem.state, .on)
     }
 
     func testPauseAppItemIsNestedInsidePauseSubmenu() {

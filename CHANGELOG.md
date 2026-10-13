@@ -4,6 +4,26 @@ All notable user-facing changes to OpenClip.
 
 ---
 
+## v1.8.2 - 2026-10-12
+
+### Features & Improvements
+- **Removed modifier key triggers**: Reverted modifier key selection triggers to ensure 100% reliable popup appearance across all apps, restoring the direct "Appear Automatically" toggle.
+- **OCR auto-copy setting**: Added a "Copy to Clipboard Automatically" setting under **General ▸ Shortcuts** with cursor status feedback.
+- **Script action options in env**: Exposed custom script options to child processes via `OPENCLIP_OPTION_<NAME>`.
+- **Popup paging & UI polish**: Added fit-to-width paging and refined count stepper in glass theme.
+
+### Fixes & Stability
+- **Fixed JS extension memory leaks (#46, #47)**: Prevented the fetch bridge from retaining `JSContext` and per-run `URLSession` instances.
+- **Calculator bounds & safety (#50)**: Bounded recursion depth in `MathEvaluator` and safely rejected overflowing inputs.
+- **AI stream cancellation (#43)**: Correctly surfaced stream cancellations for Cloud and Local AI actions.
+- **AI key persistence (#42)**: Prevented recursion on API key save failures.
+- **Classic card shadow clipping**: Added rasterization padding to prevent shadow buffer clipping on promoted AppKit layers.
+- **Toast placement & Spaces**: Fixed status toasts to prefer placement above cursor and bars, and enabled them across fullscreen Spaces.
+- **Loading pill shadow**: Reserved insets to eliminate shadow clipping on cancellable loading pills.
+- **Update reminders**: Added reliable menu bar update badges and reminders.
+
+---
+
 ## v1.8.1 - 2026-10-09
 
 ### Features & Improvements

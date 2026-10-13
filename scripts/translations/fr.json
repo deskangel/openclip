@@ -775,5 +775,12 @@
   "Decrease actions per page": "Réduire le nombre d’actions par page",
   "Increase actions per page": "Augmenter le nombre d’actions par page",
   "View Update…": "Voir la mise à jour…",
-  "Updates are disabled in development builds.": "Les mises à jour sont désactivées dans les versions de développement."
+  "Updates are disabled in development builds.": "Les mises à jour sont désactivées dans les versions de développement.",
+  "Copy captured text automatically": "Copier automatiquement le texte capturé",
+  "Copy recognized text to the clipboard. The action popup still opens.": "Copier le texte reconnu dans le presse-papiers. La fenêtre d’actions s’ouvre toujours.",
+  "Select a screen region to extract text.": "Sélectionnez une zone de l’écran pour en extraire le texte.",
+  "Copy to Clipboard Automatically": "Copier automatiquement dans le presse-papiers",
+  "The action popup still opens after capture.": "La fenêtre d’actions s’ouvre toujours après la capture.",
+  "Text copied": "Texte copié",
+  "Text captured": "Texte capturé"
 }
